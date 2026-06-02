@@ -1,0 +1,14 @@
+# Copy to dev.tfvars (gitignored) and fill in. Most values are sensitive and
+# should be passed via TF_VAR_<name> env vars in CI rather than committed.
+#
+# Required vars NOT in this file (pass via env or -var):
+#   created_on              -> $(date -u +%F), injected per-apply
+#   image_tag               -> 'bootstrap' on first apply, then $TAG
+#   openai_api_key          -> export TF_VAR_openai_api_key="$(az keyvault secret show ...)"
+#   postgres_admin_password -> export TF_VAR_postgres_admin_password="$(openssl rand -base64 24)"
+
+env      = "dev"
+location = "canadacentral"
+project  = "dsxlineage"
+
+openai_model = "gpt-4o"

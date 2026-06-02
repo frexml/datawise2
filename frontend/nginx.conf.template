@@ -1,0 +1,39 @@
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript application/xml+rss text/javascript;
+    gzip_min_length 1024;
+
+    # Required because BACKEND_URL is a runtime variable — nginx must DNS-resolve it.
+    resolver 168.63.129.16 valid=30s;
+
+    location /api/ {
+        proxy_pass         ${BACKEND_URL}/api/;
+        proxy_http_version 1.1;
+
+        # Azure Container Apps ingress routes by Host header. We must send the
+        # BACKEND's hostname (proxy_host = upstream from proxy_pass), NOT $host
+        # (which would be the frontend's FQDN and route nowhere).
+        proxy_set_header   Host              $proxy_host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+
+        # Azure Container Apps multiplex TLS on SNI — must send it.
+        proxy_ssl_server_name on;
+        proxy_ssl_protocols   TLSv1.2 TLSv1.3;
+
+        proxy_read_timeout   300s;
+        proxy_send_timeout   300s;
+        client_max_body_size 100m;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

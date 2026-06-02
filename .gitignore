@@ -1,0 +1,87 @@
+# ─── Python ───────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+*.so
+
+# ─── Virtual environments ─────────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ─── Node ─────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ─── Frontend build output ────────────────────────────────────────────
+frontend/dist/
+frontend/.vite/
+
+# ─── IDE / OS ─────────────────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ─── Logs ─────────────────────────────────────────────────────────────
+*.log
+
+# ─── Secrets / env ────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+database-password.txt
+
+# ─── LLM / API caches ─────────────────────────────────────────────────
+.llm_cache/
+.cache/
+
+# ─── Data files (extensions) ──────────────────────────────────────────
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.dsx
+*.parquet
+*.feather
+*.pptx
+*.db
+*.sqlite
+*.sqlite3
+
+# ─── Data directories ─────────────────────────────────────────────────
+samples/
+end_to_end_linage/
+backend/uploads/
+backend/app.db
+
+# ─── Misc generated text data at repo root ────────────────────────────
+/cardinality_prompt.txt
+/test.json
+/test.csv
+/*_output.csv
+/*_output.xlsx
+
+# ─── Documentation files: ignore everything *.md except README.md ─────
+# CLAUDE.md is kept (project standards, not docs).
+*.md
+!README.md
+!**/README.md
+CLAUDE.md
