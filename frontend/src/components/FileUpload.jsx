@@ -26,7 +26,7 @@ const FileUpload = ({ onUploadSuccess }) => {
             });
             setMessage('File uploaded successfully! Processing started.');
             setFile(null);
-            if (onUploadSuccess) onUploadSuccess();
+            if (onUploadSuccess) onUploadSuccess(response.data);
         } catch (error) {
             console.error('Error uploading file:', error);
             setMessage('Error uploading file.');
@@ -36,14 +36,14 @@ const FileUpload = ({ onUploadSuccess }) => {
     };
 
     return (
-        <div className="bg-white shadow sm:rounded-lg p-6 mb-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Upload DSX File</h3>
+        <div className="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6">
+            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-gray-100 mb-4">Upload DSX File</h3>
             <div className="flex items-center space-x-4">
                 <input
                     type="file"
                     accept=".dsx"
                     onChange={handleFileChange}
-                    className="block w-full text-sm text-gray-500
+                    className="block w-full text-sm text-gray-500 dark:text-gray-400
             file:mr-4 file:py-2 file:px-4
             file:rounded-full file:border-0
             file:text-sm file:font-semibold
@@ -59,7 +59,7 @@ const FileUpload = ({ onUploadSuccess }) => {
                     {uploading ? 'Uploading...' : 'Upload'}
                 </button>
             </div>
-            {message && <p className="mt-2 text-sm text-gray-600">{message}</p>}
+            {message && <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{message}</p>}
         </div>
     );
 };

@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
 
+    NEO4J_URI: str = "bolt://neo4j:7687"
+    NEO4J_USER: str = "neo4j"
+    NEO4J_PASSWORD: str = "changeme-devpassword"
+    NEO4J_DATABASE: str = "neo4j"
+
     @model_validator(mode="after")
     def _assemble_database_url(self) -> "Settings":
         if not self.DATABASE_URL:

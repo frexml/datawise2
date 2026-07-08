@@ -92,3 +92,17 @@ variable "uploads_storage_account_key" {
 variable "uploads_share_name" {
   type = string
 }
+
+variable "neo4j_data_share_name" {
+  type = string
+}
+
+variable "neo4j_password_secret_uri" {
+  type = string
+}
+
+variable "neo4j_password" {
+  type        = string
+  sensitive   = true
+  description = "Plaintext Neo4j password — used only to build the neo4j container's own inline NEO4J_AUTH secret (composite 'neo4j/<password>' string, which Key Vault stores as the bare password only)."
+}

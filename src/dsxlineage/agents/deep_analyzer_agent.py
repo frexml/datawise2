@@ -415,43 +415,66 @@ Output Format:
         analyzed_links = list(link_results)
         analyzed_annotations = list(anno_results)
 
-        # Executive summary — single call, fed by the per-stage summaries we
-        # already extracted in parallel.
+        # Executive summaries — technical and business are two independent
+        # audiences/prompts (per DataWise's documented governance model: every
+        # job gets a precise technical summary AND a plain-language business
+        # summary, reviewed separately). Both are synthesis tasks over the
+        # per-stage one-liners already extracted above — mini model, run
+        # concurrently.
         bullets = []
         for s in stage_results:
             summary = s.get("_summary") or s.get("llm_explanation", "")[:200]
             bullets.append(f"- {s['name']} ({s['type']}): {summary}")
         bullets_text = "\n".join(bullets) or "(no stages analyzed)"
 
-        summary_prompt = f"""You are an expert DataStage Developer.
+        technical_prompt = f"""You are a senior data engineer reviewing an ETL job.
 
 Here is a summary of the job's stages:
 {bullets_text}
 
 Task:
-Write a high-level executive summary of what this entire job accomplishes.
-Keep it under 200 words.
+Write a precise technical executive summary of what this entire job does, using
+data engineering terminology. Do not infer business intent beyond what the
+stages show. Keep it under 200 words.
 
 Output:
-(Executive Summary)
+(Technical Executive Summary)
 """
-        # Executive summary stitches together per-stage one-liners we already
-        # produced. It's a synthesis task, not deep reasoning — mini is fine.
-        try:
-            final_resp = await self.llm_mini.ainvoke(
-                [HumanMessage(content=summary_prompt)],
-                max_tokens=_SUMMARY_MAX_TOKENS,
-            )
-            executive_summary = final_resp.content.strip()
-        except Exception as exc:  # noqa: BLE001
-            executive_summary = f"Error generating executive summary: {exc}"
+        business_prompt = f"""You are a business analyst translating an ETL job into plain language.
+
+Here is a summary of the job's stages:
+{bullets_text}
+
+Task:
+Write a plain-language business summary explaining what business question or
+process this job serves. Avoid technical jargon — a finance director should be
+able to read it. Keep it under 150 words.
+
+Output:
+(Business Summary)
+"""
+        executive_summary, business_summary = await asyncio.gather(
+            self._generate_summary(technical_prompt, "technical executive summary"),
+            self._generate_summary(business_prompt, "business summary"),
+        )
 
         return {
             "executive_summary": executive_summary,
+            "executive_summary_business": business_summary,
             "stages": analyzed_stages,
             "links": analyzed_links,
             "annotations": analyzed_annotations,
         }
+
+    async def _generate_summary(self, prompt: str, label: str) -> str:
+        try:
+            resp = await self.llm_mini.ainvoke(
+                [HumanMessage(content=prompt)],
+                max_tokens=_SUMMARY_MAX_TOKENS,
+            )
+            return resp.content.strip()
+        except Exception as exc:  # noqa: BLE001
+            return f"Error generating {label}: {exc}"
 
     # ------------------------------------------------------------------
     # Public entry point — preserves the sync signature workflow.py expects.

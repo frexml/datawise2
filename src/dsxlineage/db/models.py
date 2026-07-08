@@ -15,6 +15,8 @@ class Job(Base):
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String, index=True)
     status = Column(String, default="PENDING") # PENDING, PROCESSING, COMPLETED, FAILED
+    current_stage = Column(String)  # parsing, analyzing, mapping_lineage, generating_summaries,
+                                     # saving_results, detecting_inefficiencies, completed
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -24,6 +26,7 @@ class Job(Base):
     links = relationship("Link", back_populates="job", cascade="all, delete-orphan")
     annotations = relationship("Annotation", back_populates="job", cascade="all, delete-orphan")
     lineages = relationship("Lineage", back_populates="job", cascade="all, delete-orphan")
+    reviews = relationship("Review", back_populates="job", cascade="all, delete-orphan")
 
 class Result(Base):
     __tablename__ = "results"
@@ -32,7 +35,8 @@ class Result(Base):
     job_id = Column(Integer, ForeignKey("jobs.id"), index=True)
     raw_json = Column(JsonCol)  # The full parsed JSON
     analysis_summary = Column(JsonCol)  # The detailed analysis report
-    llm_explanation = Column(Text) # The AI generated explanation (Executive Summary)
+    llm_explanation = Column(Text) # The AI generated explanation (Executive Summary, technical)
+    business_summary = Column(Text)  # Plain-language business summary (see deep_analyzer_agent)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     job = relationship("Job", back_populates="results")
@@ -97,5 +101,26 @@ class Lineage(Base):
     transformation_type = Column(String)
     cardinality = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     job = relationship("Job", back_populates="lineages")
+
+class Review(Base):
+    """Human review/approval audit trail for LLM-generated summaries.
+
+    Decoupled from Job.status (PENDING/PROCESSING/COMPLETED/FAILED), which
+    tracks pipeline execution only — the frontend polls and branches on that
+    field and must not be affected by review state.
+    """
+    __tablename__ = "reviews"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(Integer, ForeignKey("jobs.id"), index=True)
+    target_type = Column(String)  # e.g. "executive_summary"
+    target_id = Column(Integer)  # id of the target row (e.g. Result.id)
+    status = Column(String, default="pending_review")  # pending_review, approved, rejected
+    reviewer = Column(String)
+    feedback = Column(Text)
+    reviewed_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    job = relationship("Job", back_populates="reviews")

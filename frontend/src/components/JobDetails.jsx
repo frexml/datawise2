@@ -78,6 +78,53 @@ const getLayoutedElements = (nodes, edges, direction = 'TB') => {
     return { nodes, edges };
 };
 
+const JobDetailsSkeleton = () => (
+    <div className="min-h-screen flex flex-col animate-pulse">
+        <div className="bg-white dark:bg-gray-800 shadow px-4 py-4 flex justify-between items-center">
+            <div className="h-5 w-64 bg-gray-200 rounded" />
+            <div className="h-5 w-20 bg-gray-200 rounded-full" />
+        </div>
+        <div className="p-6 space-y-4">
+            <div className="h-24 bg-gray-100 dark:bg-gray-700 rounded border dark:border-gray-700" />
+            <div className="h-40 bg-gray-100 dark:bg-gray-700 rounded border dark:border-gray-700" />
+            <div className="h-96 bg-gray-100 dark:bg-gray-700 rounded border dark:border-gray-700" />
+        </div>
+    </div>
+);
+
+const SummaryCard = ({ title, text, emptyText }) => {
+    const [copied, setCopied] = useState(false);
+
+    const copy = async () => {
+        try {
+            await navigator.clipboard.writeText(text || '');
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        } catch (err) {
+            console.error('Failed to copy:', err);
+        }
+    };
+
+    return (
+        <div>
+            <div className="flex items-center justify-between mb-1">
+                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">{title}</div>
+                {text && (
+                    <button
+                        onClick={copy}
+                        className="text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1"
+                    >
+                        {copied ? '✓ Copied' : '📋 Copy'}
+                    </button>
+                )}
+            </div>
+            <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 p-4 rounded border dark:border-gray-700 h-full">
+                {text ? <Markdown>{text}</Markdown> : <p className="italic text-gray-500 dark:text-gray-400">{emptyText}</p>}
+            </div>
+        </div>
+    );
+};
+
 const JobDetails = () => {
     const { jobId } = useParams();
     const [job, setJob] = useState(null);
@@ -110,11 +157,13 @@ const JobDetails = () => {
             setLoadingLineage(true);
             setLoadingStageLineage(true);
 
-            const [resultRes, lineageRes, stageLineageRes] =
+            const [resultRes, lineageRes, stageLineageRes, reviewsRes, inefficienciesRes] =
                 await Promise.allSettled([
                     axios.get(`/api/results/${jobId}`),
                     axios.get(`/api/jobs/${jobId}/lineage`),
                     axios.get(`/api/jobs/${jobId}/stage-lineage`),
+                    axios.get(`/api/jobs/${jobId}/reviews`),
+                    axios.get(`/api/jobs/${jobId}/inefficiencies`),
                 ]);
             if (cancelled) return;
 
@@ -126,6 +175,12 @@ const JobDetails = () => {
 
             if (stageLineageRes.status === 'fulfilled') setStageLineageData(stageLineageRes.value.data);
             else console.error('Failed to load stage lineage:', stageLineageRes.reason);
+
+            if (reviewsRes.status === 'fulfilled') setReviews(reviewsRes.value.data);
+            else console.error('Failed to load reviews:', reviewsRes.reason);
+
+            if (inefficienciesRes.status === 'fulfilled') setInefficiencies(inefficienciesRes.value.data);
+            else console.error('Failed to load inefficiencies:', inefficienciesRes.reason);
 
             setLoadingLineage(false);
             setLoadingStageLineage(false);
@@ -571,19 +626,34 @@ const JobDetails = () => {
     const [isExportingPdf, setIsExportingPdf] = useState(false);
     const flowRef = useRef(null);
 
-    // Collapsible sections state
+    // Job Overview stays a persistent collapsible header; everything else
+    // (Summary/Inefficiencies/Graph/Stage Lineage/E2E Lineage) is a tab —
+    // activeTab replaces the old per-section expand booleans.
     const [isOverviewExpanded, setIsOverviewExpanded] = useState(true);
-    const [isSummaryExpanded, setIsSummaryExpanded] = useState(true);
-    const [isLineageExpanded, setIsLineageExpanded] = useState(true);
+    const [activeTab, setActiveTab] = useState('summary');
     const [lineageData, setLineageData] = useState([]);
     const [loadingLineage, setLoadingLineage] = useState(false);
     const [lineageSearchTerm, setLineageSearchTerm] = useState('');
-    const [isStageLineageExpanded, setIsStageLineageExpanded] = useState(true);
     const [stageLineageData, setStageLineageData] = useState([]);
     const [loadingStageLineage, setLoadingStageLineage] = useState(false);
     const [stageLineageSearchTerm, setStageLineageSearchTerm] = useState('');
-    const [isGraphExpanded, setIsGraphExpanded] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
+
+    // Inefficiency detection findings (Neo4j-backed, best-effort)
+    const [inefficiencies, setInefficiencies] = useState([]);
+
+    // One-time guided walkthrough hint — dismissed permanently per browser
+    const [showWalkthrough, setShowWalkthrough] = useState(
+        () => localStorage.getItem('dw_walkthrough_dismissed') !== 'true'
+    );
+    const dismissWalkthrough = () => {
+        localStorage.setItem('dw_walkthrough_dismissed', 'true');
+        setShowWalkthrough(false);
+    };
+
+    // Human review/approval gate — decoupled from job.status. Read-only here;
+    // the Pending Reviews queue (/reviews) is where approve/reject happens.
+    const [reviews, setReviews] = useState([]);
 
     // Fit view when nodes are loaded
     useEffect(() => {
@@ -733,7 +803,7 @@ const JobDetails = () => {
         }
     };
 
-    if (loading) return <div className="text-center mt-10">Loading...</div>;
+    if (loading) return <JobDetailsSkeleton />;
     if (error) return <div className="text-center mt-10 text-red-600">{error}</div>;
     if (!job) return <div className="text-center mt-10">Job not found.</div>;
 
@@ -741,85 +811,165 @@ const JobDetails = () => {
     const stageCount = nodes.filter(n => !n.id.includes('P')).length;
     const linkCount = edges.filter(e => e.data && e.data.fullData).length;
 
+    const processingSeconds = job.updated_at && job.created_at
+        ? Math.max(0, Math.round((new Date(job.updated_at) - new Date(job.created_at)) / 1000))
+        : null;
+    const approvedCount = reviews.filter((r) => r.status === 'approved').length;
+
     return (
         <div className="min-h-screen flex flex-col">
-            <div className="bg-white shadow px-4 py-4 flex justify-between items-center z-10">
+            <div className="bg-white dark:bg-gray-800 shadow px-4 py-4 flex justify-between items-center z-10">
                 <div className="flex items-center">
-                    <Link to="/" className="text-indigo-600 hover:text-indigo-900 mr-4">← Back</Link>
-                    <h3 className="text-lg font-medium text-gray-900">{job.filename}</h3>
+                    <Link to="/" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 mr-4">← Back</Link>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">{job.filename}</h3>
                 </div>
-                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${job.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${job.status === 'COMPLETED' ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300' : 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300'
                     }`}>
                     {job.status}
                 </span>
             </div>
 
+            {job.status === 'COMPLETED' && showWalkthrough && (
+                <div className="bg-indigo-50 dark:bg-indigo-900/30 border-b border-indigo-100 dark:border-indigo-800 px-6 py-3 flex items-start justify-between gap-4">
+                    <div className="text-sm text-indigo-900 dark:text-indigo-200">
+                        <span className="font-semibold">🎬 New here?</span> Click any node in the graph
+                        below to see its technical explanation → read the summaries above → approve them
+                        in the Review panel → export the S2T register when you're done.
+                    </div>
+                    <button
+                        onClick={dismissWalkthrough}
+                        className="text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 text-sm shrink-0"
+                        title="Dismiss"
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
+
+            {job.status === 'COMPLETED' && (
+                <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 border-b border-orange-100 dark:border-orange-900 px-6 py-3">
+                    <div className="flex flex-wrap gap-x-8 gap-y-1 text-sm text-gray-700 dark:text-gray-300">
+                        {processingSeconds !== null && (
+                            <span>
+                                ⏱️ Analyzed in <strong>{processingSeconds}s</strong>
+                                <span className="text-gray-500 dark:text-gray-400"> — vs. days of manual reconstruction</span>
+                            </span>
+                        )}
+                        <span>
+                            🧠 <strong>{stageCount}</strong> stages documented (technical + business)
+                        </span>
+                        {inefficiencies.length > 0 && (
+                            <span>
+                                ⚡ <strong>{inefficiencies.length}</strong> inefficiencies flagged
+                            </span>
+                        )}
+                        {reviews.length > 0 && (
+                            <span>
+                                🛡️ <strong>{approvedCount}/{reviews.length}</strong> summaries reviewed
+                            </span>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* Job Overview */}
-            <div className="bg-gray-50 border-b shadow-sm">
+            <div className="bg-gray-50 dark:bg-gray-900/40 border-b dark:border-gray-700 shadow-sm">
                 <div
-                    className="px-6 py-3 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-6 py-3 flex justify-between items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                     onClick={() => setIsOverviewExpanded(!isOverviewExpanded)}
                 >
-                    <h2 className="text-lg font-bold text-gray-800 flex items-center">
+                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center">
                         <span className="mr-2">📋</span> Job Overview
                     </h2>
-                    <span className="text-gray-500 text-xl">
+                    <span className="text-gray-500 dark:text-gray-400 text-xl">
                         {isOverviewExpanded ? '▲' : '▼'}
                     </span>
                 </div>
 
                 {isOverviewExpanded && (
-                    <div className="px-6 py-4 border-t bg-white">
+                    <div className="px-6 py-4 border-t dark:border-gray-700 bg-white dark:bg-gray-800">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="p-3 bg-gray-50 rounded border">
-                                <div className="text-xs text-gray-500 uppercase font-semibold">Job Identifier</div>
-                                <div className="text-sm font-medium text-gray-900 truncate" title={job.raw_json?._metadata?.job_identifier || job.filename}>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded border dark:border-gray-700">
+                                <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Job Identifier</div>
+                                <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate" title={job.raw_json?._metadata?.job_identifier || job.filename}>
                                     {job.raw_json?._metadata?.job_identifier || job.filename}
                                 </div>
                             </div>
-                            <div className="p-3 bg-gray-50 rounded border">
-                                <div className="text-xs text-gray-500 uppercase font-semibold">Status</div>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded border dark:border-gray-700">
+                                <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Status</div>
                                 <div className={`text-sm font-medium ${job.status === 'COMPLETED' ? 'text-green-600' : 'text-yellow-600'}`}>
                                     {job.status}
                                 </div>
                             </div>
-                            <div className="p-3 bg-gray-50 rounded border">
-                                <div className="text-xs text-gray-500 uppercase font-semibold">Modified On</div>
-                                <div className="text-sm font-medium text-gray-900">
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded border dark:border-gray-700">
+                                <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Modified On</div>
+                                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                                     {job.raw_json?._metadata?.date_modified ?
                                         `${job.raw_json._metadata.date_modified} ${job.raw_json._metadata.time_modified || ''}` :
                                         '-'}
                                 </div>
                             </div>
-                            <div className="p-3 bg-gray-50 rounded border">
-                                <div className="text-xs text-gray-500 uppercase font-semibold">Exported On</div>
-                                <div className="text-sm font-medium text-gray-900">
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded border dark:border-gray-700">
+                                <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Exported On</div>
+                                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                                     {job.raw_json?._metadata?.export_date ?
                                         `${job.raw_json._metadata.export_date} ${job.raw_json._metadata.export_time || ''}` :
                                         '-'}
                                 </div>
                             </div>
-                            <div className="p-3 bg-gray-50 rounded border">
-                                <div className="text-xs text-gray-500 uppercase font-semibold">Server</div>
-                                <div className="text-sm font-medium text-gray-900 truncate" title={job.raw_json?._metadata?.server_name}>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded border dark:border-gray-700">
+                                <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Server</div>
+                                <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate" title={job.raw_json?._metadata?.server_name}>
                                     {job.raw_json?._metadata?.server_name || '-'}
                                 </div>
                             </div>
-                            <div className="p-3 bg-gray-50 rounded border">
-                                <div className="text-xs text-gray-500 uppercase font-semibold">Tool Version</div>
-                                <div className="text-sm font-medium text-gray-900">
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded border dark:border-gray-700">
+                                <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Tool Version</div>
+                                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                                     {job.raw_json?._metadata?.tool_version || '-'}
                                 </div>
                             </div>
-                            <div className="p-3 bg-gray-50 rounded border">
-                                <div className="text-xs text-gray-500 uppercase font-semibold">Components</div>
-                                <div className="text-sm font-medium text-gray-900">
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded border dark:border-gray-700">
+                                <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Components</div>
+                                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                                     {stageCount} Stages, {linkCount} Links
                                 </div>
                             </div>
+                            {reviews.length > 0 && (
+                                <div className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded border dark:border-gray-700">
+                                    <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Review Status</div>
+                                    {reviews.map((review) => (
+                                        <div key={review.id} className="text-sm font-medium flex items-center gap-2 flex-wrap">
+                                            <span
+                                                className={
+                                                    'inline-block px-2 py-0.5 rounded text-xs font-semibold ' +
+                                                    (review.status === 'approved'
+                                                        ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300'
+                                                        : review.status === 'rejected'
+                                                        ? 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300'
+                                                        : 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300')
+                                                }
+                                            >
+                                                {review.status}
+                                            </span>
+                                            {review.status === 'pending_review' ? (
+                                                <Link to="/reviews" className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+                                                    Review now →
+                                                </Link>
+                                            ) : (
+                                                review.reviewer && (
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                        by {review.reviewer}
+                                                    </span>
+                                                )
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         {!job.raw_json?._metadata?.job_identifier && (
-                            <div className="mt-2 text-xs text-gray-500 italic">
+                            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
                                 * Detailed metadata not available. Please re-upload the file to extract header information.
                             </div>
                         )}
@@ -827,71 +977,121 @@ const JobDetails = () => {
                 )}
             </div>
 
-            {/* Executive Summary */}
-            {result && (
-                <div className="bg-gray-50 border-b shadow-sm">
-                    <div
-                        className="px-6 py-3 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors"
-                        onClick={() => setIsSummaryExpanded(!isSummaryExpanded)}
+            {/* Tab bar */}
+            <div className="bg-gray-100 dark:bg-gray-700 border-b dark:border-gray-700 px-6 flex gap-1 overflow-x-auto shadow-sm">
+                {[
+                    { key: 'summary', label: 'Summary', icon: '📊' },
+                    { key: 'inefficiencies', label: 'Inefficiency Findings', icon: '⚡', count: inefficiencies.length },
+                    { key: 'graph', label: 'Lineage Graph', icon: '🕸️' },
+                    { key: 'stageLineage', label: 'Stage Lineage', icon: '🔀' },
+                    { key: 'e2eLineage', label: 'End-to-End Lineage', icon: '🔗' },
+                ].map((tab) => (
+                    <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className={
+                            'px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors flex items-center gap-1.5 ' +
+                            (activeTab === tab.key
+                                ? 'border-orange-600 text-orange-700 dark:text-orange-400'
+                                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200')
+                        }
                     >
-                        <h2 className="text-lg font-bold text-gray-800 flex items-center">
-                            <span className="mr-2">📊</span> Executive Summary
-                        </h2>
-                        <span className="text-gray-500 text-xl">
-                            {isSummaryExpanded ? '▲' : '▼'}
-                        </span>
-                    </div>
+                        <span>{tab.icon}</span> {tab.label}
+                        {!!tab.count && (
+                            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-gray-200 dark:bg-gray-600 text-xs">{tab.count}</span>
+                        )}
+                    </button>
+                ))}
+            </div>
 
-                    {isSummaryExpanded && (
-                        <div className="px-6 py-4 border-t">
-                            <div className="prose prose-sm max-w-none text-gray-700 bg-white p-4 rounded border">
-                                {result.llm_explanation ? (
-                                    <Markdown>{result.llm_explanation}</Markdown>
-                                ) : (
-                                    <p className="italic text-gray-500">
-                                        Summary not available for this job. Please re-upload the file to generate a new analysis.
-                                    </p>
-                                )}
+            {/* Summary tab */}
+            {activeTab === 'summary' && result && (
+                <div className="bg-gray-50 dark:bg-gray-900/40 border-b dark:border-gray-700 shadow-sm px-6 py-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <SummaryCard
+                            title="Technical"
+                            text={result.llm_explanation}
+                            emptyText="Summary not available for this job. Please re-upload the file to generate a new analysis."
+                        />
+                        <SummaryCard title="Business" text={result.business_summary} emptyText="Business summary not available." />
+                    </div>
+                </div>
+            )}
+
+            {/* Inefficiency Findings tab */}
+            {activeTab === 'inefficiencies' && (
+                <div className="bg-gray-50 dark:bg-gray-900/40 border-b dark:border-gray-700 shadow-sm px-6 py-4">
+                    {inefficiencies.length === 0 ? (
+                        <p className="text-gray-500 dark:text-gray-400 italic">No inefficiencies flagged for this job.</p>
+                    ) : (
+                    <div className="space-y-2">
+                        {inefficiencies.map((finding, idx) => (
+                            <div
+                                key={idx}
+                                className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded p-3 flex items-start gap-3"
+                            >
+                                <span
+                                    className={
+                                        'inline-block px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap ' +
+                                        (finding.severity === 'critical' || finding.severity === 'high'
+                                            ? 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300'
+                                            : finding.severity === 'medium'
+                                            ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300'
+                                            : 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300')
+                                    }
+                                >
+                                    {finding.severity}
+                                </span>
+                                <div>
+                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+                                        {finding.pattern_type.replace(/_/g, ' ')}
+                                    </div>
+                                    <div className="text-sm text-gray-700 dark:text-gray-300">{finding.description}</div>
+                                </div>
                             </div>
-                        </div>
+                        ))}
+                    </div>
                     )}
                 </div>
             )}
 
-            {/* Graph Section Header */}
-            <div className="bg-gray-100 border-b px-6 py-2 flex justify-between items-center shadow-sm">
-                <div
-                    className="flex items-center cursor-pointer"
-                    onClick={() => setIsGraphExpanded(!isGraphExpanded)}
-                >
-                    <h2 className="text-md font-bold text-gray-700 mr-2">🕸️ Lineage Graph</h2>
-                    <span className="text-gray-500 text-sm">
-                        {isGraphExpanded ? '▲' : '▼'}
-                    </span>
+            {/* Lineage Graph tab */}
+            {activeTab === 'graph' && (
+            <>
+            <div className="bg-gray-100 dark:bg-gray-700 border-b dark:border-gray-700 px-6 py-2 flex justify-between items-center shadow-sm">
+                <div className="flex items-center">
+                    <h2 className="text-md font-bold text-gray-700 dark:text-gray-300 mr-2">🕸️ Lineage Graph</h2>
                 </div>
-                {isGraphExpanded && (
-                    <div className="flex gap-2">
-                        <button
-                            onClick={downloadAsPdf}
-                            disabled={isExportingPdf}
-                            className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                        >
-                            {isExportingPdf ? '⏳ Exporting...' : '📥 Download PDF'}
-                        </button>
-                        <button
-                            onClick={() => setIsFullscreen(!isFullscreen)}
-                            className="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 transition-colors"
-                        >
-                            {isFullscreen ? '⊗ Exit Fullscreen' : '⛶ Fullscreen'}
-                        </button>
-                    </div>
-                )}
+                <div className="flex gap-2">
+                    <button
+                        onClick={downloadAsPdf}
+                        disabled={isExportingPdf}
+                        className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                        {isExportingPdf ? '⏳ Exporting...' : '📥 Download PDF'}
+                    </button>
+                    <a
+                        href={`/api/jobs/${jobId}/export/s2t`}
+                        className="px-3 py-1 bg-emerald-700 text-white text-sm rounded hover:bg-emerald-800 transition-colors inline-flex items-center"
+                    >
+                        📊 Export S2T (Excel)
+                    </a>
+                    <button
+                        onClick={() => setIsFullscreen(!isFullscreen)}
+                        className="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 transition-colors"
+                    >
+                        {isFullscreen ? '⊗ Exit Fullscreen' : '⛶ Fullscreen'}
+                    </button>
+                </div>
             </div>
 
-            {isGraphExpanded && (
-                <div className={isFullscreen ? "fixed inset-0 z-50 flex overflow-hidden bg-white" : "h-[900px] flex overflow-hidden"}>
+                <div className={isFullscreen ? "fixed inset-0 z-50 flex overflow-hidden bg-white dark:bg-gray-800" : "h-[900px] flex overflow-hidden"}>
                     {/* Graph Area */}
-                    <div ref={flowRef} className="flex-1 relative bg-gray-50">
+                    <div
+                        ref={flowRef}
+                        className={`flex-1 relative bg-gray-50 dark:bg-gray-900/40 transition-opacity duration-700 ${nodes.length > 0 ? 'opacity-100' : 'opacity-0'
+                            }`}
+                    >
                         {isFullscreen && (
                             <button
                                 onClick={() => setIsFullscreen(false)}
@@ -919,11 +1119,11 @@ const JobDetails = () => {
                             <Background />
                             <Controls showZoom showFitView showInteractive />
                             <MiniMap zoomable pannable />
-                            <div className="absolute bottom-4 left-4 bg-white p-2 border rounded shadow text-xs z-10 max-h-64 overflow-y-auto">
+                            <div className="absolute bottom-4 left-4 bg-white dark:bg-gray-800 p-2 border dark:border-gray-700 rounded shadow text-xs z-10 max-h-64 overflow-y-auto">
                                 <h4 className="font-bold mb-2">Legend</h4>
                                 <div className="flex items-center mb-1">
                                     <span
-                                        className="w-3 h-3 inline-block mr-2 border border-gray-400 flex-shrink-0 rounded-full"
+                                        className="w-3 h-3 inline-block mr-2 border dark:border-gray-700 border-gray-400 flex-shrink-0 rounded-full"
                                         style={{ backgroundColor: '#FFC0CB' }}
                                     ></span>
                                     <span className="truncate" title="Link">Link</span>
@@ -931,7 +1131,7 @@ const JobDetails = () => {
                                 {Object.entries(stageTypes).map(([type, color]) => (
                                     <div key={type} className="flex items-center mb-1">
                                         <span
-                                            className="w-3 h-3 inline-block mr-2 border border-gray-400 flex-shrink-0"
+                                            className="w-3 h-3 inline-block mr-2 border dark:border-gray-700 border-gray-400 flex-shrink-0"
                                             style={{ backgroundColor: color }}
                                         ></span>
                                         <span className="truncate" title={type}>{type}</span>
@@ -959,27 +1159,27 @@ const JobDetails = () => {
 
                     {/* Side Panel */}
                     {selectedNode && (
-                        <div className="w-1/2 bg-white shadow-xl border-l overflow-y-auto p-6 transition-all duration-300 ease-in-out">
+                        <div className="w-1/2 bg-white dark:bg-gray-800 shadow-xl border-l overflow-y-auto p-6 transition-all duration-300 ease-in-out">
                             <div className="flex justify-between items-start mb-4">
-                                <h2 className="text-xl font-bold text-gray-900">{selectedNode.name || selectedNode.pin_id}</h2>
-                                <button onClick={() => { setSelectedNode(null); setSelectedNodeExplanation(null); }} className="text-gray-400 hover:text-gray-600">
+                                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{selectedNode.name || selectedNode.pin_id}</h2>
+                                <button onClick={() => { setSelectedNode(null); setSelectedNodeExplanation(null); }} className="text-gray-400 dark:text-gray-500 hover:text-gray-600">
                                     ✕
                                 </button>
                             </div>
 
                             <div className="mb-4">
-                                <span className="px-2 py-1 text-xs font-semibold rounded-full border" style={{ backgroundColor: selectedNode.type ? getNodeColor(selectedNode.type) : '#e0e0e0' }}>
+                                <span className="px-2 py-1 text-xs font-semibold rounded-full border dark:border-gray-700" style={{ backgroundColor: selectedNode.type ? getNodeColor(selectedNode.type) : '#e0e0e0' }}>
                                     {selectedNode.type || (selectedNode.pin_id ? 'Pin' : 'Link')}
                                 </span>
                                 {selectedNode.source_stage && selectedNode.target_stage && (
-                                    <div className="mt-2 text-sm text-gray-600">
+                                    <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">
                                         <span className="font-medium">{selectedNode.source_stage}</span>
                                         <span className="mx-2">→</span>
                                         <span className="font-medium">{selectedNode.target_stage}</span>
                                     </div>
                                 )}
                                 {selectedNode.pin_id && (
-                                    <div className="mt-2 text-sm text-gray-600">
+                                    <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">
                                         <div><strong>Stage:</strong> {selectedNode.stage?.name}</div>
                                         <div><strong>ID:</strong> {selectedNode.pin_id}</div>
                                     </div>
@@ -989,18 +1189,18 @@ const JobDetails = () => {
                             {loadingExplanation ? (
                                 <div className="text-center py-4">
                                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                                    <p className="mt-2 text-sm text-gray-500">Loading analysis...</p>
+                                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading analysis...</p>
                                 </div>
                             ) : selectedNodeExplanation ? (
                                 <div className="prose prose-sm max-w-none">
                                     <Markdown>{selectedNodeExplanation}</Markdown>
                                 </div>
                             ) : (
-                                <p className="text-gray-500 italic">No analysis available.</p>
+                                <p className="text-gray-500 dark:text-gray-400 italic">No analysis available.</p>
                             )}
 
                             <div className="mt-8">
-                                <h4 className="text-sm font-bold text-gray-700 mb-2">Properties</h4>
+                                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Properties</h4>
                                 <ReactJson
                                     src={selectedNode.properties || selectedNode}
                                     collapsed={1}
@@ -1012,23 +1212,17 @@ const JobDetails = () => {
                         </div>
                     )}
                 </div>
+            </>
             )}
 
-            {/* Stage Lineage */}
-            <div className="bg-gray-50 border-b shadow-sm">
+            {/* Stage Lineage tab */}
+            {activeTab === 'stageLineage' && (
+            <div className="bg-gray-50 dark:bg-gray-900/40 border-b dark:border-gray-700 shadow-sm">
                 <div className="px-6 py-3 flex justify-between items-center">
-                    <div
-                        className="flex items-center cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => setIsStageLineageExpanded(!isStageLineageExpanded)}
-                    >
-                        <h2 className="text-lg font-bold text-gray-800 flex items-center">
-                            <span className="mr-2">🔀</span> Stage Lineage
-                        </h2>
-                        <span className="text-gray-500 text-xl ml-2">
-                            {isStageLineageExpanded ? '▲' : '▼'}
-                        </span>
-                    </div>
-                    {isStageLineageExpanded && stageLineageData.length > 0 && (
+                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center">
+                        <span className="mr-2">🔀</span> Stage Lineage
+                    </h2>
+                    {stageLineageData.length > 0 && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -1052,21 +1246,20 @@ const JobDetails = () => {
                     )}
                 </div>
 
-                {isStageLineageExpanded && (
-                    <div className="px-6 py-4 border-t bg-white">
+                    <div className="px-6 py-4 border-t dark:border-gray-700 bg-white dark:bg-gray-800">
                         <div className="mb-4">
                             <input
                                 type="text"
                                 placeholder="Search stage lineage..."
                                 value={stageLineageSearchTerm}
                                 onChange={(e) => setStageLineageSearchTerm(e.target.value)}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                className="w-full px-4 py-2 border dark:border-gray-700 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             />
                         </div>
                         {loadingStageLineage ? (
                             <div className="text-center py-8">
                                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                                <p className="mt-2 text-sm text-gray-500">Loading stage lineage...</p>
+                                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading stage lineage...</p>
                             </div>
                         ) : stageLineageData.filter(row => 
                             !stageLineageSearchTerm || 
@@ -1075,32 +1268,32 @@ const JobDetails = () => {
                             )
                         ).length === 0 ? (
                             stageLineageData.length === 0 ? (
-                                <p className="text-gray-500 italic">No stage lineage data available.</p>
+                                <p className="text-gray-500 dark:text-gray-400 italic">No stage lineage data available.</p>
                             ) : (
-                                <p className="text-gray-500 italic">No results found for "{stageLineageSearchTerm}".</p>
+                                <p className="text-gray-500 dark:text-gray-400 italic">No results found for "{stageLineageSearchTerm}".</p>
                             )
                         ) : (
                             <div className="overflow-x-auto overflow-y-auto max-h-96">
-                                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                                    <thead className="bg-gray-50 sticky top-0">
+                                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+                                    <thead className="bg-gray-50 dark:bg-gray-900/40 sticky top-0">
                                         <tr>
                                             {stageLineageData.length > 0 && Object.keys(stageLineageData[0]).map(header => (
-                                                <th key={header} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" style={{minWidth: '150px'}}>
+                                                <th key={header} className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase" style={{minWidth: '150px'}}>
                                                     {header.replace(/_/g, ' ')}
                                                 </th>
                                             ))}
                                         </tr>
                                     </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
+                                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                         {stageLineageData.filter(row => 
                                             !stageLineageSearchTerm || 
                                             Object.values(row).some(val => 
                                                 String(val).toLowerCase().includes(stageLineageSearchTerm.toLowerCase())
                                             )
                                         ).map((row, idx) => (
-                                            <tr key={idx} className="hover:bg-gray-50">
+                                            <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                                 {Object.values(row).map((val, i) => (
-                                                    <td key={i} className="px-3 py-2 text-gray-900 relative group">
+                                                    <td key={i} className="px-3 py-2 text-gray-900 dark:text-gray-100 relative group">
                                                         <div className="max-w-xs truncate">{val}</div>
                                                         <div className="hidden group-hover:block absolute z-50 bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg whitespace-normal max-w-md left-0 top-full mt-1">{val}</div>
                                                     </td>
@@ -1112,24 +1305,17 @@ const JobDetails = () => {
                             </div>
                         )}
                     </div>
-                )}
             </div>
+            )}
 
-            {/* End-to-End Lineage */}
-            <div className="bg-gray-50 border-b shadow-sm">
+            {/* End-to-End Lineage tab */}
+            {activeTab === 'e2eLineage' && (
+            <div className="bg-gray-50 dark:bg-gray-900/40 border-b dark:border-gray-700 shadow-sm">
                 <div className="px-6 py-3 flex justify-between items-center">
-                    <div
-                        className="flex items-center cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => setIsLineageExpanded(!isLineageExpanded)}
-                    >
-                        <h2 className="text-lg font-bold text-gray-800 flex items-center">
-                            <span className="mr-2">🔗</span> End-to-End Lineage
-                        </h2>
-                        <span className="text-gray-500 text-xl ml-2">
-                            {isLineageExpanded ? '▲' : '▼'}
-                        </span>
-                    </div>
-                    {isLineageExpanded && lineageData.length > 0 && (
+                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center">
+                        <span className="mr-2">🔗</span> End-to-End Lineage
+                    </h2>
+                    {lineageData.length > 0 && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -1166,21 +1352,20 @@ const JobDetails = () => {
                     )}
                 </div>
 
-                {isLineageExpanded && (
-                    <div className="px-6 py-4 border-t bg-white">
+                    <div className="px-6 py-4 border-t dark:border-gray-700 bg-white dark:bg-gray-800">
                         <div className="mb-4">
                             <input
                                 type="text"
                                 placeholder="Search lineage (table, field, path, transformation...)..."
                                 value={lineageSearchTerm}
                                 onChange={(e) => setLineageSearchTerm(e.target.value)}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                className="w-full px-4 py-2 border dark:border-gray-700 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             />
                         </div>
                         {loadingLineage ? (
                             <div className="text-center py-8">
                                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                                <p className="mt-2 text-sm text-gray-500">Analyzing lineage...</p>
+                                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Analyzing lineage...</p>
                             </div>
                         ) : lineageData.filter(row => 
                             !lineageSearchTerm || 
@@ -1189,79 +1374,79 @@ const JobDetails = () => {
                             )
                         ).length === 0 ? (
                             lineageData.length === 0 ? (
-                                <p className="text-gray-500 italic">No lineage data available.</p>
+                                <p className="text-gray-500 dark:text-gray-400 italic">No lineage data available.</p>
                             ) : (
-                                <p className="text-gray-500 italic">No results found for "{lineageSearchTerm}".</p>
+                                <p className="text-gray-500 dark:text-gray-400 italic">No results found for "{lineageSearchTerm}".</p>
                             )
                         ) : (
                             <div className="overflow-x-auto overflow-y-auto max-h-96">
-                                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                                    <thead className="bg-gray-50 sticky top-0">
+                                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+                                    <thead className="bg-gray-50 dark:bg-gray-900/40 sticky top-0">
                                         <tr>
-                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase resize-x overflow-auto" style={{minWidth: '150px'}}>Target Table</th>
-                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase resize-x overflow-auto" style={{minWidth: '150px'}}>Target Field</th>
-                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase resize-x overflow-auto" style={{minWidth: '150px'}}>Source Table</th>
-                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase resize-x overflow-auto" style={{minWidth: '150px'}}>Source Field</th>
-                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase resize-x overflow-auto" style={{minWidth: '120px'}}>Source Link</th>
-                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase resize-x overflow-auto" style={{minWidth: '120px'}}>Target Link</th>
-                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase resize-x overflow-auto" style={{minWidth: '200px'}}>Full Path</th>
-                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" style={{minWidth: '80px'}}>Total Hops</th>
-                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase resize-x overflow-auto" style={{minWidth: '200px'}}>Transformation Logic</th>
-                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase resize-x overflow-auto" style={{minWidth: '150px'}}>Transformation Explanation</th>
-                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase resize-x overflow-auto" style={{minWidth: '120px'}}>Transformation Type</th>
-                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" style={{minWidth: '100px'}}>Cardinality</th>
+                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase resize-x overflow-auto" style={{minWidth: '150px'}}>Target Table</th>
+                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase resize-x overflow-auto" style={{minWidth: '150px'}}>Target Field</th>
+                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase resize-x overflow-auto" style={{minWidth: '150px'}}>Source Table</th>
+                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase resize-x overflow-auto" style={{minWidth: '150px'}}>Source Field</th>
+                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase resize-x overflow-auto" style={{minWidth: '120px'}}>Source Link</th>
+                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase resize-x overflow-auto" style={{minWidth: '120px'}}>Target Link</th>
+                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase resize-x overflow-auto" style={{minWidth: '200px'}}>Full Path</th>
+                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase" style={{minWidth: '80px'}}>Total Hops</th>
+                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase resize-x overflow-auto" style={{minWidth: '200px'}}>Transformation Logic</th>
+                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase resize-x overflow-auto" style={{minWidth: '150px'}}>Transformation Explanation</th>
+                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase resize-x overflow-auto" style={{minWidth: '120px'}}>Transformation Type</th>
+                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase" style={{minWidth: '100px'}}>Cardinality</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
+                                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                         {lineageData.filter(row => 
                                             !lineageSearchTerm || 
                                             Object.values(row).some(val => 
                                                 String(val).toLowerCase().includes(lineageSearchTerm.toLowerCase())
                                             )
                                         ).map((row, idx) => (
-                                            <tr key={idx} className="hover:bg-gray-50">
-                                                <td className="px-3 py-2 text-gray-900 relative group">
+                                            <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                                <td className="px-3 py-2 text-gray-900 dark:text-gray-100 relative group">
                                                     <div className="max-w-xs truncate">{row.target_table}</div>
                                                     <div className="hidden group-hover:block absolute z-50 bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg whitespace-normal max-w-md left-0 top-full mt-1">{row.target_table}</div>
                                                 </td>
-                                                <td className="px-3 py-2 text-gray-900 relative group">
+                                                <td className="px-3 py-2 text-gray-900 dark:text-gray-100 relative group">
                                                     <div className="max-w-xs truncate">{row.target_field}</div>
                                                     <div className="hidden group-hover:block absolute z-50 bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg whitespace-normal max-w-md left-0 top-full mt-1">{row.target_field}</div>
                                                 </td>
-                                                <td className="px-3 py-2 text-gray-900 relative group">
+                                                <td className="px-3 py-2 text-gray-900 dark:text-gray-100 relative group">
                                                     <div className="max-w-xs truncate">{row.source_table}</div>
                                                     <div className="hidden group-hover:block absolute z-50 bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg whitespace-normal max-w-md left-0 top-full mt-1">{row.source_table}</div>
                                                 </td>
-                                                <td className="px-3 py-2 text-gray-900 relative group">
+                                                <td className="px-3 py-2 text-gray-900 dark:text-gray-100 relative group">
                                                     <div className="max-w-xs truncate">{row.source_field}</div>
                                                     <div className="hidden group-hover:block absolute z-50 bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg whitespace-normal max-w-md left-0 top-full mt-1">{row.source_field}</div>
                                                 </td>
-                                                <td className="px-3 py-2 text-gray-600 relative group">
+                                                <td className="px-3 py-2 text-gray-600 dark:text-gray-300 relative group">
                                                     <div className="max-w-xs truncate">{row.source_link}</div>
                                                     <div className="hidden group-hover:block absolute z-50 bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg whitespace-normal max-w-md left-0 top-full mt-1">{row.source_link}</div>
                                                 </td>
-                                                <td className="px-3 py-2 text-gray-600 relative group">
+                                                <td className="px-3 py-2 text-gray-600 dark:text-gray-300 relative group">
                                                     <div className="max-w-xs truncate">{row.target_link}</div>
                                                     <div className="hidden group-hover:block absolute z-50 bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg whitespace-normal max-w-md left-0 top-full mt-1">{row.target_link}</div>
                                                 </td>
-                                                <td className="px-3 py-2 text-gray-600 relative group">
+                                                <td className="px-3 py-2 text-gray-600 dark:text-gray-300 relative group">
                                                     <div className="max-w-xs truncate">{row.full_path}</div>
                                                     <div className="hidden group-hover:block absolute z-50 bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg whitespace-normal max-w-md left-0 top-full mt-1">{row.full_path}</div>
                                                 </td>
-                                                <td className="px-3 py-2 text-center text-gray-900">{row.total_hops}</td>
-                                                <td className="px-3 py-2 text-gray-600 relative group">
+                                                <td className="px-3 py-2 text-center text-gray-900 dark:text-gray-100">{row.total_hops}</td>
+                                                <td className="px-3 py-2 text-gray-600 dark:text-gray-300 relative group">
                                                     <div className="max-w-xs truncate">{row.transformation_logic}</div>
                                                     <div className="hidden group-hover:block absolute z-50 bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg whitespace-normal max-w-md left-0 top-full mt-1">{row.transformation_logic}</div>
                                                 </td>
-                                                <td className="px-3 py-2 text-gray-600 relative group">
+                                                <td className="px-3 py-2 text-gray-600 dark:text-gray-300 relative group">
                                                     <div className="max-w-xs truncate">{row.transformation_explanation}</div>
                                                     <div className="hidden group-hover:block absolute z-50 bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg whitespace-normal max-w-md left-0 top-full mt-1">{row.transformation_explanation}</div>
                                                 </td>
-                                                <td className="px-3 py-2 text-gray-900 relative group">
+                                                <td className="px-3 py-2 text-gray-900 dark:text-gray-100 relative group">
                                                     <div className="max-w-xs truncate">{row.transformation_type}</div>
                                                     <div className="hidden group-hover:block absolute z-50 bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg whitespace-normal max-w-md left-0 top-full mt-1">{row.transformation_type}</div>
                                                 </td>
-                                                <td className="px-3 py-2 text-gray-900 relative group">
+                                                <td className="px-3 py-2 text-gray-900 dark:text-gray-100 relative group">
                                                     <div className="max-w-xs truncate">{row.cardinality}</div>
                                                     <div className="hidden group-hover:block absolute z-50 bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg whitespace-normal max-w-md left-0 top-full mt-1">{row.cardinality}</div>
                                                 </td>
@@ -1272,8 +1457,8 @@ const JobDetails = () => {
                             </div>
                         )}
                     </div>
-                )}
             </div>
+            )}
         </div>
     );
 };

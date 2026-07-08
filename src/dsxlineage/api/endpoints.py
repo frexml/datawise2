@@ -1,5 +1,8 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from datetime import datetime, timezone
 from dsxlineage.db.database import get_db
 from dsxlineage.db import models
 from dsxlineage.worker import process_dsx_task
@@ -46,6 +49,43 @@ def list_jobs(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return jobs
 
 
+@router.get("/stats")
+def get_stats(db: Session = Depends(get_db)):
+    """Aggregate KPIs for the Dashboard landing page."""
+    total_jobs = db.query(models.Job).count()
+    completed_jobs = db.query(models.Job).filter(models.Job.status == "COMPLETED").count()
+    failed_jobs = db.query(models.Job).filter(models.Job.status == "FAILED").count()
+
+    pending_reviews = db.query(models.Review).filter(models.Review.status == "pending_review").count()
+    approved_reviews = db.query(models.Review).filter(models.Review.status == "approved").count()
+    rejected_reviews = db.query(models.Review).filter(models.Review.status == "rejected").count()
+    total_reviews = pending_reviews + approved_reviews + rejected_reviews
+    review_coverage_pct = round((approved_reviews / total_reviews) * 100) if total_reviews else 0
+
+    inefficiencies_count = 0
+    try:
+        from dsxlineage.db.graph import get_driver
+        from dsxlineage.core.config import settings
+
+        driver = get_driver()
+        with driver.session(database=settings.NEO4J_DATABASE) as session:
+            record = session.run("MATCH (p:InefficiencyPattern) RETURN count(p) AS count").single()
+            inefficiencies_count = record["count"] if record else 0
+    except Exception as exc:  # noqa: BLE001 — stats must not fail if Neo4j is unreachable
+        print(f"Warning: could not fetch inefficiency count from Neo4j: {exc}")
+
+    return {
+        "total_jobs": total_jobs,
+        "completed_jobs": completed_jobs,
+        "failed_jobs": failed_jobs,
+        "pending_reviews": pending_reviews,
+        "approved_reviews": approved_reviews,
+        "rejected_reviews": rejected_reviews,
+        "review_coverage_pct": review_coverage_pct,
+        "inefficiencies_count": inefficiencies_count,
+    }
+
+
 
 @router.get("/jobs/{job_id}")
 def get_job(job_id: int, db: Session = Depends(get_db)):
@@ -58,6 +98,7 @@ def get_job(job_id: int, db: Session = Depends(get_db)):
         "id": job.id,
         "filename": job.filename,
         "status": job.status,
+        "current_stage": job.current_stage,
         "created_at": job.created_at,
         "updated_at": job.updated_at,
         "stages_count": db.query(models.Stage).filter(models.Stage.job_id == job_id).count(),
@@ -130,6 +171,84 @@ def get_results(job_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Result not found")
     return result
 
+class ReviewDecision(BaseModel):
+    reviewer: str
+    decision: str  # "approved" or "rejected"
+    feedback: str | None = None
+
+
+@router.get("/jobs/{job_id}/reviews")
+def list_reviews(job_id: int, db: Session = Depends(get_db)):
+    job = db.query(models.Job).filter(models.Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return db.query(models.Review).filter(models.Review.job_id == job_id).all()
+
+
+_PREVIEW_LEN = 240
+
+
+@router.get("/reviews")
+def list_all_reviews(status: str | None = "pending_review", db: Session = Depends(get_db)):
+    """Cross-job review queue. Defaults to pending items; pass status=all for everything."""
+    query = db.query(models.Review)
+    if status and status != "all":
+        query = query.filter(models.Review.status == status)
+    reviews = query.order_by(models.Review.created_at.asc()).all()
+
+    job_ids = {r.job_id for r in reviews}
+    jobs_by_id = {
+        j.id: j for j in db.query(models.Job).filter(models.Job.id.in_(job_ids)).all()
+    } if job_ids else {}
+
+    result_ids = {r.target_id for r in reviews if r.target_type == "executive_summary"}
+    results_by_id = {
+        r.id: r for r in db.query(models.Result).filter(models.Result.id.in_(result_ids)).all()
+    } if result_ids else {}
+
+    def preview(text: str | None) -> str | None:
+        if not text:
+            return text
+        return text if len(text) <= _PREVIEW_LEN else text[:_PREVIEW_LEN].rstrip() + "…"
+
+    payload = []
+    for r in reviews:
+        job = jobs_by_id.get(r.job_id)
+        result = results_by_id.get(r.target_id) if r.target_type == "executive_summary" else None
+        payload.append({
+            "id": r.id,
+            "job_id": r.job_id,
+            "job_filename": job.filename if job else None,
+            "target_type": r.target_type,
+            "status": r.status,
+            "reviewer": r.reviewer,
+            "feedback": r.feedback,
+            "created_at": r.created_at,
+            "reviewed_at": r.reviewed_at,
+            "technical_preview": preview(result.llm_explanation) if result else None,
+            "business_preview": preview(result.business_summary) if result else None,
+        })
+    return payload
+
+
+@router.post("/reviews/{review_id}")
+def submit_review(review_id: int, decision: ReviewDecision, db: Session = Depends(get_db)):
+    if decision.decision not in ("approved", "rejected"):
+        raise HTTPException(status_code=400, detail="decision must be 'approved' or 'rejected'")
+
+    review = db.query(models.Review).filter(models.Review.id == review_id).first()
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+
+    review.status = decision.decision
+    review.reviewer = decision.reviewer
+    review.feedback = decision.feedback
+    review.reviewed_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(review)
+    return review
+
+
 @router.get("/stages/{stage_id}/explanation")
 def get_stage_explanation(stage_id: int, db: Session = Depends(get_db)):
     stage = db.query(models.Stage).filter(models.Stage.id == stage_id).first()
@@ -174,6 +293,44 @@ def get_end_to_end_lineage(job_id: int, db: Session = Depends(get_db)):
         }
         for r in rows
     ]
+
+@router.get("/jobs/{job_id}/inefficiencies")
+def get_inefficiencies(job_id: int, db: Session = Depends(get_db)):
+    from dsxlineage.db.graph import get_driver
+    from dsxlineage.core.config import settings
+
+    job = db.query(models.Job).filter(models.Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    driver = get_driver()
+    with driver.session(database=settings.NEO4J_DATABASE) as session:
+        records = session.run(
+            """
+            MATCH (:Job {job_id: $job_id})-[:HAS_PATTERN]->(p:InefficiencyPattern)
+            RETURN p.pattern_type AS pattern_type, p.severity AS severity, p.description AS description
+            """,
+            job_id=job_id,
+        )
+        return [dict(r) for r in records]
+
+
+@router.get("/jobs/{job_id}/export/s2t")
+def export_s2t_register(job_id: int, db: Session = Depends(get_db)):
+    from dsxlineage.services.s2t_export import generate_s2t_register
+
+    job = db.query(models.Job).filter(models.Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    buffer = generate_s2t_register(job_id, db)
+    filename = f"{os.path.splitext(job.filename)[0]}_s2t_register.xlsx"
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
 
 @router.get("/jobs/{job_id}/stage-lineage")
 def get_stage_lineage(job_id: int, db: Session = Depends(get_db)):

@@ -4,6 +4,8 @@ from dsxlineage.agents.workflow import process_file
 from dsxlineage.db.database import SessionLocal
 from dsxlineage.db import models
 from dsxlineage.db.models import Result, Stage, Link, Annotation, Lineage
+from dsxlineage.db.graph import sync_job_to_graph
+from dsxlineage.agents.inefficiency_agent import detect_inefficiencies
 import json
 
 celery_app = Celery(
@@ -71,29 +73,46 @@ def process_dsx_task(self, job_id: int, file_path: str):
         if job:
             job.status = "PROCESSING"
             db.commit()
-        
+
+        def on_stage(stage: str):
+            """Persist real pipeline progress for the Home page's animated stepper."""
+            if job:
+                job.current_stage = stage
+                db.commit()
+
         # Run LangGraph Workflow
         # The process_file function is expected to return a dictionary
         # containing parsed_data, analysis_result, and structured components
         # like stages, links, and annotations.
-        final_output = process_file(file_path)
-        
+        final_output = process_file(file_path, on_stage=on_stage)
+
         parsed_data = final_output.get("parsed_data", {})
         analysis_result = final_output.get("analysis_result", {})
 
         # Update Job status and save structured results
         if job:
-            job.status = "COMPLETED"
-            
+            job.current_stage = "saving_results"
+            db.commit()
+
             # Save main result
             result = Result(
                 job_id=job_id,
                 raw_json=parsed_data,
                 analysis_summary=analysis_result, # Fixed: Use analysis_result directly
-                llm_explanation=final_output.get("executive_summary", "")
+                llm_explanation=final_output.get("executive_summary", ""),
+                business_summary=final_output.get("executive_summary_business", "")
             )
             db.add(result)
-            
+            db.flush()  # populate result.id for the Review row below
+
+            db.add(models.Review(
+                job_id=job_id,
+                target_type="executive_summary",
+                target_id=result.id,
+                status="pending_review",
+            ))
+
+
             # Get lineage info
             lineage_result = final_output.get("lineage_result", {})
             link_map = lineage_result.get("links", {})
@@ -104,6 +123,7 @@ def process_dsx_task(self, job_id: int, file_path: str):
                 print(f"Worker: Sample Position Key: {list(stage_positions.keys())[0]}")
             
             # Save Stages
+            graph_stages = []
             for stage_data in final_output.get("stages", []):
                 stage_id = stage_data.get("stage_id")
                 props = stage_data.get("properties", {})
@@ -124,7 +144,12 @@ def process_dsx_task(self, job_id: int, file_path: str):
                     llm_explanation=stage_data.get("llm_explanation")
                 )
                 db.add(stage)
-            
+                graph_stages.append({
+                    "stage_id": stage_id,
+                    "name": stage_data.get("name"),
+                    "type": stage_data.get("type"),
+                })
+
             # Save Links - use edges from lineage_result to capture all partner connections
             edges = lineage_result.get("edges", [])
             
@@ -143,6 +168,7 @@ def process_dsx_task(self, job_id: int, file_path: str):
                 }
 
             # Save each edge as a separate link record
+            graph_links = []
             for edge in edges:
                 link_name = edge.get("link_name")
                 link_props = link_props_map.get(link_name, {})
@@ -159,7 +185,14 @@ def process_dsx_task(self, job_id: int, file_path: str):
                     llm_explanation=link_props.get("llm_explanation")
                 )
                 db.add(db_link)
-                
+                graph_links.append({
+                    "name": link_name,
+                    "source_stage": edge.get("source"),
+                    "target_stage": edge.get("target"),
+                    "source_pin": edge.get("source_pin"),
+                    "target_pin": edge.get("target_pin"),
+                })
+
             # Save Annotations
             for anno_data in final_output.get("annotations", []):
                 anno = Annotation(
@@ -173,7 +206,31 @@ def process_dsx_task(self, job_id: int, file_path: str):
                 db.add(anno)
             
             db.commit()
-            
+
+            job.current_stage = "detecting_inefficiencies"
+            db.commit()
+
+            # Mirror stages/links into Neo4j for graph-native queries
+            # (inefficiency detection, future lineage traversal). Additive
+            # only — a Neo4j failure must not fail the job.
+            try:
+                sync_job_to_graph(job_id, job.filename, graph_stages, graph_links)
+            except Exception as graph_err:
+                print(f"Warning: Neo4j sync failed for job {job_id}: {graph_err}")
+            else:
+                # Inefficiency detection needs the graph mirror above, so it
+                # only runs when that sync succeeded. Best-effort, same as
+                # the sync itself — must not fail the job.
+                try:
+                    findings = detect_inefficiencies(job_id)
+                    print(f"Inefficiency detection for job {job_id}: {len(findings)} pattern(s) flagged.")
+                except Exception as ineff_err:
+                    print(f"Warning: inefficiency detection failed for job {job_id}: {ineff_err}")
+
+            job.status = "COMPLETED"
+            job.current_stage = "completed"
+            db.commit()
+
             # Trigger async lineage generation
             generate_lineage_task.delay(job_id)
             print(f"Task {job_id} completed successfully.")

@@ -6,6 +6,13 @@ resource "random_string" "suffix" {
   special = false
 }
 
+# Self-hosted Neo4j Community (no managed Azure PaaS offering exists for it,
+# unlike Postgres/Redis above) — Terraform owns and generates its password.
+resource "random_password" "neo4j" {
+  length  = 24
+  special = false
+}
+
 resource "azurerm_postgresql_flexible_server" "main" {
   name                          = "psql-${var.name_prefix}-${random_string.suffix.result}"
   resource_group_name           = var.resource_group_name
@@ -55,6 +62,13 @@ resource "azurerm_storage_share" "uploads" {
   name                 = "uploads"
   storage_account_name = azurerm_storage_account.uploads.name
   quota                = 50 # GB
+}
+
+# Durable storage for Neo4j's /data directory across container restarts.
+resource "azurerm_storage_share" "neo4j_data" {
+  name                 = "neo4j-data"
+  storage_account_name = azurerm_storage_account.uploads.name
+  quota                = 10 # GB — demo scale
 }
 
 resource "azurerm_redis_cache" "main" {

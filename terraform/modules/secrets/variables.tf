@@ -44,6 +44,11 @@ variable "redis_connection_url" {
   sensitive = true
 }
 
+variable "neo4j_password" {
+  type      = string
+  sensitive = true
+}
+
 variable "tags" {
   type = map(string)
 }

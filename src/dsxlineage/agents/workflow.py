@@ -1,4 +1,4 @@
-from typing import Dict, Any, TypedDict
+from typing import Callable, Dict, Any, Optional, TypedDict
 from langgraph.graph import StateGraph, END
 from dsxlineage.agents.parser_agent import ParserAgent
 from dsxlineage.agents.analyzer_agent import AnalyzerAgent
@@ -16,6 +16,7 @@ class AgentState(TypedDict):
     links: list
     annotations: list
     executive_summary: str
+    executive_summary_business: str
 
 def run_parser(state: AgentState):
     agent = ParserAgent()
@@ -49,10 +50,32 @@ workflow.add_edge("deep_analyzer", END)
 
 app = workflow.compile()
 
-def process_file(file_path: str):
+# LangGraph node name -> user-facing pipeline stage, used to drive the
+# animated progress view. Node names are internal; these are what the
+# frontend renders.
+NODE_STAGE_NAMES = {
+    "parser": "parsing",
+    "analyzer": "analyzing",
+    "lineage": "mapping_lineage",
+    "deep_analyzer": "generating_summaries",
+}
+
+def process_file(file_path: str, on_stage: Optional[Callable[[str], None]] = None) -> Dict[str, Any]:
     """
     Entry point to run the graph.
+
+    Streams node-by-node (stream_mode="updates" — the default) instead of a
+    single blocking invoke() so callers can observe real pipeline progress.
+    Each yielded step is {node_name: partial_state}; since no reducers are
+    defined on AgentState, merging is a plain shallow overwrite — the same
+    semantics invoke() used internally.
     """
-    initial_state = {"file_path": file_path, "parsed_data": {}, "analysis_result": {}, "llm_explanation": ""}
-    result = app.invoke(initial_state)
-    return result
+    state: Dict[str, Any] = {
+        "file_path": file_path, "parsed_data": {}, "analysis_result": {}, "llm_explanation": ""
+    }
+    for step in app.stream(state):
+        for node_name, partial_state in step.items():
+            state.update(partial_state)
+            if on_stage:
+                on_stage(NODE_STAGE_NAMES.get(node_name, node_name))
+    return state

@@ -73,3 +73,12 @@ resource "azurerm_key_vault_secret" "redis_url" {
 
   depends_on = [azurerm_key_vault_access_policy.deployer]
 }
+
+resource "azurerm_key_vault_secret" "neo4j_password" {
+  name         = "neo4j-password"
+  value        = var.neo4j_password
+  key_vault_id = azurerm_key_vault.main.id
+  tags         = var.tags
+
+  depends_on = [azurerm_key_vault_access_policy.deployer]
+}

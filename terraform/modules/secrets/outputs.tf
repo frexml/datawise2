@@ -21,3 +21,7 @@ output "database_url_secret_uri" {
 output "redis_url_secret_uri" {
   value = azurerm_key_vault_secret.redis_url.versionless_id
 }
+
+output "neo4j_password_secret_uri" {
+  value = azurerm_key_vault_secret.neo4j_password.versionless_id
+}

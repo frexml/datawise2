@@ -2,7 +2,7 @@
 
 A web app for reverse-engineering IBM DataStage `.dsx` exports into column-level data lineage. Users upload a job export through the UI; the backend parses it deterministically, a LangGraph multi-agent workflow enriches stages and links with LLM-generated explanations, and the result is rendered as interactive lineage graphs, stage breakdowns, and downloadable CSV/JSON artifacts.
 
-Built by [mobileLIVE](https://mobilelive.ca).
+Built by [ML arteka](https://ML arteka.ca).
 
 ---
 
@@ -205,4 +205,4 @@ These are acceptable for dev but **must be addressed before prod**:
 
 ## License
 
-Internal — mobileLIVE.
+Internal — ML arteka.

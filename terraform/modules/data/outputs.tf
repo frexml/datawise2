@@ -49,3 +49,12 @@ output "redis_connection_url" {
   )
   sensitive = true
 }
+
+output "neo4j_password" {
+  value     = random_password.neo4j.result
+  sensitive = true
+}
+
+output "neo4j_data_share_name" {
+  value = azurerm_storage_share.neo4j_data.name
+}
