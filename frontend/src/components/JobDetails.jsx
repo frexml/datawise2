@@ -93,50 +93,87 @@ const JobDetails = () => {
     const [loadingExplanation, setLoadingExplanation] = useState(false);
     const [stageTypes, setStageTypes] = useState({});
 
+    // Cache of LLM explanations keyed by "stage:<id>" or "link:<id>".
+    // Lives for the lifetime of this page — clicking the same node twice
+    // skips the round-trip entirely.
+    const explanationCacheRef = useRef(new Map());
+
     useEffect(() => {
-        const fetchData = async () => {
+        let cancelled = false;
+        let timerId = null;
+        let completedLoaded = false;
+
+        // Parallel-fetch the heavyweight follow-ups once the job is COMPLETED.
+        const loadCompletedData = async () => {
+            if (completedLoaded || cancelled) return;
+            completedLoaded = true;
+            setLoadingLineage(true);
+            setLoadingStageLineage(true);
+
+            const [resultRes, lineageRes, stageLineageRes] =
+                await Promise.allSettled([
+                    axios.get(`/api/results/${jobId}`),
+                    axios.get(`/api/jobs/${jobId}/lineage`),
+                    axios.get(`/api/jobs/${jobId}/stage-lineage`),
+                ]);
+            if (cancelled) return;
+
+            if (resultRes.status === 'fulfilled') setResult(resultRes.value.data);
+            else console.error('Failed to load result:', resultRes.reason);
+
+            if (lineageRes.status === 'fulfilled') setLineageData(lineageRes.value.data);
+            else console.error('Failed to load lineage:', lineageRes.reason);
+
+            if (stageLineageRes.status === 'fulfilled') setStageLineageData(stageLineageRes.value.data);
+            else console.error('Failed to load stage lineage:', stageLineageRes.reason);
+
+            setLoadingLineage(false);
+            setLoadingStageLineage(false);
+        };
+
+        // Poll every 5s until the job leaves PROCESSING/PENDING. Pauses when the
+        // tab is hidden (cheap: just don't reschedule).
+        const tick = async () => {
+            if (cancelled) return;
             try {
                 const jobRes = await axios.get(`/api/jobs/${jobId}/full`);
+                if (cancelled) return;
                 setJob(jobRes.data);
+                setLoading(false);
 
-                if (jobRes.data.status === 'COMPLETED') {
-                    const resultRes = await axios.get(`/api/results/${jobId}`);
-                    setResult(resultRes.data);
-
-                    // Initialize Graph
+                const status = jobRes.data.status;
+                if (status === 'COMPLETED') {
                     initializeGraph(jobRes.data);
-                    
-                    // Load lineage data
-                    setLoadingLineage(true);
-                    try {
-                        const lineageRes = await axios.get(`/api/jobs/${jobId}/lineage`);
-                        setLineageData(lineageRes.data);
-                    } catch (err) {
-                        console.error('Failed to load lineage:', err);
-                    } finally {
-                        setLoadingLineage(false);
-                    }
-                    
-                    // Load stage lineage data
-                    setLoadingStageLineage(true);
-                    try {
-                        const stageLineageRes = await axios.get(`/api/jobs/${jobId}/stage-lineage`);
-                        setStageLineageData(stageLineageRes.data);
-                    } catch (err) {
-                        console.error('Failed to load stage lineage:', err);
-                    } finally {
-                        setLoadingStageLineage(false);
-                    }
+                    await loadCompletedData();
+                    return;  // terminal — stop polling
+                }
+                if (status === 'FAILED') {
+                    return;  // terminal — stop polling
+                }
+                // PROCESSING or PENDING — keep polling (unless tab hidden)
+                if (!document.hidden) {
+                    timerId = setTimeout(tick, 5000);
                 }
             } catch (err) {
+                if (cancelled) return;
                 console.error(err);
                 setError('Failed to fetch job details.');
-            } finally {
                 setLoading(false);
             }
         };
 
-        fetchData();
+        const onVisibilityChange = () => {
+            if (!document.hidden && !completedLoaded && !cancelled) tick();
+        };
+        document.addEventListener('visibilitychange', onVisibilityChange);
+
+        tick();
+
+        return () => {
+            cancelled = true;
+            if (timerId) clearTimeout(timerId);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+        };
     }, [jobId]);
 
     // distinct colors for stage types (Darker shades for white text)
@@ -469,45 +506,64 @@ const JobDetails = () => {
         setEdges(newEdges);
     };
 
+    const fetchExplanation = useCallback(async (kind, id) => {
+        if (id == null) return null;
+        const key = `${kind}:${id}`;
+        const cache = explanationCacheRef.current;
+        if (cache.has(key)) return cache.get(key);
+
+        const res = await axios.get(`/api/${kind}s/${id}/explanation`);
+        const explanation = res.data.llm_explanation;
+        cache.set(key, explanation);
+        return explanation;
+    }, []);
+
     const onNodeClick = useCallback(async (event, node) => {
         setSelectedNode(node.data.fullData);
         setSelectedNodeExplanation(null);
+
+        const data = node.data.fullData;
+        const kind = data.stage_id ? 'stage' : (data.link_id ? 'link' : null);
+        if (!kind) return;
+
+        // Show spinner only if we have to hit the network.
+        const cached = explanationCacheRef.current.get(`${kind}:${data.id}`);
+        if (cached !== undefined) {
+            setSelectedNodeExplanation(cached);
+            return;
+        }
+
         setLoadingExplanation(true);
-        
         try {
-            // Determine type and fetch explanation
-            if (node.data.fullData.stage_id) {
-                // It's a stage
-                const res = await axios.get(`/api/stages/${node.data.fullData.id}/explanation`);
-                setSelectedNodeExplanation(res.data.llm_explanation);
-            } else if (node.data.fullData.link_id) {
-                // It's a link
-                const res = await axios.get(`/api/links/${node.data.fullData.id}/explanation`);
-                setSelectedNodeExplanation(res.data.llm_explanation);
-            }
+            setSelectedNodeExplanation(await fetchExplanation(kind, data.id));
         } catch (err) {
             console.error('Failed to load explanation:', err);
         } finally {
             setLoadingExplanation(false);
         }
-    }, []);
+    }, [fetchExplanation]);
 
     const onEdgeClick = useCallback(async (event, edge) => {
         setSelectedNode(edge.data.fullData);
         setSelectedNodeExplanation(null);
+        const id = edge.data.fullData.id;
+        if (id == null) return;
+
+        const cached = explanationCacheRef.current.get(`link:${id}`);
+        if (cached !== undefined) {
+            setSelectedNodeExplanation(cached);
+            return;
+        }
+
         setLoadingExplanation(true);
-        
         try {
-            if (edge.data.fullData.id) {
-                const res = await axios.get(`/api/links/${edge.data.fullData.id}/explanation`);
-                setSelectedNodeExplanation(res.data.llm_explanation);
-            }
+            setSelectedNodeExplanation(await fetchExplanation('link', id));
         } catch (err) {
             console.error('Failed to load explanation:', err);
         } finally {
             setLoadingExplanation(false);
         }
-    }, []);
+    }, [fetchExplanation]);
 
     const [hoveredNode, setHoveredNode] = useState(null);
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });

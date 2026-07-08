@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   backend:
-    build: ./backend
+    build: .
     ports:
       - "8000:8000"
     deploy:
@@ -22,8 +22,8 @@ services:
       - db
       - redis
     volumes:
-      - ./backend:/app
-      - ./end_to_end_linage:/app/end_to_end_linage:ro
+      - .:/app
+      - ./data/end_to_end_linage:/app/end_to_end_linage:ro
 
   frontend:
     build:
@@ -41,8 +41,8 @@ services:
       - backend
 
   celery_worker:
-    build: ./backend
-    command: celery -A app.worker.celery_app worker --loglevel=info
+    build: .
+    command: celery -A dsxlineage.worker.celery_app worker --loglevel=info
     environment:
       - POSTGRES_SERVER=db
       - POSTGRES_USER=postgres
@@ -56,8 +56,8 @@ services:
       - db
       - redis
     volumes:
-      - ./backend:/app
-      - ./end_to_end_linage:/app/end_to_end_linage:ro
+      - .:/app
+      - ./data/end_to_end_linage:/app/end_to_end_linage:ro
 
   db:
     image: postgres:13
@@ -66,7 +66,9 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=dsx_db
     ports:
-      - "5432:5432"
+      # Host:container — host port 5433 to avoid clashing with other local
+      # Postgres instances. Backend talks to `db:5432` via the compose network.
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 

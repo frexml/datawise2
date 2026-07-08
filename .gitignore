@@ -67,10 +67,9 @@ database-password.txt
 *.sqlite3
 
 # ─── Data directories ─────────────────────────────────────────────────
-samples/
-end_to_end_linage/
-backend/uploads/
-backend/app.db
+data/samples/
+data/end_to_end_linage/
+/uploads/
 
 # ─── Misc generated text data at repo root ────────────────────────────
 /cardinality_prompt.txt
@@ -85,3 +84,8 @@ backend/app.db
 !README.md
 !**/README.md
 CLAUDE.md
+azure-deploy-pattern.md
+
+datawise-docs/
+
+migrations/

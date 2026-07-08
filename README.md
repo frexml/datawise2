@@ -46,32 +46,36 @@ Uploads are written to a **shared filesystem** (Docker volume locally, Azure Fil
 
 ```
 .
-├── backend/                     # FastAPI service
-│   ├── app/
-│   │   ├── agents/              # LangGraph agents (parser, analyzer, deep_analyzer, lineage, workflow)
-│   │   ├── api/endpoints.py     # REST routes mounted at /api
-│   │   ├── core/config.py       # Pydantic settings
-│   │   ├── db/                  # SQLAlchemy models + session
-│   │   ├── services/
-│   │   └── worker.py            # Celery app + task
-│   ├── main.py                  # FastAPI entry
-│   ├── Dockerfile               # python:3.12-slim + uv
-│   └── requirements.txt
-├── frontend/                    # Vite + React (JSX)
+├── src/
+│   └── dsxlineage/               # FastAPI service (uv-managed Python package)
+│       ├── agents/               # LangGraph agents (parser, analyzer, deep_analyzer, lineage, workflow)
+│       ├── api/endpoints.py      # REST routes mounted at /api
+│       ├── core/config.py        # Pydantic settings
+│       ├── db/                   # SQLAlchemy models + session
+│       ├── services/
+│       ├── worker.py             # Celery app + task
+│       └── main.py               # FastAPI entry
+├── tests/                        # Parser/lineage verification scripts
+├── scripts/                      # Ops/debug scripts (check_db.py, show_lineage.py, ...)
+├── migrations/                   # Hand-written SQL migrations (run manually per env)
+├── data/
+│   ├── samples/                  # Sample .dsx + reference outputs
+│   └── end_to_end_linage/        # Generated lineage CSVs for samples
+├── frontend/                     # Vite + React (JSX)
 │   ├── src/
 │   │   ├── App.jsx
 │   │   ├── main.jsx
 │   │   └── components/{Dashboard,FileUpload,JobDetails}.jsx
-│   ├── public/                  # favicons, logo (served at root)
-│   ├── nginx.conf.template      # Runtime-templated reverse proxy
-│   ├── vite.config.js           # Dev proxy for /api → backend
-│   └── Dockerfile               # node build → nginx:alpine serve
-├── file_parser/                 # Standalone DSX parser scripts
-├── samples/                     # Sample .dsx + reference outputs
-├── end_to_end_linage/           # Generated lineage CSVs for samples
-├── terraform/                   # Azure IaC (see terraform/README.md)
-├── docker-compose.yml           # Local dev stack
-└── .env.example                 # Required env vars
+│   ├── public/                   # favicons, logo (served at root)
+│   ├── nginx.conf.template       # Runtime-templated reverse proxy
+│   ├── vite.config.js            # Dev proxy for /api → backend
+│   └── Dockerfile                # node build → nginx:alpine serve
+├── terraform/                    # Azure IaC (see terraform/README.md)
+├── docs/                         # Design notes, deploy patterns
+├── Dockerfile                    # python:3.12-slim + uv (backend + worker image)
+├── pyproject.toml / uv.lock      # uv-managed Python deps
+├── docker-compose.yml            # Local dev stack
+└── .env.example                  # Required env vars
 ```
 
 ---
@@ -105,7 +109,7 @@ docker-compose logs -f celery_worker   # async processing + LLM calls
 Upload a sample DSX via the UI or via curl:
 
 ```bash
-curl -F "file=@samples/BNCMRXALLInsSTGTransactionActual.dsx" \
+curl -F "file=@data/samples/BNCMRXALLInsSTGTransactionActual.dsx" \
   http://localhost:8000/api/upload
 ```
 

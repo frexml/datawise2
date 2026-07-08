@@ -1,19 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import FileUpload from './FileUpload';
 
+// Polling cadence: fast while a job is actively PROCESSING; slow otherwise.
+// Pauses entirely when the tab is hidden.
+const POLL_ACTIVE_MS = 5000;
+const POLL_IDLE_MS = 30000;
+
 const Dashboard = () => {
     const [jobs, setJobs] = useState([]);
+    const jobsRef = useRef(jobs);
+    jobsRef.current = jobs;
 
-    const fetchJobs = async () => {
+    const fetchJobs = useCallback(async () => {
         try {
             const response = await axios.get('/api/jobs');
             setJobs(response.data);
         } catch (error) {
             console.error('Error fetching jobs:', error);
         }
-    };
+    }, []);
 
     const handleDelete = async (jobId) => {
         if (!window.confirm("Are you sure you want to delete this job?")) return;
@@ -26,10 +33,39 @@ const Dashboard = () => {
     };
 
     useEffect(() => {
-        fetchJobs();
-        const interval = setInterval(fetchJobs, 5000); // Poll every 5 seconds
-        return () => clearInterval(interval);
-    }, []);
+        let timerId = null;
+
+        const hasProcessing = () =>
+            jobsRef.current.some((j) => j.status === 'PROCESSING' || j.status === 'PENDING');
+
+        const schedule = () => {
+            if (document.hidden) return; // tab hidden — don't queue another tick
+            const delay = hasProcessing() ? POLL_ACTIVE_MS : POLL_IDLE_MS;
+            timerId = setTimeout(async () => {
+                await fetchJobs();
+                schedule();
+            }, delay);
+        };
+
+        const onVisibilityChange = () => {
+            if (document.hidden) {
+                if (timerId) {
+                    clearTimeout(timerId);
+                    timerId = null;
+                }
+            } else {
+                fetchJobs().then(schedule);
+            }
+        };
+
+        fetchJobs().then(schedule);
+        document.addEventListener('visibilitychange', onVisibilityChange);
+
+        return () => {
+            if (timerId) clearTimeout(timerId);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+        };
+    }, [fetchJobs]);
 
     return (
         <div>
