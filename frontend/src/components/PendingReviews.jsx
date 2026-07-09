@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import Markdown from 'react-markdown';
 
 const STATUS_BADGE = {
     pending_review: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300',
@@ -351,15 +352,15 @@ const PendingReviews = () => {
                                     <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                                         <div className="bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded p-3">
                                             <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Technical</div>
-                                            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                                                {review.technical_preview || '—'}
-                                            </p>
+                                            <div className="prose prose-sm max-w-none text-sm text-gray-700 dark:text-gray-300">
+                                                {review.technical_preview ? <Markdown>{review.technical_preview}</Markdown> : '—'}
+                                            </div>
                                         </div>
                                         <div className="bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded p-3">
                                             <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Business</div>
-                                            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                                                {review.business_preview || '—'}
-                                            </p>
+                                            <div className="prose prose-sm max-w-none text-sm text-gray-700 dark:text-gray-300">
+                                                {review.business_preview ? <Markdown>{review.business_preview}</Markdown> : '—'}
+                                            </div>
                                         </div>
                                     </div>
                                 )}

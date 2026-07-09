@@ -1078,6 +1078,13 @@ const JobDetails = () => {
                     >
                         📊 Export S2T (Excel)
                     </a>
+                    <a
+                        href={`/api/jobs/${jobId}/export/evidence-pack`}
+                        title="Column-level lineage + review audit trail, regulatory-submission-ready"
+                        className="px-3 py-1 bg-slate-700 text-white text-sm rounded hover:bg-slate-800 transition-colors inline-flex items-center"
+                    >
+                        🏛️ Evidence Pack (PDF)
+                    </a>
                     <button
                         onClick={() => setIsFullscreen(!isFullscreen)}
                         className="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 transition-colors"

@@ -412,6 +412,23 @@ def export_s2t_register(job_id: int, db: Session = Depends(get_db)):
     )
 
 
+@router.get("/jobs/{job_id}/export/evidence-pack")
+def export_evidence_pack(job_id: int, db: Session = Depends(get_db)):
+    from dsxlineage.services.evidence_pack import generate_evidence_pack
+
+    job = db.query(models.Job).filter(models.Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    buffer = generate_evidence_pack(job_id, db)
+    filename = f"{os.path.splitext(job.filename)[0]}_evidence_pack.pdf"
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/jobs/{job_id}/stage-lineage")
 def get_stage_lineage(job_id: int, db: Session = Depends(get_db)):
     import csv
