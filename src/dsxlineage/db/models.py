@@ -19,6 +19,8 @@ class Job(Base):
                                      # saving_results, detecting_inefficiencies, completed
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    catalog_pushed_at = Column(DateTime(timezone=True))  # set once pushed to the governance catalog
+    catalog_url = Column(String)  # link to the Pipeline entity in the catalog UI
 
     # Relationships
     results = relationship("Result", back_populates="job", cascade="all, delete-orphan")

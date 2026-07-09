@@ -162,6 +162,8 @@ def get_job_full(job_id: int, db: Session = Depends(get_db)):
         "status": job.status,
         "created_at": job.created_at,
         "updated_at": job.updated_at,
+        "catalog_pushed_at": job.catalog_pushed_at,
+        "catalog_url": job.catalog_url,
         "stages": stages,
         "links": links,
         "annotations": annotations
@@ -266,6 +268,11 @@ def submit_review(review_id: int, decision: ReviewDecision, db: Session = Depend
     review.reviewed_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(review)
+
+    if decision.decision == "approved" and review.target_type == "executive_summary":
+        from dsxlineage.worker import push_to_catalog_task
+        push_to_catalog_task.delay(review.job_id)
+
     return review
 
 
@@ -305,6 +312,10 @@ def edit_review(review_id: int, edit: ReviewEdit, db: Session = Depends(get_db))
     review.reviewed_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(review)
+
+    from dsxlineage.worker import push_to_catalog_task
+    push_to_catalog_task.delay(review.job_id)
+
     return review
 
 

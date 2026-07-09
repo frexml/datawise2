@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from celery import Celery
 from dsxlineage.core.config import settings
 from dsxlineage.agents.workflow import process_file
@@ -153,6 +154,37 @@ def generate_scopeiq_estimate_task(job_id: int):
             f"ScopeIQ estimate generated for job {job_id}: "
             f"{result['total_days_adjusted']} days ({result['complexity_tier']})."
         )
+    finally:
+        db.close()
+
+
+@celery_app.task
+def push_to_catalog_task(job_id: int):
+    """Pushes a job's approved lineage/summary to the open-source data
+    governance catalog (OpenMetadata). Fires on every approval (including
+    re-approval after an edit/rerun) so the catalog stays in sync with the
+    latest governed content. Best-effort — a catalog outage must not affect
+    the review approval that triggered this, same guard as the Neo4j sync
+    in process_dsx_task."""
+    from dsxlineage.services.catalog_push import push_job_to_catalog
+
+    db = SessionLocal()
+    try:
+        job = db.query(models.Job).filter(models.Job.id == job_id).first()
+        if not job:
+            print(f"push_to_catalog_task: job {job_id} not found, skipping")
+            return
+
+        try:
+            catalog_url = push_job_to_catalog(job_id, db)
+        except Exception as exc:  # noqa: BLE001 — catalog is additive, must not break approval
+            print(f"Warning: catalog push failed for job {job_id}: {exc}")
+            return
+
+        job.catalog_pushed_at = datetime.now(timezone.utc)
+        job.catalog_url = catalog_url
+        db.commit()
+        print(f"push_to_catalog_task: job {job_id} pushed to catalog at {catalog_url}")
     finally:
         db.close()
 

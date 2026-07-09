@@ -1002,6 +1002,23 @@ const JobDetails = () => {
                                     ))}
                                 </div>
                             )}
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded border dark:border-gray-700">
+                                <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Governance Catalog</div>
+                                {job.catalog_pushed_at ? (
+                                    <a
+                                        href={job.catalog_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-sm font-medium inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline"
+                                    >
+                                        📚 In Catalog →
+                                    </a>
+                                ) : (
+                                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                                        Not yet pushed — pushes automatically once the summary is approved
+                                    </span>
+                                )}
+                            </div>
                         </div>
                         {!job.raw_json?._metadata?.job_identifier && (
                             <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
