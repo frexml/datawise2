@@ -56,10 +56,15 @@ def get_stats(db: Session = Depends(get_db)):
     completed_jobs = db.query(models.Job).filter(models.Job.status == "COMPLETED").count()
     failed_jobs = db.query(models.Job).filter(models.Job.status == "FAILED").count()
 
-    pending_reviews = db.query(models.Review).filter(models.Review.status == "pending_review").count()
+    # "pending_reviews" means "needs a reviewer's attention" — includes items
+    # rejected-but-not-yet-resolved (reviewer still has to pick Edit or Re-run)
+    # and items currently regenerating, not just untouched ones.
+    pending_reviews = db.query(models.Review).filter(
+        models.Review.status.in_(["pending_review", "rejected", "regenerating"])
+    ).count()
     approved_reviews = db.query(models.Review).filter(models.Review.status == "approved").count()
     rejected_reviews = db.query(models.Review).filter(models.Review.status == "rejected").count()
-    total_reviews = pending_reviews + approved_reviews + rejected_reviews
+    total_reviews = db.query(models.Review).count()
     review_coverage_pct = round((approved_reviews / total_reviews) * 100) if total_reviews else 0
 
     inefficiencies_count = 0
@@ -189,10 +194,19 @@ _PREVIEW_LEN = 240
 
 
 @router.get("/reviews")
-def list_all_reviews(status: str | None = "pending_review", db: Session = Depends(get_db)):
-    """Cross-job review queue. Defaults to pending items; pass status=all for everything."""
+def list_all_reviews(status: str | None = "open", db: Session = Depends(get_db)):
+    """Cross-job review queue.
+
+    Defaults to "open" — pending_review, rejected (awaiting the reviewer's
+    edit-or-rerun choice), and regenerating — i.e. anything not yet resolved.
+    Pass status=all for everything, or an exact status value to filter to it.
+    """
     query = db.query(models.Review)
-    if status and status != "all":
+    if status == "all":
+        pass
+    elif not status or status == "open":
+        query = query.filter(models.Review.status.in_(["pending_review", "rejected", "regenerating"]))
+    else:
         query = query.filter(models.Review.status == status)
     reviews = query.order_by(models.Review.created_at.asc()).all()
 
@@ -223,6 +237,7 @@ def list_all_reviews(status: str | None = "pending_review", db: Session = Depend
             "status": r.status,
             "reviewer": r.reviewer,
             "feedback": r.feedback,
+            "edited_by_reviewer": r.edited_by_reviewer,
             "created_at": r.created_at,
             "reviewed_at": r.reviewed_at,
             "technical_preview": preview(result.llm_explanation) if result else None,
@@ -235,6 +250,8 @@ def list_all_reviews(status: str | None = "pending_review", db: Session = Depend
 def submit_review(review_id: int, decision: ReviewDecision, db: Session = Depends(get_db)):
     if decision.decision not in ("approved", "rejected"):
         raise HTTPException(status_code=400, detail="decision must be 'approved' or 'rejected'")
+    if decision.decision == "rejected" and not (decision.feedback and decision.feedback.strip()):
+        raise HTTPException(status_code=400, detail="A reason is required when rejecting a summary")
 
     review = db.query(models.Review).filter(models.Review.id == review_id).first()
     if not review:
@@ -242,10 +259,73 @@ def submit_review(review_id: int, decision: ReviewDecision, db: Session = Depend
 
     review.status = decision.decision
     review.reviewer = decision.reviewer
-    review.feedback = decision.feedback
+    if decision.feedback:
+        review.feedback = decision.feedback
+    if decision.decision == "approved":
+        review.edited_by_reviewer = False  # approved as-is through this endpoint, not via /edit
     review.reviewed_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(review)
+    return review
+
+
+class ReviewEdit(BaseModel):
+    reviewer: str
+    technical_summary: str | None = None
+    business_summary: str | None = None
+
+
+@router.post("/reviews/{review_id}/edit")
+def edit_review(review_id: int, edit: ReviewEdit, db: Session = Depends(get_db)):
+    """Hand-edit a rejected summary and approve it in the same action —
+    editing the text IS the review decision here, so there's no separate
+    approve step."""
+    review = db.query(models.Review).filter(models.Review.id == review_id).first()
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    if review.status != "rejected":
+        raise HTTPException(status_code=400, detail="Only a rejected review can be edited")
+    if review.target_type != "executive_summary":
+        raise HTTPException(status_code=400, detail="Editing is only supported for executive summaries")
+    if edit.technical_summary is None and edit.business_summary is None:
+        raise HTTPException(status_code=400, detail="Provide technical_summary and/or business_summary")
+
+    result = db.query(models.Result).filter(models.Result.id == review.target_id).first()
+    if not result:
+        raise HTTPException(status_code=404, detail="Result not found")
+
+    if edit.technical_summary is not None:
+        result.llm_explanation = edit.technical_summary
+    if edit.business_summary is not None:
+        result.business_summary = edit.business_summary
+
+    review.status = "approved"
+    review.reviewer = edit.reviewer
+    review.edited_by_reviewer = True
+    review.reviewed_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(review)
+    return review
+
+
+@router.post("/reviews/{review_id}/rerun")
+def rerun_review(review_id: int, db: Session = Depends(get_db)):
+    """Regenerate a rejected summary with the rejection feedback fed back
+    into the LLM prompt. Runs async — the review sits in "regenerating"
+    until the Celery task flips it back to "pending_review"."""
+    from dsxlineage.worker import regenerate_summary_task
+
+    review = db.query(models.Review).filter(models.Review.id == review_id).first()
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    if review.status != "rejected":
+        raise HTTPException(status_code=400, detail="Only a rejected review can be re-run")
+
+    review.status = "regenerating"
+    db.commit()
+    db.refresh(review)
+
+    regenerate_summary_task.delay(review_id)
     return review
 
 

@@ -63,6 +63,55 @@ def generate_lineage_task(job_id: int):
     finally:
         db.close()
 
+@celery_app.task
+def regenerate_summary_task(review_id: int):
+    """Re-run just the executive summary after a reviewer rejects it and
+    chooses "Re-run" — the rejection feedback is fed back into the prompt.
+
+    Rebuilds the per-stage bullet list from persisted Stage.llm_explanation
+    (the original per-stage one-liners used on the first pass aren't stored),
+    then reuses the same review row: regenerating -> pending_review again,
+    so the audit trail (previous reviewer/feedback) stays visible until the
+    next decision overwrites it.
+    """
+    from dsxlineage.agents.deep_analyzer_agent import DeepAnalyzerAgent
+
+    db = SessionLocal()
+    try:
+        review = db.query(models.Review).filter(models.Review.id == review_id).first()
+        if not review or review.target_type != "executive_summary":
+            print(f"regenerate_summary_task: review {review_id} not found or not an executive_summary")
+            return
+
+        result = db.query(Result).filter(Result.id == review.target_id).first()
+        if not result:
+            print(f"regenerate_summary_task: result {review.target_id} not found for review {review_id}")
+            return
+
+        stages = db.query(Stage).filter(Stage.job_id == review.job_id).all()
+        bullets = [
+            f"- {s.name} ({s.type}): {(s.llm_explanation or '')[:200]}"
+            for s in stages
+        ]
+        bullets_text = "\n".join(bullets) or "(no stages analyzed)"
+
+        agent = DeepAnalyzerAgent()
+        technical, business = agent.regenerate_executive_summary(bullets_text, feedback=review.feedback)
+
+        result.llm_explanation = technical
+        result.business_summary = business
+        review.status = "pending_review"
+        db.commit()
+        print(f"regenerate_summary_task: regenerated summary for job {review.job_id}, review {review_id} back to pending_review.")
+    except Exception as e:
+        print(f"Error regenerating summary for review {review_id}: {e}")
+        db.rollback()
+        # Leave the review in "regenerating" rather than silently reverting to
+        # "rejected" — a stuck state is visible and re-triggerable, a silent
+        # revert would look like the rerun never happened.
+    finally:
+        db.close()
+
 @celery_app.task(bind=True)
 def process_dsx_task(self, job_id: int, file_path: str):
     db = SessionLocal()

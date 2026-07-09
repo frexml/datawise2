@@ -41,20 +41,19 @@ const RunProgress = ({ job }) => {
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
                 Watch it move through the pipeline in real time — this is live backend state, not a simulated timer.
             </p>
-            <ol>
+            <ol className="flex items-start overflow-x-auto pb-1">
                 {PIPELINE_STAGES.map((stage, i) => {
                     const isDone = i <= doneIndex;
                     const isActive = i === doneIndex + 1 && job.status === 'PROCESSING';
                     const isLast = i === PIPELINE_STAGES.length - 1;
 
-                    // The connector below THIS node, leading to the next one.
+                    // The connector to the RIGHT of this node, leading to the next one.
                     const connectorIsDone = i < doneIndex;
                     const connectorIsFlowing = i === doneIndex && job.status === 'PROCESSING';
 
                     return (
-                        <li key={stage.key} className="flex gap-4">
-                            {/* Node + connector column */}
-                            <div className="flex flex-col items-center">
+                        <React.Fragment key={stage.key}>
+                            <li className="flex flex-col items-center w-20 sm:w-24 shrink-0 text-center">
                                 <div
                                     className={
                                         'h-10 w-10 rounded-full flex items-center justify-center text-base shrink-0 transition-all duration-500 ' +
@@ -67,37 +66,9 @@ const RunProgress = ({ job }) => {
                                 >
                                     {isDone ? '✓' : stage.icon}
                                 </div>
-                                {!isLast && (
-                                    <div className="relative w-0.5 h-8 my-0.5 overflow-visible">
-                                        <div
-                                            className={
-                                                'absolute inset-0 rounded-full transition-colors duration-500 ' +
-                                                (connectorIsDone
-                                                    ? 'bg-green-400 dark:bg-green-600'
-                                                    : connectorIsFlowing
-                                                    ? 'animate-march'
-                                                    : 'bg-gray-200 dark:bg-gray-700')
-                                            }
-                                            style={
-                                                connectorIsFlowing
-                                                    ? { backgroundImage: 'repeating-linear-gradient(to bottom, #6366f1 0 6px, transparent 6px 12px)' }
-                                                    : undefined
-                                            }
-                                        />
-                                        {connectorIsFlowing && (
-                                            <span className="absolute -left-[7px] top-1 text-indigo-500 dark:text-indigo-400 text-sm animate-arrow-travel">
-                                                ▾
-                                            </span>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Label */}
-                            <div className={isLast ? 'pt-2' : 'pt-2 pb-2'}>
                                 <span
                                     className={
-                                        'text-sm transition-colors duration-500 ' +
+                                        'mt-2 text-xs leading-tight transition-colors duration-500 ' +
                                         (isDone
                                             ? 'text-gray-900 dark:text-gray-100 font-medium'
                                             : isActive
@@ -106,10 +77,35 @@ const RunProgress = ({ job }) => {
                                     }
                                 >
                                     {stage.label}
-                                    {isActive && <span className="ml-1">…</span>}
+                                    {isActive && <span>…</span>}
                                 </span>
-                            </div>
-                        </li>
+                            </li>
+
+                            {!isLast && (
+                                <li className="relative flex-1 min-w-[24px] h-0.5 mt-5 overflow-visible">
+                                    <div
+                                        className={
+                                            'absolute inset-0 rounded-full transition-colors duration-500 ' +
+                                            (connectorIsDone
+                                                ? 'bg-green-400 dark:bg-green-600'
+                                                : connectorIsFlowing
+                                                ? 'animate-march-x'
+                                                : 'bg-gray-200 dark:bg-gray-700')
+                                        }
+                                        style={
+                                            connectorIsFlowing
+                                                ? { backgroundImage: 'repeating-linear-gradient(to right, #6366f1 0 6px, transparent 6px 12px)' }
+                                                : undefined
+                                        }
+                                    />
+                                    {connectorIsFlowing && (
+                                        <span className="absolute left-1/2 -top-[7px] -translate-x-1/2 text-indigo-500 dark:text-indigo-400 text-sm animate-arrow-travel-x">
+                                            ▸
+                                        </span>
+                                    )}
+                                </li>
+                            )}
+                        </React.Fragment>
                     );
                 })}
             </ol>

@@ -427,36 +427,7 @@ Output Format:
             bullets.append(f"- {s['name']} ({s['type']}): {summary}")
         bullets_text = "\n".join(bullets) or "(no stages analyzed)"
 
-        technical_prompt = f"""You are a senior data engineer reviewing an ETL job.
-
-Here is a summary of the job's stages:
-{bullets_text}
-
-Task:
-Write a precise technical executive summary of what this entire job does, using
-data engineering terminology. Do not infer business intent beyond what the
-stages show. Keep it under 200 words.
-
-Output:
-(Technical Executive Summary)
-"""
-        business_prompt = f"""You are a business analyst translating an ETL job into plain language.
-
-Here is a summary of the job's stages:
-{bullets_text}
-
-Task:
-Write a plain-language business summary explaining what business question or
-process this job serves. Avoid technical jargon — a finance director should be
-able to read it. Keep it under 150 words.
-
-Output:
-(Business Summary)
-"""
-        executive_summary, business_summary = await asyncio.gather(
-            self._generate_summary(technical_prompt, "technical executive summary"),
-            self._generate_summary(business_prompt, "business summary"),
-        )
+        executive_summary, business_summary = await self._generate_both_summaries(bullets_text)
 
         return {
             "executive_summary": executive_summary,
@@ -465,6 +436,68 @@ Output:
             "links": analyzed_links,
             "annotations": analyzed_annotations,
         }
+
+    # ------------------------------------------------------------------
+    # Executive summary prompts — shared by the first-pass pipeline run
+    # (above) and the standalone re-run-on-rejection path (below). A
+    # reviewer's rejection feedback, when present, is appended as a
+    # correction directive rather than discarded.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _build_technical_prompt(bullets_text: str, feedback: Optional[str] = None) -> str:
+        feedback_block = ""
+        if feedback:
+            feedback_block = f"""
+
+A human reviewer rejected the previous version of this summary with the
+following feedback — address it directly in your rewrite:
+"{feedback}"
+"""
+        return f"""You are a senior data engineer reviewing an ETL job.
+
+Here is a summary of the job's stages:
+{bullets_text}
+{feedback_block}
+Task:
+Write a precise technical executive summary of what this entire job does, using
+data engineering terminology. Do not infer business intent beyond what the
+stages show. Keep it under 200 words.
+
+Output:
+(Technical Executive Summary)
+"""
+
+    @staticmethod
+    def _build_business_prompt(bullets_text: str, feedback: Optional[str] = None) -> str:
+        feedback_block = ""
+        if feedback:
+            feedback_block = f"""
+
+A human reviewer rejected the previous version of this summary with the
+following feedback — address it directly in your rewrite:
+"{feedback}"
+"""
+        return f"""You are a business analyst translating an ETL job into plain language.
+
+Here is a summary of the job's stages:
+{bullets_text}
+{feedback_block}
+Task:
+Write a plain-language business summary explaining what business question or
+process this job serves. Avoid technical jargon — a finance director should be
+able to read it. Keep it under 150 words.
+
+Output:
+(Business Summary)
+"""
+
+    async def _generate_both_summaries(self, bullets_text: str, feedback: Optional[str] = None) -> Tuple[str, str]:
+        technical_prompt = self._build_technical_prompt(bullets_text, feedback)
+        business_prompt = self._build_business_prompt(bullets_text, feedback)
+        return await asyncio.gather(
+            self._generate_summary(technical_prompt, "technical executive summary"),
+            self._generate_summary(business_prompt, "business summary"),
+        )
 
     async def _generate_summary(self, prompt: str, label: str) -> str:
         try:
@@ -477,7 +510,16 @@ Output:
             return f"Error generating {label}: {exc}"
 
     # ------------------------------------------------------------------
-    # Public entry point — preserves the sync signature workflow.py expects.
+    # Public entry points.
     # ------------------------------------------------------------------
     def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Preserves the sync signature workflow.py expects."""
         return asyncio.run(self._run_async(state))
+
+    def regenerate_executive_summary(self, bullets_text: str, feedback: Optional[str] = None) -> Tuple[str, str]:
+        """Re-run just the executive summary (technical, business) — used when
+        a reviewer rejects a summary and chooses "Re-run" instead of editing
+        it by hand. `bullets_text` is rebuilt from persisted Stage.llm_explanation
+        rows since the original per-stage one-liners aren't stored (see worker.py).
+        """
+        return asyncio.run(self._generate_both_summaries(bullets_text, feedback))

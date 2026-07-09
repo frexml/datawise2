@@ -947,21 +947,23 @@ const JobDetails = () => {
                                                         ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300'
                                                         : review.status === 'rejected'
                                                         ? 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300'
+                                                        : review.status === 'regenerating'
+                                                        ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-300'
                                                         : 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300')
                                                 }
                                             >
-                                                {review.status}
+                                                {review.status.replace(/_/g, ' ')}
                                             </span>
-                                            {review.status === 'pending_review' ? (
-                                                <Link to="/reviews" className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
-                                                    Review now →
-                                                </Link>
-                                            ) : (
+                                            {review.status === 'approved' ? (
                                                 review.reviewer && (
                                                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                        by {review.reviewer}
+                                                        by {review.reviewer}{review.edited_by_reviewer ? ' (edited)' : ''}
                                                     </span>
                                                 )
+                                            ) : (
+                                                <Link to="/reviews" className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+                                                    {review.status === 'regenerating' ? 'View progress →' : 'Review now →'}
+                                                </Link>
                                             )}
                                         </div>
                                     ))}

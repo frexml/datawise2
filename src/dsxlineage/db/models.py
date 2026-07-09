@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey, Text, Boolean
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -117,9 +117,10 @@ class Review(Base):
     job_id = Column(Integer, ForeignKey("jobs.id"), index=True)
     target_type = Column(String)  # e.g. "executive_summary"
     target_id = Column(Integer)  # id of the target row (e.g. Result.id)
-    status = Column(String, default="pending_review")  # pending_review, approved, rejected
+    status = Column(String, default="pending_review")  # pending_review, approved, rejected, regenerating
     reviewer = Column(String)
-    feedback = Column(Text)
+    feedback = Column(Text)  # required on reject; carried forward as context if re-run is chosen
+    edited_by_reviewer = Column(Boolean, default=False)  # True if approved via direct hand-edit, not as-is
     reviewed_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
