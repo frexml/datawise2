@@ -20,7 +20,7 @@ const KpiTile = ({ label, value, accent, icon }) => (
 // so the "active" step in the UI is always the one immediately AFTER the
 // matched index, not the matched stage itself.
 const PIPELINE_STAGES = [
-    { key: 'parsing', label: 'Parsing DataStage export', icon: '🔬' },
+    { key: 'parsing', label: 'Parsing ETL export', icon: '🔬' },
     { key: 'analyzing', label: 'Analyzing structure', icon: '🧩' },
     { key: 'mapping_lineage', label: 'Mapping lineage', icon: '🗺️' },
     { key: 'generating_summaries', label: 'Generating summaries', icon: '🧠' },
@@ -176,13 +176,13 @@ const Home = () => {
                     <div className="relative">
                         <div className="text-5xl mb-4">🕸️</div>
                         <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">
-                            Turn legacy DataStage jobs into<br className="hidden sm:block" />
+                            Turn legacy ETL jobs into<br className="hidden sm:block" />
                             <span className="text-orange-600">governed documentation</span> — automatically
                         </h1>
                         <p className="mt-4 text-base text-gray-600 dark:text-gray-300 max-w-xl mx-auto">
-                            Upload a `.dsx` export and watch column-level lineage, technical &amp; business
-                            summaries, and inefficiency findings get extracted in minutes — every summary
-                            human-reviewed before it's governed.
+                            Upload a DataStage (`.dsx`) or SSIS (`.dtsx`) export and watch column-level lineage,
+                            technical &amp; business summaries, and inefficiency findings get extracted in
+                            minutes — every summary human-reviewed before it's governed.
                         </p>
 
                         {!showUpload ? (

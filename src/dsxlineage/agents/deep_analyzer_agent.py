@@ -36,6 +36,11 @@ _SUMMARY_MAX_TOKENS = 800
 
 _MINI_MODEL = "gpt-4o-mini"
 
+_DIALECT_LABELS = {
+    "datastage": "DataStage",
+    "ssis": "SSIS (SQL Server Integration Services)",
+}
+
 
 class DeepAnalyzerAgent:
     def __init__(self) -> None:
@@ -103,8 +108,9 @@ class DeepAnalyzerAgent:
         trx_class: str,
         trx_cache: str,
         trx_warnings: str,
+        dialect_label: str = "DataStage",
     ) -> str:
-        prompt = f"""You are an expert DataStage Developer.
+        prompt = f"""You are an expert {dialect_label} Developer.
 
 Job Context:
 {job_context}
@@ -161,8 +167,8 @@ Output Format:
         return prompt
 
     @staticmethod
-    def _build_link_prompt(link_name: str, properties: Dict[str, Any]) -> str:
-        return f"""You are an expert DataStage Developer.
+    def _build_link_prompt(link_name: str, properties: Dict[str, Any], dialect_label: str = "DataStage") -> str:
+        return f"""You are an expert {dialect_label} Developer.
 
 Link to Analyze:
 Name: {link_name}
@@ -187,8 +193,8 @@ Output Format:
 """
 
     @staticmethod
-    def _build_annotation_prompt(anno_name: str, properties: Dict[str, Any]) -> str:
-        return f"""You are an expert DataStage Developer.
+    def _build_annotation_prompt(anno_name: str, properties: Dict[str, Any], dialect_label: str = "DataStage") -> str:
+        return f"""You are an expert {dialect_label} Developer.
 
 Annotation to Analyze:
 Name: {anno_name}
@@ -222,7 +228,7 @@ Output Format:
     # Async analysis primitives.
     # ------------------------------------------------------------------
     async def _analyze_stage(
-        self, stage_id: str, stage: Dict[str, Any], job_context: str
+        self, stage_id: str, stage: Dict[str, Any], job_context: str, dialect_label: str = "DataStage"
     ) -> Dict[str, Any]:
         stage_name = stage.get("Name", "Unnamed")
         stage_type = stage.get("StageType", stage.get("OLEType", "Unknown"))
@@ -238,7 +244,7 @@ Output Format:
 
         prompt = self._build_stage_prompt(
             stage_name, stage_type, prompt_props, job_context,
-            trx_code, trx_class, trx_cache, trx_warnings,
+            trx_code, trx_class, trx_cache, trx_warnings, dialect_label,
         )
 
         try:
@@ -265,10 +271,10 @@ Output Format:
                 "_summary": "",
             }
 
-    async def _analyze_link(self, link_id: str, link: Dict[str, Any]) -> Dict[str, Any]:
+    async def _analyze_link(self, link_id: str, link: Dict[str, Any], dialect_label: str = "DataStage") -> Dict[str, Any]:
         link_name = link.get("Name", "Unnamed")
         properties = self._extract_subrecords(link)
-        prompt = self._build_link_prompt(link_name, properties)
+        prompt = self._build_link_prompt(link_name, properties, dialect_label)
 
         try:
             async with self._sem:
@@ -293,11 +299,11 @@ Output Format:
             }
 
     async def _analyze_annotation(
-        self, anno_id: str, anno: Dict[str, Any]
+        self, anno_id: str, anno: Dict[str, Any], dialect_label: str = "DataStage"
     ) -> Dict[str, Any]:
         anno_name = anno.get("Name", "Unnamed")
         properties = self._extract_subrecords(anno)
-        prompt = self._build_annotation_prompt(anno_name, properties)
+        prompt = self._build_annotation_prompt(anno_name, properties, dialect_label)
 
         try:
             async with self._sem:
@@ -387,25 +393,26 @@ Output Format:
 
         stage_order = self._determine_stage_order(stages, containers)
         job_context = self._build_job_context(job_props, job_type, stage_order, stages)
+        dialect_label = _DIALECT_LABELS.get(state.get("dialect", "datastage"), "ETL")
 
         print(
             f"DeepAnalyzerAgent: analyzing {len(stage_order)} stages, "
             f"{len(links)} links, {len(annotations)} annotations "
-            f"(concurrency={_CONCURRENCY})"
+            f"(concurrency={_CONCURRENCY}, dialect={dialect_label})"
         )
 
         # Fan out — all three groups concurrently. asyncio.gather inside gather
         # is fine; outer gather just waits for the three inner gathers.
         stage_results, link_results, anno_results = await asyncio.gather(
             asyncio.gather(*(
-                self._analyze_stage(sid, stages[sid], job_context)
+                self._analyze_stage(sid, stages[sid], job_context, dialect_label)
                 for sid in stage_order if sid in stages
             )),
             asyncio.gather(*(
-                self._analyze_link(lid, link) for lid, link in links.items()
+                self._analyze_link(lid, link, dialect_label) for lid, link in links.items()
             )),
             asyncio.gather(*(
-                self._analyze_annotation(aid, anno) for aid, anno in annotations.items()
+                self._analyze_annotation(aid, anno, dialect_label) for aid, anno in annotations.items()
             )),
         )
 

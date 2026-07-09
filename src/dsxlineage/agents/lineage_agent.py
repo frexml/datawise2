@@ -1,14 +1,21 @@
 from typing import Dict, Any, List
 from dsxlineage.agents.lib.partner_extractor import extract_partner_connections
+from dsxlineage.agents.lib.ssis_analyzer import extract_ssis_lineage
 
 class LineageAgent:
     def __init__(self):
         pass
 
     def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        if state.get("dialect") == "ssis":
+            print("LineageAgent: Starting SSIS lineage extraction...")
+            lineage_result = extract_ssis_lineage(state.get("analysis_result", {}))
+            print(f"LineageAgent: Extracted {len(lineage_result.get('edges', []))} edges from SSIS paths")
+            return {"lineage_result": lineage_result}
+
         print("LineageAgent: Starting programmatic lineage analysis...")
         parsed_data = state.get("parsed_data", {})
-        
+
         # Use new partner extractor module
         partner_data = extract_partner_connections(parsed_data)
         edges = partner_data.get("edges", [])

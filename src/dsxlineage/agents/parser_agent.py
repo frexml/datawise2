@@ -1,5 +1,7 @@
+import os
 from typing import Dict, Any
 from dsxlineage.agents.lib.dsx_parser import parse_dsx
+from dsxlineage.agents.lib.ssis_parser import parse_dtsx
 
 class ParserAgent:
     def __init__(self):
@@ -9,10 +11,27 @@ class ParserAgent:
         file_path = state.get("file_path")
         if not file_path:
             raise ValueError("No file path provided")
-        
-        print(f"ParserAgent: Parsing {file_path}")
+
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext == ".dtsx":
+            return self._run_ssis(file_path)
+        return self._run_datastage(file_path)
+
+    def _run_ssis(self, file_path: str) -> Dict[str, Any]:
+        print(f"ParserAgent: Parsing {file_path} (SSIS)")
+        parsed_data = parse_dtsx(file_path)
+        parsed_data["_metadata"] = {
+            "dialect": "ssis",
+            "job_type": "SSIS Package",
+            "job_identifier": parsed_data.get("package_name"),
+            "export_date": parsed_data.get("creation_date"),
+        }
+        return {"parsed_data": parsed_data, "dialect": "ssis"}
+
+    def _run_datastage(self, file_path: str) -> Dict[str, Any]:
+        print(f"ParserAgent: Parsing {file_path} (DataStage)")
         parsed_data = parse_dsx(file_path)
-        
+
         # Detect Job Type
         job_type_code = parsed_data.get("JobType", "Unknown")
         job_type = "Unknown"
@@ -24,15 +43,16 @@ class ParserAgent:
             job_type = "Server"
         elif job_type_code == "0":
             job_type = "General"
-            
+
         print(f"ParserAgent: Detected Job Type: {job_type} (Code: {job_type_code})")
-        
+
         # Add metadata to parsed data
         metadata = {
+            "dialect": "datastage",
             "job_type": job_type,
             "job_type_code": job_type_code
         }
-        
+
         # Extract HEADER info
         if "HEADER" in parsed_data and isinstance(parsed_data["HEADER"], list) and len(parsed_data["HEADER"]) > 0:
             header = parsed_data["HEADER"][0]
@@ -43,7 +63,7 @@ class ParserAgent:
                 "export_time": header.get("Time"),
                 "character_set": header.get("CharacterSet")
             })
-            
+
         # Extract DSJOB info
         if "DSJOB" in parsed_data and isinstance(parsed_data["DSJOB"], list) and len(parsed_data["DSJOB"]) > 0:
             dsjob = parsed_data["DSJOB"][0]
@@ -53,7 +73,7 @@ class ParserAgent:
                 "time_modified": dsjob.get("TimeModified"),
                 "description": dsjob.get("Description") # Might be in a sub-record, but checking here
             })
-            
+
         parsed_data["_metadata"] = metadata
-        
-        return {"parsed_data": parsed_data}
+
+        return {"parsed_data": parsed_data, "dialect": "datastage"}

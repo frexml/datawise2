@@ -37,11 +37,11 @@ const FileUpload = ({ onUploadSuccess }) => {
 
     return (
         <div className="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-gray-100 mb-4">Upload DSX File</h3>
+            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-gray-100 mb-4">Upload ETL Export</h3>
             <div className="flex items-center space-x-4">
                 <input
                     type="file"
-                    accept=".dsx"
+                    accept=".dsx,.dtsx"
                     onChange={handleFileChange}
                     className="block w-full text-sm text-gray-500 dark:text-gray-400
             file:mr-4 file:py-2 file:px-4

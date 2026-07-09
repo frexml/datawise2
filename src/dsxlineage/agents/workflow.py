@@ -7,6 +7,7 @@ from dsxlineage.agents.deep_analyzer_agent import DeepAnalyzerAgent
 
 class AgentState(TypedDict):
     file_path: str
+    dialect: str
     parsed_data: Dict[str, Any]
     analysis_result: Dict[str, Any]
     lineage_result: Dict[str, Any] # Added lineage result
