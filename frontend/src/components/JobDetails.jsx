@@ -157,13 +157,14 @@ const JobDetails = () => {
             setLoadingLineage(true);
             setLoadingStageLineage(true);
 
-            const [resultRes, lineageRes, stageLineageRes, reviewsRes, inefficienciesRes] =
+            const [resultRes, lineageRes, stageLineageRes, reviewsRes, inefficienciesRes, scopeiqRes] =
                 await Promise.allSettled([
                     axios.get(`/api/results/${jobId}`),
                     axios.get(`/api/jobs/${jobId}/lineage`),
                     axios.get(`/api/jobs/${jobId}/stage-lineage`),
                     axios.get(`/api/jobs/${jobId}/reviews`),
                     axios.get(`/api/jobs/${jobId}/inefficiencies`),
+                    axios.get(`/api/jobs/${jobId}/scopeiq`),
                 ]);
             if (cancelled) return;
 
@@ -181,6 +182,9 @@ const JobDetails = () => {
 
             if (inefficienciesRes.status === 'fulfilled') setInefficiencies(inefficienciesRes.value.data);
             else console.error('Failed to load inefficiencies:', inefficienciesRes.reason);
+
+            if (scopeiqRes.status === 'fulfilled') setScopeiq(scopeiqRes.value.data);
+            else console.error('Failed to load ScopeIQ estimate:', scopeiqRes.reason);
 
             setLoadingLineage(false);
             setLoadingStageLineage(false);
@@ -230,6 +234,33 @@ const JobDetails = () => {
             document.removeEventListener('visibilitychange', onVisibilityChange);
         };
     }, [jobId]);
+
+    const generateScopeiqEstimate = async () => {
+        setScopeiqGenerating(true);
+        try {
+            await axios.post(`/api/jobs/${jobId}/scopeiq/generate`);
+        } catch (err) {
+            console.error('Failed to start ScopeIQ estimate generation:', err);
+            setScopeiqGenerating(false);
+            return;
+        }
+
+        const poll = async () => {
+            try {
+                const res = await axios.get(`/api/jobs/${jobId}/scopeiq`);
+                setScopeiq(res.data);
+                if (res.data.status === 'generating' || res.data.status === 'pending') {
+                    setTimeout(poll, 4000);
+                } else {
+                    setScopeiqGenerating(false);
+                }
+            } catch (err) {
+                console.error('Failed to poll ScopeIQ estimate status:', err);
+                setScopeiqGenerating(false);
+            }
+        };
+        poll();
+    };
 
     // distinct colors for stage types (Darker shades for white text)
     const distinctColors = [
@@ -641,6 +672,8 @@ const JobDetails = () => {
 
     // Inefficiency detection findings (Neo4j-backed, best-effort)
     const [inefficiencies, setInefficiencies] = useState([]);
+    const [scopeiq, setScopeiq] = useState(null);
+    const [scopeiqGenerating, setScopeiqGenerating] = useState(false);
 
     // One-time guided walkthrough hint — dismissed permanently per browser
     const [showWalkthrough, setShowWalkthrough] = useState(
@@ -987,6 +1020,7 @@ const JobDetails = () => {
                     { key: 'graph', label: 'Lineage Graph', icon: '🕸️' },
                     { key: 'stageLineage', label: 'Stage Lineage', icon: '🔀' },
                     { key: 'e2eLineage', label: 'End-to-End Lineage', icon: '🔗' },
+                    { key: 'scopeiq', label: 'ScopeIQ Estimate', icon: '📦' },
                 ].map((tab) => (
                     <button
                         key={tab.key}
@@ -1468,6 +1502,202 @@ const JobDetails = () => {
                     </div>
             </div>
             )}
+
+            {/* ScopeIQ Estimate tab */}
+            {activeTab === 'scopeiq' && (
+                <div className="bg-gray-50 dark:bg-gray-900/40 border-b dark:border-gray-700 shadow-sm px-6 py-4">
+                    <ScopeiqEstimateTab
+                        scopeiq={scopeiq}
+                        generating={scopeiqGenerating}
+                        onGenerate={generateScopeiqEstimate}
+                        jobId={jobId}
+                    />
+                </div>
+            )}
+        </div>
+    );
+};
+
+const ROLE_LABELS = {
+    data_architect: 'Data Architect',
+    ai_engineer: 'AI Engineer',
+    compliance_lead: 'Compliance Lead',
+    migration_engineer: 'Migration Engineer',
+    engagement_lead: 'Engagement Lead',
+};
+const ROLE_ORDER = ['data_architect', 'ai_engineer', 'compliance_lead', 'migration_engineer', 'engagement_lead'];
+const DIMENSION_LABELS = {
+    tech_stack: 'Technology Stack',
+    compliance_regulatory: 'Compliance & Regulatory',
+    integration_patterns: 'Integration Patterns',
+    delivery_risk: 'Delivery Risk',
+};
+const DIMENSION_ORDER = ['tech_stack', 'compliance_regulatory', 'integration_patterns', 'delivery_risk'];
+const TIER_STYLES = {
+    low: 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-300 dark:border-green-700',
+    medium: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700',
+    high: 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-300 dark:border-red-700',
+};
+
+const RoleDaysTable = ({ roleDays, totalLabel }) => {
+    const total = ROLE_ORDER.reduce((sum, r) => sum + (roleDays?.[r] || 0), 0);
+    return (
+        <div className="overflow-x-auto">
+            <table className="min-w-full text-sm border dark:border-gray-700 rounded overflow-hidden">
+                <thead className="bg-gray-800 text-white">
+                    <tr>
+                        <th className="px-3 py-2 text-left">Role</th>
+                        {ROLE_ORDER.map(r => <th key={r} className="px-3 py-2 text-center">{ROLE_LABELS[r]}</th>)}
+                        <th className="px-3 py-2 text-center">{totalLabel || 'Total'}</th>
+                    </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800">
+                    <tr>
+                        <td className="px-3 py-2 text-gray-500 dark:text-gray-400">Days</td>
+                        {ROLE_ORDER.map(r => <td key={r} className="px-3 py-2 text-center text-gray-900 dark:text-gray-100">{(roleDays?.[r] || 0).toFixed(1)}</td>)}
+                        <td className="px-3 py-2 text-center font-semibold text-gray-900 dark:text-gray-100">{total.toFixed(1)}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    );
+};
+
+const ScopeiqEstimateTab = ({ scopeiq, generating, onGenerate, jobId }) => {
+    const status = scopeiq?.status || 'not_started';
+
+    if (status === 'not_started') {
+        return (
+            <div className="text-center py-12">
+                <div className="mx-auto h-14 w-14 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-2xl mb-4">📦</div>
+                <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100">No ScopeIQ estimate yet</h4>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+                    Generate a delivery-effort estimate for this job: a ScopeIQ agent decomposes it into four
+                    research dimensions, each producing a role-level day breakdown, complexity uplift signals,
+                    and risk adjustments.
+                </p>
+                <button
+                    onClick={onGenerate}
+                    className="mt-4 px-4 py-2 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 transition-colors"
+                >
+                    Generate ScopeIQ Estimate
+                </button>
+            </div>
+        );
+    }
+
+    if (generating || status === 'generating' || status === 'pending') {
+        return (
+            <div className="text-center py-12">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                    Researching tech stack, compliance, integration patterns, and delivery risk — this can take up to a minute.
+                </p>
+            </div>
+        );
+    }
+
+    if (status === 'failed') {
+        return (
+            <div className="text-center py-12">
+                <div className="mx-auto h-14 w-14 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-2xl mb-4">⚠️</div>
+                <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100">Estimate generation failed</h4>
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400 max-w-md mx-auto">{scopeiq.error || 'Unknown error.'}</p>
+                <button
+                    onClick={onGenerate}
+                    className="mt-4 px-4 py-2 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 transition-colors"
+                >
+                    Retry
+                </button>
+            </div>
+        );
+    }
+
+    // completed
+    const totalUpliftPct = (scopeiq.uplift_adjustments || []).reduce((sum, s) => sum + (s.uplift_pct || 0), 0);
+    const totalRiskDays = (scopeiq.risk_adjustments || []).reduce((sum, r) => sum + (r.impact_days || 0), 0);
+    const dimensionsByName = Object.fromEntries((scopeiq.dimensions || []).map(d => [d.dimension, d]));
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className={`inline-block px-3 py-1.5 rounded border text-sm font-semibold ${TIER_STYLES[scopeiq.complexity_tier] || ''}`}>
+                    Complexity Tier: {(scopeiq.complexity_tier || 'unknown').toUpperCase()}
+                </div>
+                <div className="flex gap-2">
+                    <button
+                        onClick={onGenerate}
+                        className="px-3 py-1 text-sm text-gray-600 dark:text-gray-300 hover:underline"
+                    >
+                        🔄 Regenerate
+                    </button>
+                    <a
+                        href={`/api/jobs/${jobId}/export/scopeiq-estimate`}
+                        className="px-3 py-1 bg-slate-700 text-white text-sm rounded hover:bg-slate-800 transition-colors inline-flex items-center"
+                    >
+                        📄 Export PDF
+                    </a>
+                </div>
+            </div>
+
+            <div>
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Base Effort</h3>
+                <RoleDaysTable roleDays={scopeiq.role_day_totals} totalLabel="Base Total" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+                <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded p-3">
+                    <div className="text-gray-500 dark:text-gray-400">Base effort</div>
+                    <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">{scopeiq.total_days_base?.toFixed(1)}d</div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded p-3">
+                    <div className="text-gray-500 dark:text-gray-400">Complexity uplift</div>
+                    <div className="text-lg font-semibold text-indigo-600 dark:text-indigo-400">+{totalUpliftPct.toFixed(0)}%</div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded p-3">
+                    <div className="text-gray-500 dark:text-gray-400">Risk adjustment</div>
+                    <div className="text-lg font-semibold text-amber-600 dark:text-amber-400">+{totalRiskDays.toFixed(1)}d</div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 border-2 border-indigo-300 dark:border-indigo-700 rounded p-3">
+                    <div className="text-gray-500 dark:text-gray-400">Adjusted total</div>
+                    <div className="text-lg font-bold text-gray-900 dark:text-gray-100">{scopeiq.total_days_adjusted?.toFixed(1)}d</div>
+                </div>
+            </div>
+
+            <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Research Dimensions</h3>
+                {DIMENSION_ORDER.filter(name => dimensionsByName[name]).map((name) => {
+                    const dim = dimensionsByName[name];
+                    return (
+                        <div key={name} className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg p-4">
+                            <h4 className="font-semibold text-gray-900 dark:text-gray-100">{DIMENSION_LABELS[name] || name}</h4>
+                            <p className="text-xs italic text-gray-500 dark:text-gray-400 mt-1">Scope: {dim.scope_brief}</p>
+                            <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">{dim.findings}</p>
+                            <div className="mt-3">
+                                <RoleDaysTable roleDays={dim.role_days} />
+                            </div>
+                            {(dim.uplift_signals || []).length > 0 && (
+                                <div className="mt-3 space-y-1">
+                                    {dim.uplift_signals.map((s, i) => (
+                                        <div key={i} className="text-sm bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 rounded px-3 py-2">
+                                            <b>+{s.uplift_pct?.toFixed(0)}% — {s.signal}</b>: {s.rationale}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {(dim.risks || []).length > 0 && (
+                                <div className="mt-3 space-y-1">
+                                    {dim.risks.map((r, i) => (
+                                        <div key={i} className="text-sm bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700 rounded px-3 py-2">
+                                            <b>Risk ({r.likelihood} likelihood, +{r.impact_days?.toFixed(1)}d)</b>: {r.description}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 };

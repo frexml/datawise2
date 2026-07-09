@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey, Text, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey, Text, Boolean, Float
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -27,6 +27,7 @@ class Job(Base):
     annotations = relationship("Annotation", back_populates="job", cascade="all, delete-orphan")
     lineages = relationship("Lineage", back_populates="job", cascade="all, delete-orphan")
     reviews = relationship("Review", back_populates="job", cascade="all, delete-orphan")
+    scopeiq_estimate = relationship("ScopeIQEstimate", back_populates="job", uselist=False, cascade="all, delete-orphan")
 
 class Result(Base):
     __tablename__ = "results"
@@ -125,3 +126,28 @@ class Review(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     job = relationship("Job", back_populates="reviews")
+
+class ScopeIQEstimate(Base):
+    """Per-job delivery-effort estimate produced by the ScopeIQ agent.
+
+    One row per job (regenerating overwrites in place, like Result) — this
+    is a derived analytical product, not an audit trail like Review.
+    """
+    __tablename__ = "scopeiq_estimates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(Integer, ForeignKey("jobs.id"), unique=True, index=True)
+    status = Column(String, default="pending")  # pending, generating, completed, failed
+    package_id = Column(String)
+    dimensions = Column(JsonCol)  # list of {dimension, scope_brief, findings, role_days, uplift_signals, risks}
+    role_day_totals = Column(JsonCol)  # {role: days} summed across dimensions, pre-adjustment
+    uplift_adjustments = Column(JsonCol)  # [{dimension, signal, uplift_pct, rationale}]
+    risk_adjustments = Column(JsonCol)  # [{dimension, description, impact_days, likelihood}]
+    total_days_base = Column(Float)
+    total_days_adjusted = Column(Float)
+    complexity_tier = Column(String)  # low, medium, high
+    error = Column(Text)  # populated when status == "failed"
+    generated_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    job = relationship("Job", back_populates="scopeiq_estimate")

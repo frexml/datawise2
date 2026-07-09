@@ -112,6 +112,51 @@ def regenerate_summary_task(review_id: int):
     finally:
         db.close()
 
+@celery_app.task
+def generate_scopeiq_estimate_task(job_id: int):
+    """Async task backing the on-demand 'Generate ScopeIQ Estimate' button.
+
+    The triggering endpoint already created/reset the ScopeIQEstimate row to
+    status="generating" before dispatching this task, so a missing row here
+    means the job was deleted mid-flight — nothing to do.
+    """
+    from dsxlineage.agents.scopeiq_agent import generate_estimate_for_job
+
+    db = SessionLocal()
+    try:
+        estimate = db.query(models.ScopeIQEstimate).filter(models.ScopeIQEstimate.job_id == job_id).first()
+        if not estimate:
+            print(f"generate_scopeiq_estimate_task: no ScopeIQEstimate row for job {job_id}, skipping")
+            return
+
+        try:
+            result = generate_estimate_for_job(job_id)
+        except Exception as exc:
+            estimate.status = "failed"
+            estimate.error = str(exc)
+            db.commit()
+            print(f"ScopeIQ estimate generation failed for job {job_id}: {exc}")
+            return
+
+        estimate.status = "completed"
+        estimate.package_id = result["package_id"]
+        estimate.dimensions = result["dimensions"]
+        estimate.role_day_totals = result["role_day_totals"]
+        estimate.uplift_adjustments = result["uplift_adjustments"]
+        estimate.risk_adjustments = result["risk_adjustments"]
+        estimate.total_days_base = result["total_days_base"]
+        estimate.total_days_adjusted = result["total_days_adjusted"]
+        estimate.complexity_tier = result["complexity_tier"]
+        estimate.generated_at = result["generated_at"]
+        db.commit()
+        print(
+            f"ScopeIQ estimate generated for job {job_id}: "
+            f"{result['total_days_adjusted']} days ({result['complexity_tier']})."
+        )
+    finally:
+        db.close()
+
+
 @celery_app.task(bind=True)
 def process_dsx_task(self, job_id: int, file_path: str):
     db = SessionLocal()

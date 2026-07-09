@@ -412,6 +412,70 @@ def export_s2t_register(job_id: int, db: Session = Depends(get_db)):
     )
 
 
+@router.post("/jobs/{job_id}/scopeiq/generate")
+def generate_scopeiq_estimate(job_id: int, db: Session = Depends(get_db)):
+    from dsxlineage.worker import generate_scopeiq_estimate_task
+
+    job = db.query(models.Job).filter(models.Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.status != "COMPLETED":
+        raise HTTPException(status_code=409, detail="Job must be completed before generating a ScopeIQ estimate")
+
+    estimate = db.query(models.ScopeIQEstimate).filter(models.ScopeIQEstimate.job_id == job_id).first()
+    if estimate:
+        estimate.status = "generating"
+        estimate.error = None
+    else:
+        estimate = models.ScopeIQEstimate(job_id=job_id, status="generating")
+        db.add(estimate)
+    db.commit()
+
+    generate_scopeiq_estimate_task.delay(job_id)
+    return {"status": "generating"}
+
+
+@router.get("/jobs/{job_id}/scopeiq")
+def get_scopeiq_estimate(job_id: int, db: Session = Depends(get_db)):
+    estimate = db.query(models.ScopeIQEstimate).filter(models.ScopeIQEstimate.job_id == job_id).first()
+    if not estimate:
+        return {"status": "not_started"}
+    return {
+        "status": estimate.status,
+        "package_id": estimate.package_id,
+        "dimensions": estimate.dimensions,
+        "role_day_totals": estimate.role_day_totals,
+        "uplift_adjustments": estimate.uplift_adjustments,
+        "risk_adjustments": estimate.risk_adjustments,
+        "total_days_base": estimate.total_days_base,
+        "total_days_adjusted": estimate.total_days_adjusted,
+        "complexity_tier": estimate.complexity_tier,
+        "error": estimate.error,
+        "generated_at": estimate.generated_at,
+    }
+
+
+@router.get("/jobs/{job_id}/export/scopeiq-estimate")
+def export_scopeiq_estimate(job_id: int, db: Session = Depends(get_db)):
+    from dsxlineage.services.scopeiq_pdf import generate_scopeiq_estimate_pdf
+
+    job = db.query(models.Job).filter(models.Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    estimate = db.query(models.ScopeIQEstimate).filter(models.ScopeIQEstimate.job_id == job_id).first()
+    if not estimate or estimate.status != "completed":
+        raise HTTPException(status_code=409, detail="ScopeIQ estimate is not ready for this job")
+
+    buffer = generate_scopeiq_estimate_pdf(job, estimate)
+    filename = f"{os.path.splitext(job.filename)[0]}_scopeiq_estimate.pdf"
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/jobs/{job_id}/export/evidence-pack")
 def export_evidence_pack(job_id: int, db: Session = Depends(get_db)):
     from dsxlineage.services.evidence_pack import generate_evidence_pack
@@ -427,6 +491,8 @@ def export_evidence_pack(job_id: int, db: Session = Depends(get_db)):
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
 
 
 @router.get("/jobs/{job_id}/stage-lineage")

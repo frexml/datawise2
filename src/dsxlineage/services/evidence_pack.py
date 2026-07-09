@@ -6,8 +6,6 @@ audit trail and governed (or explicitly not-yet-governed) summaries —
 suitable for submission to a regulatory examiner on demand.
 """
 import io
-import re
-import xml.sax.saxutils as saxutils
 from datetime import datetime, timezone
 
 from reportlab.lib import colors
@@ -20,6 +18,7 @@ from reportlab.platypus import (
 from sqlalchemy.orm import Session
 
 from dsxlineage.db import models
+from dsxlineage.services.pdf_text import markdown_to_reportlab
 
 _PAGE_SIZE = landscape(letter)
 _PAGE_WIDTH = _PAGE_SIZE[0]
@@ -38,23 +37,6 @@ _INDIGO = colors.HexColor("#3730A3")
 _INDIGO_BG = colors.HexColor("#E0E7FF")
 _GRID = colors.HexColor("#CBD5E1")
 _ZEBRA = colors.HexColor("#F1F5F9")
-
-# The LLM writes markdown (**bold** headers, `code` identifiers) but
-# reportlab's Paragraph only understands a small XML tag set — convert.
-_LEADING_TITLE_RE = re.compile(r"^\s*\*\*[^\n*]+\*\*\s*\n+")
-_BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
-_CODE_RE = re.compile(r"`([^`]+)`")
-
-
-def _markdown_to_reportlab(text: str | None) -> str:
-    if not text:
-        return "Not available."
-    # Strip a leading **Title** line — it duplicates the section heading we already render.
-    text = _LEADING_TITLE_RE.sub("", text, count=1)
-    escaped = saxutils.escape(text)
-    escaped = _CODE_RE.sub(lambda m: f'<font face="Courier">{m.group(1)}</font>', escaped)
-    escaped = _BOLD_RE.sub(lambda m: f"<b>{m.group(1)}</b>", escaped)
-    return escaped.replace("\n\n", "<br/><br/>").replace("\n", "<br/>")
 
 
 def _styles():
@@ -201,10 +183,10 @@ def generate_evidence_pack(job_id: int, db: Session) -> io.BytesIO:
         HRFlowable(width=_CONTENT_WIDTH, color=_GRID, thickness=0.75),
         Spacer(1, 10),
         Paragraph("Technical Summary", styles["heading"]),
-        Paragraph(_markdown_to_reportlab(result.llm_explanation if result else None), styles["body"]),
+        Paragraph(markdown_to_reportlab(result.llm_explanation if result else None), styles["body"]),
         Spacer(1, 12),
         Paragraph("Business Summary", styles["heading"]),
-        Paragraph(_markdown_to_reportlab(result.business_summary if result else None), styles["body"]),
+        Paragraph(markdown_to_reportlab(result.business_summary if result else None), styles["body"]),
         PageBreak(),
         Paragraph("Column-Level Lineage", styles["heading"]),
     ]
