@@ -39,6 +39,7 @@ _MINI_MODEL = "gpt-4o-mini"
 _DIALECT_LABELS = {
     "datastage": "DataStage",
     "ssis": "SSIS (SQL Server Integration Services)",
+    "informatica": "Informatica PowerCenter",
 }
 
 

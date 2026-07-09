@@ -41,7 +41,7 @@ const FileUpload = ({ onUploadSuccess }) => {
             <div className="flex items-center space-x-4">
                 <input
                     type="file"
-                    accept=".dsx,.dtsx"
+                    accept=".dsx,.dtsx,.xml"
                     onChange={handleFileChange}
                     className="block w-full text-sm text-gray-500 dark:text-gray-400
             file:mr-4 file:py-2 file:px-4

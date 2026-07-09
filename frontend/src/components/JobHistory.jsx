@@ -99,7 +99,7 @@ const JobHistory = () => {
         <div>
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Job History</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Every DataStage or SSIS export processed so far.</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Every DataStage, SSIS, or Informatica export processed so far.</p>
             </div>
 
             <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-md">

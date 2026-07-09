@@ -1,7 +1,8 @@
-import os
 from typing import Dict, Any
+from dsxlineage.agents.lib.dialect_detection import detect_dialect
 from dsxlineage.agents.lib.dsx_parser import parse_dsx
 from dsxlineage.agents.lib.ssis_parser import parse_dtsx
+from dsxlineage.agents.lib.informatica_parser import parse_informatica_xml
 
 class ParserAgent:
     def __init__(self):
@@ -12,9 +13,11 @@ class ParserAgent:
         if not file_path:
             raise ValueError("No file path provided")
 
-        ext = os.path.splitext(file_path)[1].lower()
-        if ext == ".dtsx":
+        dialect = detect_dialect(file_path)
+        if dialect == "ssis":
             return self._run_ssis(file_path)
+        if dialect == "informatica":
+            return self._run_informatica(file_path)
         return self._run_datastage(file_path)
 
     def _run_ssis(self, file_path: str) -> Dict[str, Any]:
@@ -27,6 +30,17 @@ class ParserAgent:
             "export_date": parsed_data.get("creation_date"),
         }
         return {"parsed_data": parsed_data, "dialect": "ssis"}
+
+    def _run_informatica(self, file_path: str) -> Dict[str, Any]:
+        print(f"ParserAgent: Parsing {file_path} (Informatica)")
+        parsed_data = parse_informatica_xml(file_path)
+        parsed_data["_metadata"] = {
+            "dialect": "informatica",
+            "job_type": "Informatica PowerCenter Mapping",
+            "job_identifier": parsed_data.get("folder_name"),
+            "export_date": parsed_data.get("creation_date"),
+        }
+        return {"parsed_data": parsed_data, "dialect": "informatica"}
 
     def _run_datastage(self, file_path: str) -> Dict[str, Any]:
         print(f"ParserAgent: Parsing {file_path} (DataStage)")

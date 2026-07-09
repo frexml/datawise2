@@ -180,9 +180,9 @@ const Home = () => {
                             <span className="text-orange-600">governed documentation</span> — automatically
                         </h1>
                         <p className="mt-4 text-base text-gray-600 dark:text-gray-300 max-w-xl mx-auto">
-                            Upload a DataStage (`.dsx`) or SSIS (`.dtsx`) export and watch column-level lineage,
-                            technical &amp; business summaries, and inefficiency findings get extracted in
-                            minutes — every summary human-reviewed before it's governed.
+                            Upload a DataStage (`.dsx`), SSIS (`.dtsx`), or Informatica (`.xml`) export and watch
+                            column-level lineage, technical &amp; business summaries, and inefficiency findings
+                            get extracted in minutes — every summary human-reviewed before it's governed.
                         </p>
 
                         {!showUpload ? (

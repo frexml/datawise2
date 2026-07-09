@@ -2,6 +2,7 @@ from typing import Dict, Any
 import json
 from dsxlineage.agents.lib.detailed_analyzer import DSXAnalyzer
 from dsxlineage.agents.lib.ssis_analyzer import analyze_ssis
+from dsxlineage.agents.lib.informatica_analyzer import analyze_informatica
 
 class AnalyzerAgent:
     def __init__(self):
@@ -12,9 +13,13 @@ class AnalyzerAgent:
         if not parsed_data:
              raise ValueError("No parsed data provided in state")
 
-        if state.get("dialect") == "ssis":
+        dialect = state.get("dialect")
+        if dialect == "ssis":
             print("AnalyzerAgent: Analyzing SSIS package")
             return {"analysis_result": analyze_ssis(parsed_data)}
+        if dialect == "informatica":
+            print("AnalyzerAgent: Analyzing Informatica mapping")
+            return {"analysis_result": analyze_informatica(parsed_data)}
 
         # DataStage: DSXAnalyzer is designed to load from file, but since we
         # already have parsed_data in state we instantiate it with data=
