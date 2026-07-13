@@ -9,6 +9,13 @@ const STATUS_BADGE = {
     regenerating: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-300',
 };
 
+// Matches the backend's _REVIEW_SLA_HOURS (endpoints.py) — kept as a
+// frontend-only computation since it's purely a display concern here.
+const REVIEW_SLA_HOURS = 48;
+const isOverdue = (review) =>
+    ['pending_review', 'rejected', 'regenerating'].includes(review.status) &&
+    (Date.now() - new Date(review.created_at).getTime()) / (1000 * 60 * 60) > REVIEW_SLA_HOURS;
+
 const PendingReviews = () => {
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -203,6 +210,11 @@ const PendingReviews = () => {
                                             <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_BADGE[review.status] || ''}`}>
                                                 {review.status.replace(/_/g, ' ')}
                                             </span>
+                                            {isOverdue(review) && (
+                                                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300" title={`Open longer than ${REVIEW_SLA_HOURS}h`}>
+                                                    ⏰ Overdue
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="text-xs text-gray-500 dark:text-gray-400">
                                             {review.target_type.replace(/_/g, ' ')} · queued {new Date(review.created_at).toLocaleString()}

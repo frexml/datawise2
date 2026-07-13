@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 // Polling cadence: fast while a job is actively PROCESSING; slow otherwise.
 // Pauses entirely when the tab is hidden.
@@ -39,16 +39,44 @@ const JobHistory = () => {
     const jobsRef = useRef(jobs);
     jobsRef.current = jobs;
 
+    const [searchParams, setSearchParams] = useSearchParams();
+    const domainFilter = searchParams.get('domain') || '';
+    const waveFilter = searchParams.get('wave') || '';
+    const priorityFilter = searchParams.get('priority') === '1';
+    const [knownDomains, setKnownDomains] = useState([]);
+    const [knownWaves, setKnownWaves] = useState([]);
+
+    useEffect(() => {
+        axios.get('/api/portfolio')
+            .then((res) => {
+                setKnownDomains(res.data.domains || []);
+                setKnownWaves(res.data.waves || []);
+            })
+            .catch((err) => console.error('Failed to load domain/wave filters:', err));
+    }, []);
+
     const fetchJobs = useCallback(async () => {
         try {
-            const response = await axios.get('/api/jobs');
+            const params = {};
+            if (domainFilter) params.domain = domainFilter;
+            if (waveFilter) params.wave = waveFilter;
+            if (priorityFilter) params.priority = true;
+            const response = await axios.get('/api/jobs', { params });
             setJobs(response.data);
         } catch (error) {
             console.error('Error fetching jobs:', error);
         } finally {
             setLoadingJobs(false);
         }
-    }, []);
+    }, [domainFilter, waveFilter, priorityFilter]);
+
+    const updateFilter = (key, value) => {
+        const next = new URLSearchParams(searchParams);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        setSearchParams(next);
+        setLoadingJobs(true);
+    };
 
     const handleDelete = async (jobId) => {
         if (!window.confirm("Are you sure you want to delete this job?")) return;
@@ -103,8 +131,37 @@ const JobHistory = () => {
             </div>
 
             <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-md">
-                <div className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
+                <div className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-wrap gap-3">
                     <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-gray-100">Processed Jobs</h3>
+                    <div className="flex items-center gap-2">
+                        <select
+                            value={domainFilter}
+                            onChange={(e) => updateFilter('domain', e.target.value)}
+                            className="text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded px-2 py-1"
+                        >
+                            <option value="">All Domains</option>
+                            <option value="Unassigned">Unassigned</option>
+                            {knownDomains.map((d) => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                        <select
+                            value={waveFilter}
+                            onChange={(e) => updateFilter('wave', e.target.value)}
+                            className="text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded px-2 py-1"
+                        >
+                            <option value="">All Waves</option>
+                            <option value="Unassigned">Unassigned</option>
+                            {knownWaves.map((w) => <option key={w} value={w}>{w}</option>)}
+                        </select>
+                        <label className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                            <input
+                                type="checkbox"
+                                checked={priorityFilter}
+                                onChange={(e) => updateFilter('priority', e.target.checked ? '1' : '')}
+                                className="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            ⭐ Priority only
+                        </label>
+                    </div>
                 </div>
 
                 {loadingJobs ? (
@@ -118,7 +175,17 @@ const JobHistory = () => {
                                 <Link to={`/jobs/${job.id}`} className="block hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                     <div className="px-4 py-4 sm:px-6">
                                         <div className="flex items-center justify-between">
-                                            <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400 truncate">{job.filename}</p>
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400 truncate">{job.filename}</p>
+                                                {job.domain && (
+                                                    <span className="px-1.5 py-0.5 text-xs rounded bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 whitespace-nowrap">{job.domain}</span>
+                                                )}
+                                                {job.wave && (
+                                                    <span className="px-1.5 py-0.5 text-xs rounded bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300 whitespace-nowrap">{job.wave}</span>
+                                                )}
+                                                {job.priority && <span title="Priority job">⭐</span>}
+                                                {job.catalog_pushed_at && <span title="Pushed to governance catalog">📚</span>}
+                                            </div>
                                             <div className="ml-2 flex-shrink-0 flex">
                                                 <p className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
                         ${job.status === 'COMPLETED' ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300' :

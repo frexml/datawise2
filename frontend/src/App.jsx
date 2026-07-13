@@ -5,6 +5,7 @@ import Home from './components/Home';
 import JobHistory from './components/JobHistory';
 import JobDetails from './components/JobDetails';
 import PendingReviews from './components/PendingReviews';
+import Portfolio from './components/Portfolio';
 
 const ThemeToggle = () => {
     const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
@@ -80,6 +81,9 @@ function App() {
                                 <NavLink to="/history" className={navLinkClass}>
                                     History
                                 </NavLink>
+                                <NavLink to="/portfolio" className={navLinkClass}>
+                                    Portfolio
+                                </NavLink>
                                 <NavLink to="/reviews" className={navLinkClass}>
                                     <span className="inline-flex items-center gap-1.5">
                                         Reviews
@@ -102,6 +106,7 @@ function App() {
                         <Routes>
                             <Route path="/" element={<Home />} />
                             <Route path="/history" element={<JobHistory />} />
+                            <Route path="/portfolio" element={<Portfolio />} />
                             <Route path="/jobs/:jobId" element={<JobDetails />} />
                             <Route path="/reviews" element={<PendingReviews />} />
                         </Routes>

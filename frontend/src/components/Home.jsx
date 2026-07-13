@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import FileUpload from './FileUpload';
+import BulkUpload from './BulkUpload';
 
 const KpiTile = ({ label, value, accent, icon }) => (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4 flex items-center gap-3">
@@ -116,7 +117,7 @@ const RunProgress = ({ job }) => {
 const Home = () => {
     const navigate = useNavigate();
     const [stats, setStats] = useState(null);
-    const [showUpload, setShowUpload] = useState(false);
+    const [uploadMode, setUploadMode] = useState(null); // null | 'single' | 'bulk'
     const [activeJob, setActiveJob] = useState(null);
     const pollRef = useRef(null);
 
@@ -142,7 +143,7 @@ const Home = () => {
     }, []);
 
     const onUploadSuccess = ({ job_id }) => {
-        setShowUpload(false);
+        setUploadMode(null);
         setActiveJob({ id: job_id, filename: 'your file', status: 'PENDING', current_stage: null });
 
         const poll = async () => {
@@ -185,16 +186,29 @@ const Home = () => {
                             get extracted in minutes — every summary human-reviewed before it's governed.
                         </p>
 
-                        {!showUpload ? (
-                            <button
-                                onClick={() => setShowUpload(true)}
-                                className="mt-8 inline-flex items-center gap-2 px-6 py-3 bg-orange-600 text-white text-base font-semibold rounded-lg shadow hover:bg-orange-700 transition-colors"
-                            >
-                                🚀 Start New Run
-                            </button>
-                        ) : (
+                        {!uploadMode ? (
+                            <div className="mt-8 flex items-center justify-center gap-3">
+                                <button
+                                    onClick={() => setUploadMode('single')}
+                                    className="inline-flex items-center gap-2 px-6 py-3 bg-orange-600 text-white text-base font-semibold rounded-lg shadow hover:bg-orange-700 transition-colors"
+                                >
+                                    🚀 Start New Run
+                                </button>
+                                <button
+                                    onClick={() => setUploadMode('bulk')}
+                                    className="inline-flex items-center gap-2 px-6 py-3 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-base font-semibold rounded-lg shadow border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                                >
+                                    📦 Bulk Upload
+                                </button>
+                            </div>
+                        ) : uploadMode === 'single' ? (
                             <div className="mt-8 max-w-lg mx-auto text-left">
                                 <FileUpload onUploadSuccess={onUploadSuccess} />
+                                <button onClick={() => setUploadMode(null)} className="mt-2 text-sm text-gray-500 dark:text-gray-400 hover:underline">✕ Cancel</button>
+                            </div>
+                        ) : (
+                            <div className="mt-8 max-w-2xl mx-auto text-left">
+                                <BulkUpload onCancel={() => setUploadMode(null)} />
                             </div>
                         )}
                     </div>
@@ -223,12 +237,13 @@ const Home = () => {
 
             {/* KPI tiles */}
             {stats && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                     <KpiTile label="Jobs Processed" value={stats.total_jobs} accent="bg-indigo-50 dark:bg-indigo-900/40" icon="📦" />
                     <KpiTile label="Completed" value={stats.completed_jobs} accent="bg-green-50 dark:bg-green-900/40" icon="✅" />
                     <KpiTile label="Pending Review" value={stats.pending_reviews} accent="bg-yellow-50 dark:bg-yellow-900/40" icon="📝" />
                     <KpiTile label="Inefficiencies Flagged" value={stats.inefficiencies_count} accent="bg-red-50 dark:bg-red-900/40" icon="⚡" />
                     <KpiTile label="Review Coverage" value={`${stats.review_coverage_pct}%`} accent="bg-blue-50 dark:bg-blue-900/40" icon="🛡️" />
+                    <KpiTile label="Pushed to Catalog" value={stats.catalog_pushed_count} accent="bg-purple-50 dark:bg-purple-900/40" icon="📚" />
                 </div>
             )}
         </div>

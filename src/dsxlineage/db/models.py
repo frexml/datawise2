@@ -17,6 +17,9 @@ class Job(Base):
     status = Column(String, default="PENDING") # PENDING, PROCESSING, COMPLETED, FAILED
     current_stage = Column(String)  # parsing, analyzing, mapping_lineage, generating_summaries,
                                      # saving_results, detecting_inefficiencies, completed
+    domain = Column(String, index=True)  # free-text engagement grouping, e.g. "Portfolio", "Fees"
+    wave = Column(String, index=True)    # free-text migration wave, e.g. "Wave 1"
+    priority = Column(Boolean, default=False, index=True)  # exit-gate coverage tracks priority jobs separately
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     catalog_pushed_at = Column(DateTime(timezone=True))  # set once pushed to the governance catalog

@@ -89,3 +89,6 @@ azure-deploy-pattern.md
 datawise-docs/
 
 migrations/
+
+# Claude related files
+.claude/

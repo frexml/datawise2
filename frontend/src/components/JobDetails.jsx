@@ -262,6 +262,30 @@ const JobDetails = () => {
         poll();
     };
 
+    const startEditingTags = () => {
+        setDomainInput(job.domain || '');
+        setWaveInput(job.wave || '');
+        setPriorityInput(!!job.priority);
+        setEditingTags(true);
+    };
+
+    const saveTags = async () => {
+        setSavingTags(true);
+        try {
+            const res = await axios.patch(`/api/jobs/${jobId}`, {
+                domain: domainInput.trim() || null,
+                wave: waveInput.trim() || null,
+                priority: priorityInput,
+            });
+            setJob((prev) => ({ ...prev, domain: res.data.domain, wave: res.data.wave, priority: res.data.priority }));
+            setEditingTags(false);
+        } catch (err) {
+            console.error('Failed to save domain/wave/priority:', err);
+        } finally {
+            setSavingTags(false);
+        }
+    };
+
     // distinct colors for stage types (Darker shades for white text)
     const distinctColors = [
         '#C0392B', // Dark Red
@@ -674,6 +698,11 @@ const JobDetails = () => {
     const [inefficiencies, setInefficiencies] = useState([]);
     const [scopeiq, setScopeiq] = useState(null);
     const [scopeiqGenerating, setScopeiqGenerating] = useState(false);
+    const [editingTags, setEditingTags] = useState(false);
+    const [domainInput, setDomainInput] = useState('');
+    const [waveInput, setWaveInput] = useState('');
+    const [priorityInput, setPriorityInput] = useState(false);
+    const [savingTags, setSavingTags] = useState(false);
 
     // One-time guided walkthrough hint — dismissed permanently per browser
     const [showWalkthrough, setShowWalkthrough] = useState(
@@ -885,7 +914,13 @@ const JobDetails = () => {
                         {processingSeconds !== null && (
                             <span>
                                 ⏱️ Analyzed in <strong>{processingSeconds}s</strong>
-                                <span className="text-gray-500 dark:text-gray-400"> — vs. days of manual reconstruction</span>
+                                {scopeiq?.status === 'completed' ? (
+                                    <span className="text-gray-500 dark:text-gray-400">
+                                        {' '}— vs. an estimated <strong>{scopeiq.total_days_adjusted}</strong> days of manual delivery effort (ScopeIQ)
+                                    </span>
+                                ) : (
+                                    <span className="text-gray-500 dark:text-gray-400"> — vs. days of manual reconstruction</span>
+                                )}
                             </span>
                         )}
                         <span>
@@ -1002,6 +1037,60 @@ const JobDetails = () => {
                                     ))}
                                 </div>
                             )}
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded border dark:border-gray-700">
+                                <div className="flex items-center justify-between">
+                                    <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Domain / Wave / Priority</div>
+                                    {!editingTags && (
+                                        <button onClick={startEditingTags} className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">✏️ Edit</button>
+                                    )}
+                                </div>
+                                {editingTags ? (
+                                    <div className="mt-1 space-y-1.5">
+                                        <input
+                                            type="text"
+                                            placeholder="Domain (e.g. Fees)"
+                                            value={domainInput}
+                                            onChange={(e) => setDomainInput(e.target.value)}
+                                            className="w-full text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded px-2 py-1"
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="Wave (e.g. Wave 1)"
+                                            value={waveInput}
+                                            onChange={(e) => setWaveInput(e.target.value)}
+                                            className="w-full text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded px-2 py-1"
+                                        />
+                                        <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                            <input
+                                                type="checkbox"
+                                                checked={priorityInput}
+                                                onChange={(e) => setPriorityInput(e.target.checked)}
+                                                className="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                            ⭐ Priority job
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={saveTags}
+                                                disabled={savingTags}
+                                                className="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-50"
+                                            >
+                                                {savingTags ? 'Saving...' : 'Save'}
+                                            </button>
+                                            <button onClick={() => setEditingTags(false)} className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400 hover:underline">
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                        {job.domain || <span className="text-gray-400 italic">Unassigned</span>}
+                                        {' · '}
+                                        {job.wave || <span className="text-gray-400 italic">Unassigned</span>}
+                                        {job.priority && <span className="ml-1.5" title="Priority job">⭐</span>}
+                                    </div>
+                                )}
+                            </div>
                             <div className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded border dark:border-gray-700">
                                 <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Governance Catalog</div>
                                 {job.catalog_pushed_at ? (

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -15,38 +15,276 @@ router = APIRouter()
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+_REVIEW_SLA_HOURS = 48  # matches the Config & Deployment Guide's review_sla_hours default
+
 @router.post("/upload")
-async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_file(
+    file: UploadFile = File(...),
+    domain: str | None = Form(None),
+    wave: str | None = Form(None),
+    priority: bool = Form(False),
+    db: Session = Depends(get_db),
+):
     # Generate unique filename
     file_ext = os.path.splitext(file.filename)[1]
     unique_filename = f"{uuid.uuid4()}{file_ext}"
     file_path = os.path.join(UPLOAD_DIR, unique_filename)
-    
+
     # Save file
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-        
+
     # Create Job record
-    job = models.Job(filename=file.filename, status="PENDING")
+    job = models.Job(
+        filename=file.filename,
+        status="PENDING",
+        domain=(domain or "").strip() or None,
+        wave=(wave or "").strip() or None,
+        priority=priority,
+    )
     db.add(job)
     db.commit()
     db.refresh(job)
-    
+
     # Trigger Celery task
     process_dsx_task.delay(job.id, os.path.abspath(file_path))
-    
+
     return {"job_id": job.id, "status": "PENDING"}
 
 @router.get("/jobs")
-def list_jobs(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def list_jobs(
+    skip: int = 0,
+    limit: int = 100,
+    domain: str | None = None,
+    wave: str | None = None,
+    priority: bool | None = None,
+    db: Session = Depends(get_db),
+):
+    query = db.query(models.Job)
+    if domain:
+        query = query.filter(models.Job.domain == (None if domain == "Unassigned" else domain))
+    if wave:
+        query = query.filter(models.Job.wave == (None if wave == "Unassigned" else wave))
+    if priority is not None:
+        query = query.filter(models.Job.priority == priority)
     jobs = (
-        db.query(models.Job)
+        query
         .order_by(models.Job.created_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
     )
     return jobs
+
+
+class JobTagUpdate(BaseModel):
+    domain: str | None = None
+    wave: str | None = None
+    priority: bool | None = None
+
+
+@router.patch("/jobs/{job_id}")
+def update_job_tags(job_id: int, update: JobTagUpdate, db: Session = Depends(get_db)):
+    job = db.query(models.Job).filter(models.Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job.domain = (update.domain or "").strip() or None
+    job.wave = (update.wave or "").strip() or None
+    if update.priority is not None:
+        job.priority = update.priority
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def _fetch_inefficiency_counts_by_job() -> dict[int, int]:
+    """{job_id: pattern_count} across all jobs, in one Neo4j round trip.
+    Best-effort — same guard as /api/stats, must not fail the endpoint."""
+    try:
+        from dsxlineage.db.graph import get_driver
+        from dsxlineage.core.config import settings
+
+        driver = get_driver()
+        with driver.session(database=settings.NEO4J_DATABASE) as session:
+            records = session.run(
+                "MATCH (j:Job)-[:HAS_PATTERN]->(p:InefficiencyPattern) "
+                "RETURN j.job_id AS job_id, count(p) AS count"
+            )
+            return {r["job_id"]: r["count"] for r in records}
+    except Exception as exc:  # noqa: BLE001
+        print(f"Warning: could not fetch inefficiency counts from Neo4j: {exc}")
+        return {}
+
+
+_RECURRING_PATTERN_MIN_JOBS = 2  # matches the Config Guide's redundant_join_min_occurrences default
+_RECURRING_PATTERN_LIMIT = 20
+
+
+def _fetch_recurring_patterns(jobs_by_id: dict[int, dict]) -> dict:
+    """Patterns whose signature (see inefficiency_agent.py) recurs across 2+
+    jobs — "the same join/pattern appears in N+ jobs" per the docs' config
+    thresholds. Best-effort, same Neo4j-outage guard as the rest of this file."""
+    try:
+        from dsxlineage.db.graph import get_driver
+        from dsxlineage.core.config import settings
+
+        driver = get_driver()
+        with driver.session(database=settings.NEO4J_DATABASE) as session:
+            records = list(session.run(
+                "MATCH (j:Job)-[:HAS_PATTERN]->(p:InefficiencyPattern) "
+                "WHERE p.signature IS NOT NULL "
+                "RETURN j.job_id AS job_id, p.pattern_type AS pattern_type, "
+                "p.signature AS signature, p.description AS description"
+            ))
+    except Exception as exc:  # noqa: BLE001
+        print(f"Warning: could not fetch recurring patterns from Neo4j: {exc}")
+        return {"patterns": [], "truncated": False}
+
+    grouped: dict[str, dict] = {}
+    for r in records:
+        job_id = r["job_id"]
+        if job_id not in jobs_by_id:
+            continue  # job deleted since detection ran
+        bucket = grouped.setdefault(r["signature"], {
+            "pattern_type": r["pattern_type"],
+            "sample_description": r["description"],
+            "job_ids": set(),
+        })
+        bucket["job_ids"].add(job_id)
+
+    rows = [
+        {
+            "signature": sig,
+            "pattern_type": b["pattern_type"],
+            "sample_description": b["sample_description"],
+            "job_count": len(b["job_ids"]),
+            "jobs": [jobs_by_id[jid] for jid in sorted(b["job_ids"])],
+        }
+        for sig, b in grouped.items()
+        if len(b["job_ids"]) >= _RECURRING_PATTERN_MIN_JOBS
+    ]
+    rows.sort(key=lambda r: r["job_count"], reverse=True)
+
+    truncated = len(rows) > _RECURRING_PATTERN_LIMIT
+    return {"patterns": rows[:_RECURRING_PATTERN_LIMIT], "truncated": truncated}
+
+
+@router.get("/portfolio")
+def get_portfolio(db: Session = Depends(get_db)):
+    """Coverage breakdown by domain and by wave, for portfolio-scale
+    engagements (many jobs grouped into named domains/waves) rather than
+    the single flat number /api/stats reports."""
+
+    completed_ids = {
+        j.id for j in db.query(models.Job.id).filter(models.Job.status == "COMPLETED").all()
+    }
+    ineff_by_job = _fetch_inefficiency_counts_by_job()
+    scopeiq_by_job = {
+        e.job_id: e.total_days_adjusted
+        for e in db.query(models.ScopeIQEstimate).filter(models.ScopeIQEstimate.status == "completed").all()
+    }
+    catalog_pushed_ids = {
+        j.id for j in db.query(models.Job.id).filter(models.Job.catalog_pushed_at.isnot(None)).all()
+    }
+    now = datetime.now(timezone.utc)
+    sla_cutoff_hours = _REVIEW_SLA_HOURS
+
+    def _breakdown(group_field) -> list[dict]:
+        jobs = db.query(models.Job.id, group_field, models.Job.priority).all()
+        buckets: dict[str, dict] = {}
+        for job_id, group_value, is_priority in jobs:
+            key = group_value or "Unassigned"
+            buckets.setdefault(key, {"job_ids": [], "priority_job_ids": []})
+            buckets[key]["job_ids"].append(job_id)
+            if is_priority:
+                buckets[key]["priority_job_ids"].append(job_id)
+
+        rows = []
+        for key, bucket in buckets.items():
+            job_ids = bucket["job_ids"]
+            priority_job_ids = set(bucket["priority_job_ids"])
+            total_jobs = len(job_ids)
+            completed_jobs = sum(1 for jid in job_ids if jid in completed_ids)
+
+            reviews = (
+                db.query(models.Review)
+                .filter(models.Review.job_id.in_(job_ids), models.Review.target_type == "executive_summary")
+                .all()
+            )
+            total_reviews = len(reviews)
+            approved_reviews = sum(1 for r in reviews if r.status == "approved")
+            coverage_pct = round((approved_reviews / total_reviews) * 100) if total_reviews else 0
+
+            priority_reviews = [r for r in reviews if r.job_id in priority_job_ids]
+            priority_total_reviews = len(priority_reviews)
+            priority_approved_reviews = sum(1 for r in priority_reviews if r.status == "approved")
+            priority_coverage_pct = (
+                round((priority_approved_reviews / priority_total_reviews) * 100)
+                if priority_total_reviews else 0
+            )
+
+            turnaround_days = [
+                (r.reviewed_at - r.created_at).total_seconds() / 86400
+                for r in reviews if r.status == "approved" and r.reviewed_at and r.created_at
+            ]
+            avg_turnaround_days = round(sum(turnaround_days) / len(turnaround_days), 1) if turnaround_days else None
+
+            overdue_reviews = sum(
+                1 for r in reviews
+                if r.status in ("pending_review", "rejected", "regenerating")
+                and r.created_at
+                and (now - r.created_at).total_seconds() / 3600 > sla_cutoff_hours
+            )
+
+            inefficiencies_count = sum(ineff_by_job.get(jid, 0) for jid in job_ids)
+            scopeiq_days = [scopeiq_by_job[jid] for jid in job_ids if jid in scopeiq_by_job]
+            scopeiq_total_days = round(sum(scopeiq_days), 1) if scopeiq_days else 0
+            scopeiq_estimated_jobs = len(scopeiq_days)
+            catalog_pushed_count = sum(1 for jid in job_ids if jid in catalog_pushed_ids)
+
+            rows.append({
+                "name": key,
+                "total_jobs": total_jobs,
+                "completed_jobs": completed_jobs,
+                "approved_reviews": approved_reviews,
+                "total_reviews": total_reviews,
+                "coverage_pct": coverage_pct,
+                "priority_total_jobs": len(priority_job_ids),
+                "priority_approved_reviews": priority_approved_reviews,
+                "priority_total_reviews": priority_total_reviews,
+                "priority_coverage_pct": priority_coverage_pct,
+                "avg_turnaround_days": avg_turnaround_days,
+                "overdue_reviews": overdue_reviews,
+                "inefficiencies_count": inefficiencies_count,
+                "scopeiq_total_days": scopeiq_total_days,
+                "scopeiq_estimated_jobs": scopeiq_estimated_jobs,
+                "catalog_pushed_count": catalog_pushed_count,
+            })
+
+        rows.sort(key=lambda r: (r["name"] == "Unassigned", r["name"]))
+        return rows
+
+    by_domain = _breakdown(models.Job.domain)
+    by_wave = _breakdown(models.Job.wave)
+
+    domains = sorted({r["name"] for r in by_domain if r["name"] != "Unassigned"})
+    waves = sorted({r["name"] for r in by_wave if r["name"] != "Unassigned"})
+
+    jobs_by_id = {
+        j.id: {"id": j.id, "filename": j.filename, "domain": j.domain, "wave": j.wave}
+        for j in db.query(models.Job.id, models.Job.filename, models.Job.domain, models.Job.wave).all()
+    }
+    recurring = _fetch_recurring_patterns(jobs_by_id)
+
+    return {
+        "by_domain": by_domain,
+        "by_wave": by_wave,
+        "domains": domains,
+        "waves": waves,
+        "recurring_patterns": recurring["patterns"],
+        "recurring_patterns_truncated": recurring["truncated"],
+    }
 
 
 @router.get("/stats")
@@ -66,6 +304,7 @@ def get_stats(db: Session = Depends(get_db)):
     rejected_reviews = db.query(models.Review).filter(models.Review.status == "rejected").count()
     total_reviews = db.query(models.Review).count()
     review_coverage_pct = round((approved_reviews / total_reviews) * 100) if total_reviews else 0
+    catalog_pushed_count = db.query(models.Job).filter(models.Job.catalog_pushed_at.isnot(None)).count()
 
     inefficiencies_count = 0
     try:
@@ -88,6 +327,7 @@ def get_stats(db: Session = Depends(get_db)):
         "rejected_reviews": rejected_reviews,
         "review_coverage_pct": review_coverage_pct,
         "inefficiencies_count": inefficiencies_count,
+        "catalog_pushed_count": catalog_pushed_count,
     }
 
 
@@ -164,6 +404,9 @@ def get_job_full(job_id: int, db: Session = Depends(get_db)):
         "updated_at": job.updated_at,
         "catalog_pushed_at": job.catalog_pushed_at,
         "catalog_url": job.catalog_url,
+        "domain": job.domain,
+        "wave": job.wave,
+        "priority": job.priority,
         "stages": stages,
         "links": links,
         "annotations": annotations

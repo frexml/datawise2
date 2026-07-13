@@ -37,6 +37,9 @@ _QUERIES = [
             f"({r['in_count']} inbound / {r['out_count']} outbound links) — "
             f"candidate bottleneck or over-consolidated stage."
         ),
+        # Static — this pattern type recurring across jobs is itself the
+        # cross-job signal, no finer sub-type available from this query.
+        "signature": lambda r: "high_fan_in_out",
     },
     {
         "pattern_type": "long_derivation_chain",
@@ -56,6 +59,7 @@ _QUERIES = [
             f"Derivation chain of {r['hops']} hops: {' → '.join(r['chain'])} — "
             f"consider simplifying or breaking into intermediate outputs."
         ),
+        "signature": lambda r: "long_derivation_chain",
     },
     {
         "pattern_type": "orphan_stage",
@@ -70,6 +74,7 @@ _QUERIES = [
             f"Stage '{r['name']}' has no inbound or outbound links — "
             f"likely dead/unused, safe to remove after confirmation."
         ),
+        "signature": lambda r: "orphan_stage",
     },
     {
         "pattern_type": "repeated_stage_type",
@@ -86,6 +91,10 @@ _QUERIES = [
             f"({', '.join(r['stages'][:5])}{'…' if len(r['stages']) > 5 else ''}) — "
             f"review for consolidation opportunity."
         ),
+        # Sub-typed by the actual recurring stage type (e.g. "PxJoin") —
+        # this is the one pattern with a natural cross-job-comparable key,
+        # matching the docs' "same join/aggregation appears in N+ jobs".
+        "signature": lambda r: f"repeated_stage_type:{r['type']}",
     },
 ]
 
@@ -98,11 +107,11 @@ def detect_inefficiencies(job_id: int) -> list[dict]:
         for q in _QUERIES:
             params = {"job_id": job_id, **q["params"]}
             for record in session.run(q["cypher"], **params):
-                description = q["describe"](record)
                 findings.append({
                     "pattern_type": q["pattern_type"],
                     "severity": q["severity"],
-                    "description": description,
+                    "description": q["describe"](record),
+                    "signature": q["signature"](record),
                 })
 
         for finding in findings:
@@ -113,7 +122,7 @@ def detect_inefficiencies(job_id: int) -> list[dict]:
                     pattern_type: $pattern_type,
                     description: $description
                 })
-                SET p.severity = $severity
+                SET p.severity = $severity, p.signature = $signature
                 WITH p
                 MATCH (j:Job {job_id: $job_id})
                 MERGE (j)-[:HAS_PATTERN]->(p)
@@ -122,6 +131,7 @@ def detect_inefficiencies(job_id: int) -> list[dict]:
                 pattern_type=finding["pattern_type"],
                 description=finding["description"],
                 severity=finding["severity"],
+                signature=finding["signature"],
             )
 
     return findings
