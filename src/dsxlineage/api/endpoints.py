@@ -597,6 +597,21 @@ def get_link_explanation(link_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Link not found")
     return {"llm_explanation": link.llm_explanation}
 
+def _fetch_global_lineage_table_sets(db: Session) -> tuple[set, set]:
+    """Distinct source/target table names across ALL jobs' Lineage rows —
+    needed for medallion tier classification, which only makes sense
+    estate-wide (see lineage_analyzer.classify_medallion_tiers)."""
+    source_tables = {
+        r[0] for r in db.query(models.Lineage.source_table)
+        .filter(models.Lineage.source_table.isnot(None)).distinct().all()
+    }
+    target_tables = {
+        r[0] for r in db.query(models.Lineage.target_table)
+        .filter(models.Lineage.target_table.isnot(None)).distinct().all()
+    }
+    return source_tables, target_tables
+
+
 @router.get("/jobs/{job_id}/lineage")
 def get_end_to_end_lineage(job_id: int, db: Session = Depends(get_db)):
     """Return end-to-end lineage for a job from the Lineage DB table.
@@ -605,11 +620,16 @@ def get_end_to_end_lineage(job_id: int, db: Session = Depends(get_db)):
     filename, which failed silently for any job whose basename did not match a
     bundled sample. The Lineage table is the canonical source.
     """
+    from dsxlineage.services.lineage_analyzer import classify_medallion_tiers
+
     job = db.query(models.Job).filter(models.Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
     rows = db.query(models.Lineage).filter(models.Lineage.job_id == job_id).all()
+    all_source_tables, all_target_tables = _fetch_global_lineage_table_sets(db)
+    tiers = classify_medallion_tiers(all_source_tables, all_target_tables)
+
     return [
         {
             "target_table": r.target_table,
@@ -624,6 +644,8 @@ def get_end_to_end_lineage(job_id: int, db: Session = Depends(get_db)):
             "transformation_explanation": r.transformation_explanation,
             "transformation_type": r.transformation_type,
             "cardinality": r.cardinality,
+            "source_tier": tiers.get(r.source_table),
+            "target_tier": tiers.get(r.target_table),
         }
         for r in rows
     ]

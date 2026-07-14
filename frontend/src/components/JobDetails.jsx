@@ -92,6 +92,25 @@ const JobDetailsSkeleton = () => (
     </div>
 );
 
+const TIER_BADGE_STYLES = {
+    bronze: 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300',
+    silver: 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200',
+    gold: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300',
+};
+const TIER_BADGE_ICON = { bronze: '🥉', silver: '🥈', gold: '🥇' };
+
+const TierBadge = ({ tier }) => {
+    if (!tier) return <span className="text-gray-400 dark:text-gray-500">—</span>;
+    return (
+        <span
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap ${TIER_BADGE_STYLES[tier] || ''}`}
+            title={`Suggested Databricks medallion tier: ${tier}`}
+        >
+            {TIER_BADGE_ICON[tier]} {tier}
+        </span>
+    );
+};
+
 const SummaryCard = ({ title, text, emptyText }) => {
     const [copied, setCopied] = useState(false);
 
@@ -1468,13 +1487,15 @@ const JobDetails = () => {
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                const headers = ['Target Table', 'Target Field', 'Source Table', 'Source Field', 'Source Link', 'Target Link', 'Full Path', 'Total Hops', 'Transformation Logic', 'Transformation Explanation', 'Transformation Type', 'Cardinality'];
+                                const headers = ['Target Table', 'Target Tier', 'Target Field', 'Source Table', 'Source Tier', 'Source Field', 'Source Link', 'Target Link', 'Full Path', 'Total Hops', 'Transformation Logic', 'Transformation Explanation', 'Transformation Type', 'Cardinality'];
                                 const csvContent = [
                                     headers.join(','),
                                     ...lineageData.map(row => [
                                         row.target_table,
+                                        row.target_tier,
                                         row.target_field,
                                         row.source_table,
+                                        row.source_tier,
                                         row.source_field,
                                         row.source_link,
                                         row.target_link,
@@ -1533,8 +1554,10 @@ const JobDetails = () => {
                                     <thead className="bg-gray-50 dark:bg-gray-900/40 sticky top-0">
                                         <tr>
                                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase resize-x overflow-auto" style={{minWidth: '150px'}}>Target Table</th>
+                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase" style={{minWidth: '90px'}}>Target Tier</th>
                                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase resize-x overflow-auto" style={{minWidth: '150px'}}>Target Field</th>
                                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase resize-x overflow-auto" style={{minWidth: '150px'}}>Source Table</th>
+                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase" style={{minWidth: '90px'}}>Source Tier</th>
                                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase resize-x overflow-auto" style={{minWidth: '150px'}}>Source Field</th>
                                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase resize-x overflow-auto" style={{minWidth: '120px'}}>Source Link</th>
                                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase resize-x overflow-auto" style={{minWidth: '120px'}}>Target Link</th>
@@ -1558,6 +1581,7 @@ const JobDetails = () => {
                                                     <div className="max-w-xs truncate">{row.target_table}</div>
                                                     <div className="hidden group-hover:block absolute z-50 bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg whitespace-normal max-w-md left-0 top-full mt-1">{row.target_table}</div>
                                                 </td>
+                                                <td className="px-3 py-2"><TierBadge tier={row.target_tier} /></td>
                                                 <td className="px-3 py-2 text-gray-900 dark:text-gray-100 relative group">
                                                     <div className="max-w-xs truncate">{row.target_field}</div>
                                                     <div className="hidden group-hover:block absolute z-50 bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg whitespace-normal max-w-md left-0 top-full mt-1">{row.target_field}</div>
@@ -1566,6 +1590,7 @@ const JobDetails = () => {
                                                     <div className="max-w-xs truncate">{row.source_table}</div>
                                                     <div className="hidden group-hover:block absolute z-50 bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg whitespace-normal max-w-md left-0 top-full mt-1">{row.source_table}</div>
                                                 </td>
+                                                <td className="px-3 py-2"><TierBadge tier={row.source_tier} /></td>
                                                 <td className="px-3 py-2 text-gray-900 dark:text-gray-100 relative group">
                                                     <div className="max-w-xs truncate">{row.source_field}</div>
                                                     <div className="hidden group-hover:block absolute z-50 bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg whitespace-normal max-w-md left-0 top-full mt-1">{row.source_field}</div>

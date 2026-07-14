@@ -228,3 +228,27 @@ def find_all_paths(stages: List[models.Stage], links: List[models.Link]) -> List
 def analyze_lineage_with_llm(lineage_record: Dict[str, Any]) -> Dict[str, Any]:
     """No-op function - transformation details already extracted from DSX"""
     return lineage_record
+
+
+def classify_medallion_tiers(all_source_tables: set, all_target_tables: set) -> Dict[str, str]:
+    """Suggests a Databricks medallion tier per table, for migration planning.
+
+    Must be computed across the whole estate (all jobs), not per job: within
+    one job's own Lineage rows, source_table/target_table are the true path
+    endpoints (find_all_paths only records stages with zero incoming or zero
+    outgoing links) — a table can never be "both" within a single job's
+    rows. A table only earns "silver" when a *different* job's source table
+    matches this job's target table (or vice versa) — e.g. a staging table
+    one job writes and another job reads, the textbook Silver-layer case.
+    """
+    tiers: Dict[str, str] = {}
+    for table in all_source_tables | all_target_tables:
+        is_source = table in all_source_tables
+        is_target = table in all_target_tables
+        if is_source and is_target:
+            tiers[table] = "silver"
+        elif is_target:
+            tiers[table] = "gold"
+        else:
+            tiers[table] = "bronze"
+    return tiers

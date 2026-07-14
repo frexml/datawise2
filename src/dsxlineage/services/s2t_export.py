@@ -11,10 +11,11 @@ from openpyxl.styles import Font, PatternFill
 from sqlalchemy.orm import Session
 
 from dsxlineage.db import models
+from dsxlineage.services.lineage_analyzer import classify_medallion_tiers
 
 _HEADERS = [
-    "Source Table", "Source Field", "Source Link",
-    "Target Table", "Target Field", "Target Link",
+    "Source Table", "Source Tier", "Source Field", "Source Link",
+    "Target Table", "Target Tier", "Target Field", "Target Link",
     "Transformation Logic", "Transformation Type", "Cardinality", "Total Hops",
 ]
 
@@ -29,6 +30,17 @@ def generate_s2t_register(job_id: int, db: Session) -> io.BytesIO:
 
     rows = db.query(models.Lineage).filter(models.Lineage.job_id == job_id).all()
 
+    # Medallion tiers are estate-wide, not per-job — see classify_medallion_tiers.
+    all_source_tables = {
+        r[0] for r in db.query(models.Lineage.source_table)
+        .filter(models.Lineage.source_table.isnot(None)).distinct().all()
+    }
+    all_target_tables = {
+        r[0] for r in db.query(models.Lineage.target_table)
+        .filter(models.Lineage.target_table.isnot(None)).distinct().all()
+    }
+    tiers = classify_medallion_tiers(all_source_tables, all_target_tables)
+
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = (job.filename or f"job_{job_id}")[:31]  # Excel sheet name limit
@@ -40,15 +52,17 @@ def generate_s2t_register(job_id: int, db: Session) -> io.BytesIO:
 
     for r, row in enumerate(rows, start=2):
         ws.cell(r, 1, row.source_table)
-        ws.cell(r, 2, row.source_field)
-        ws.cell(r, 3, row.source_link)
-        ws.cell(r, 4, row.target_table)
-        ws.cell(r, 5, row.target_field)
-        ws.cell(r, 6, row.target_link)
-        ws.cell(r, 7, row.transformation_logic)
-        ws.cell(r, 8, row.transformation_type)
-        ws.cell(r, 9, row.cardinality)
-        ws.cell(r, 10, row.total_hops)
+        ws.cell(r, 2, tiers.get(row.source_table))
+        ws.cell(r, 3, row.source_field)
+        ws.cell(r, 4, row.source_link)
+        ws.cell(r, 5, row.target_table)
+        ws.cell(r, 6, tiers.get(row.target_table))
+        ws.cell(r, 7, row.target_field)
+        ws.cell(r, 8, row.target_link)
+        ws.cell(r, 9, row.transformation_logic)
+        ws.cell(r, 10, row.transformation_type)
+        ws.cell(r, 11, row.cardinality)
+        ws.cell(r, 12, row.total_hops)
 
     for col in range(1, len(_HEADERS) + 1):
         ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 22
