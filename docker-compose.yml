@@ -116,6 +116,12 @@ services:
       - MYSQL_PASSWORD=openmetadata_password
     volumes:
       - openmetadata_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-popenmetadata_root_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   openmetadata_elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.16.3
@@ -124,6 +130,38 @@ services:
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     volumes:
       - openmetadata_es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200 >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # One-shot schema/index migration. openmetadata_server's own entrypoint
+  # does NOT run this — a fresh openmetadata_mysql_data volume crash-loops
+  # forever on "Table 'openmetadata_db.ACT_GE_PROPERTY' doesn't exist"
+  # without it. Runs on every `docker compose up`, not just first boot:
+  # openmetadata-ops.sh migrate checks the applied-migrations table and
+  # no-ops in a few seconds when the schema is already current, so this is
+  # safe and cheap to rerun on a volume that survived a teardown too.
+  openmetadata_migrate:
+    image: openmetadata/server:1.12.6
+    environment:
+      - DB_DRIVER_CLASS=com.mysql.cj.jdbc.Driver
+      - DB_SCHEME=mysql
+      - DB_USE_SSL=false
+      - DB_USER=openmetadata_user
+      - DB_USER_PASSWORD=openmetadata_password
+      - DB_HOST=openmetadata_mysql
+      - DB_PORT=3306
+      - OM_DATABASE=openmetadata_db
+      - ELASTICSEARCH_HOST=openmetadata_elasticsearch
+      - ELASTICSEARCH_PORT=9200
+    command: ["/opt/openmetadata/bootstrap/openmetadata-ops.sh", "migrate"]
+    restart: "no"
+    depends_on:
+      openmetadata_mysql:
+        condition: service_healthy
 
   openmetadata_server:
     image: openmetadata/server:1.12.6
@@ -144,8 +182,12 @@ services:
       - "8585:8585"
       - "8586:8586"
     depends_on:
-      - openmetadata_mysql
-      - openmetadata_elasticsearch
+      openmetadata_mysql:
+        condition: service_healthy
+      openmetadata_elasticsearch:
+        condition: service_healthy
+      openmetadata_migrate:
+        condition: service_completed_successfully
 
   openmetadata_ingestion:
     image: openmetadata/ingestion:1.12.6

@@ -208,27 +208,10 @@ A dark-mode toggle (persisted, `prefers-color-scheme`-aware) is available from t
 cp .env.example .env
 # Edit .env and set a real OPENAI_API_KEY
 
-docker compose up -d db redis neo4j openmetadata_mysql openmetadata_elasticsearch
+docker compose up --build
 ```
 
-**First boot only** — OpenMetadata's server crashes if it starts against a truly empty database (it needs its schema migrated before the app boots, not by the app on boot). Run this once per fresh `openmetadata_mysql_data` volume:
-
-```bash
-docker compose up -d openmetadata_server   # will crash-loop once, that's expected
-docker run --rm --network datastage_default \
-  -e DB_DRIVER_CLASS=com.mysql.cj.jdbc.Driver -e DB_SCHEME=mysql -e DB_USE_SSL=false \
-  -e DB_USER=openmetadata_user -e DB_USER_PASSWORD=openmetadata_password \
-  -e DB_HOST=openmetadata_mysql -e DB_PORT=3306 -e OM_DATABASE=openmetadata_db \
-  -e ELASTICSEARCH_HOST=openmetadata_elasticsearch -e ELASTICSEARCH_PORT=9200 \
-  openmetadata/server:1.12.6 /opt/openmetadata/bootstrap/openmetadata-ops.sh migrate
-docker compose restart openmetadata_server
-```
-
-Then bring up everything else:
-
-```bash
-docker compose up --build backend celery_worker frontend openmetadata_ingestion
-```
+OpenMetadata's schema migration (`openmetadata-ops.sh migrate`) runs automatically as a one-shot `openmetadata_migrate` service gated on MySQL's healthcheck, and `openmetadata_server` won't start until it exits successfully — this is what used to require a manual step on every fresh `openmetadata_mysql_data` volume (e.g. after `docker compose down -v`, or any teardown that drops the volume). The migration step is idempotent, so it's a no-op (a few seconds) on a volume that's already up to date — no manual intervention needed either way.
 
 Wait for `curl -sf http://localhost:8585/api/v1/system/version` to return `200` before pushing anything to the catalog — Elasticsearch index bootstrapping takes a bit after a fresh start.
 

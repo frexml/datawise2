@@ -467,12 +467,29 @@ Here is a summary of the job's stages:
 {bullets_text}
 {feedback_block}
 Task:
-Write a precise technical executive summary of what this entire job does, using
-data engineering terminology. Do not infer business intent beyond what the
-stages show. Keep it under 200 words.
+Write a technical executive summary of what this entire job does, using data
+engineering terminology. Do not infer business intent beyond what the stages
+show. Structure it exactly as the McKinsey pyramid-principle sections below —
+lead with the answer, then support it. Use markdown; bold each bullet's
+lead-in phrase. Keep the whole thing under 250 words.
 
 Output:
-(Technical Executive Summary)
+**Bottom Line:** <the single governing insight — what this job does and its
+technical criticality — in one sentence>
+
+**Situation:** <1-2 sentences: job type, scale/volume signals, where it sits
+in the pipeline>
+
+**Key Findings:**
+- **<lead-in>:** <supporting technical detail>
+- **<lead-in>:** <supporting technical detail>
+- **<lead-in>:** <supporting technical detail>
+
+**Technical Risks:** <1-2 sentences on fragility, inefficiencies, or
+dependencies observed in the stages — omit if none are evident>
+
+**Recommended Actions:** <1-2 concrete, prioritized next steps for a data
+engineer>
 """
 
     @staticmethod
@@ -491,12 +508,29 @@ Here is a summary of the job's stages:
 {bullets_text}
 {feedback_block}
 Task:
-Write a plain-language business summary explaining what business question or
-process this job serves. Avoid technical jargon — a finance director should be
-able to read it. Keep it under 150 words.
+Write a business summary explaining what business question or process this
+job serves. Avoid technical jargon — a finance director should be able to
+read it. Structure it exactly as the McKinsey pyramid-principle sections
+below — lead with the answer, then support it. Use markdown; bold each
+bullet's lead-in phrase. Keep the whole thing under 200 words.
 
 Output:
-(Business Summary)
+**Bottom Line:** <the single governing insight — what business outcome this
+job delivers — in one sentence, in plain language>
+
+**Situation:** <1-2 sentences of business context: what process or question
+this job supports>
+
+**Key Findings:**
+- **<lead-in>:** <supporting detail in plain language>
+- **<lead-in>:** <supporting detail in plain language>
+- **<lead-in>:** <supporting detail in plain language>
+
+**Business Impact:** <1-2 sentences on what depends on this job, or what
+happens if it fails or is delayed — omit if not evident>
+
+**Recommended Next Steps:** <1-2 concrete, prioritized actions for a business
+stakeholder>
 """
 
     async def _generate_both_summaries(self, bullets_text: str, feedback: Optional[str] = None) -> Tuple[str, str]:
