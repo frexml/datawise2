@@ -230,6 +230,39 @@ def analyze_lineage_with_llm(lineage_record: Dict[str, Any]) -> Dict[str, Any]:
     return lineage_record
 
 
+def build_stage_lineage(stages: List[models.Stage], links: List[models.Link]) -> List[Dict[str, Any]]:
+    """Stage-to-stage lineage, one row per link — built from the Stage/Link
+    DB tables, which exist for every job regardless of dialect.
+
+    Replaces a legacy lookup that read a pre-bundled CSV from
+    data/end_to_end_linage/{basename}_stage_lineage.csv keyed by the
+    uploaded filename — those files only ever existed for 2 sample jobs, so
+    every other job silently got an empty tab. The frontend renders this
+    tab generically from whatever keys are present (no hardcoded column
+    names), so this shape doesn't need to match the old CSV's columns.
+    """
+    stage_by_name = {s.name: s for s in stages}
+    incoming_by_stage: Dict[str, List[models.Link]] = {}
+    for link in links:
+        incoming_by_stage.setdefault(link.target_stage, []).append(link)
+
+    rows = []
+    for link in links:
+        source_stage = stage_by_name.get(link.source_stage)
+        target_stage = stage_by_name.get(link.target_stage)
+        incoming = incoming_by_stage.get(link.source_stage, [])
+
+        rows.append({
+            "input_link": incoming[0].name if incoming else "",
+            "stage_name": link.source_stage or "",
+            "stage_type": source_stage.type if source_stage else "",
+            "output_link": link.name or "",
+            "next_stage_name": link.target_stage or "",
+            "next_stage_type": target_stage.type if target_stage else "",
+        })
+    return rows
+
+
 def classify_medallion_tiers(all_source_tables: set, all_target_tables: set) -> Dict[str, str]:
     """Suggests a Databricks medallion tier per table, for migration planning.
 

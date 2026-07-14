@@ -773,29 +773,22 @@ def export_evidence_pack(job_id: int, db: Session = Depends(get_db)):
 
 @router.get("/jobs/{job_id}/stage-lineage")
 def get_stage_lineage(job_id: int, db: Session = Depends(get_db)):
-    import csv
-    
+    """Stage-to-stage lineage from the Stage/Link DB tables.
+
+    Previously read a pre-bundled CSV keyed by the uploaded filename, which
+    only ever existed for 2 sample jobs and silently returned [] for every
+    other job — the same class of bug the /lineage endpoint's docstring
+    already documents having been fixed for End-to-End Lineage.
+    """
+    from dsxlineage.services.lineage_analyzer import build_stage_lineage
+
     job = db.query(models.Job).filter(models.Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
-    base_filename = os.path.splitext(job.filename)[0]
-    lineage_folder = os.environ.get('LINEAGE_FOLDER', '/app/end_to_end_linage')
-    stage_file = os.path.join(lineage_folder, f"{base_filename}_stage_lineage.csv")
-    
-    if not os.path.exists(stage_file):
-        return []
-    
-    stage_data = []
-    try:
-        with open(stage_file, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                stage_data.append(dict(row))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read stage lineage file: {str(e)}")
-    
-    return stage_data
+
+    stages = db.query(models.Stage).filter(models.Stage.job_id == job_id).all()
+    links = db.query(models.Link).filter(models.Link.job_id == job_id).all()
+    return build_stage_lineage(stages, links)
 
 @router.delete("/jobs/{job_id}")
 def delete_job(job_id: int, db: Session = Depends(get_db)):
