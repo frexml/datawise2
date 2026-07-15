@@ -39,18 +39,19 @@ module "data" {
 module "secrets" {
   source = "../../modules/secrets"
 
-  name_prefix             = local.name_prefix
-  location                = var.location
-  resource_group_name     = azurerm_resource_group.main.name
-  tenant_id               = data.azurerm_client_config.current.tenant_id
-  deployer_object_id      = data.azurerm_client_config.current.object_id
-  app_identity_object_id  = module.registry.identity_principal_id
-  openai_api_key          = var.openai_api_key
-  postgres_admin_password = var.postgres_admin_password
-  postgres_connection_url = module.data.postgres_connection_url
-  redis_connection_url    = module.data.redis_connection_url
-  neo4j_password          = module.data.neo4j_password
-  tags                    = local.common_tags
+  name_prefix                 = local.name_prefix
+  location                    = var.location
+  resource_group_name         = azurerm_resource_group.main.name
+  tenant_id                   = data.azurerm_client_config.current.tenant_id
+  deployer_object_id          = data.azurerm_client_config.current.object_id
+  app_identity_object_id      = module.registry.identity_principal_id
+  openai_api_key              = var.openai_api_key
+  postgres_admin_password     = var.postgres_admin_password
+  postgres_connection_url     = module.data.postgres_connection_url
+  redis_connection_url        = module.data.redis_connection_url
+  neo4j_password              = module.data.neo4j_password
+  openmetadata_mysql_password = module.data.openmetadata_mysql_password
+  tags                        = local.common_tags
 }
 
 module "apps" {
@@ -77,9 +78,12 @@ module "apps" {
   image_tag    = var.image_tag
   openai_model = var.openai_model
 
-  openai_api_key_secret_uri = module.secrets.openai_api_key_secret_uri
-  database_url_secret_uri   = module.secrets.database_url_secret_uri
-  redis_url_secret_uri      = module.secrets.redis_url_secret_uri
-  neo4j_password_secret_uri = module.secrets.neo4j_password_secret_uri
-  neo4j_password            = module.data.neo4j_password
+  openai_api_key_secret_uri   = module.secrets.openai_api_key_secret_uri
+  database_url_secret_uri     = module.secrets.database_url_secret_uri
+  redis_url_secret_uri        = module.secrets.redis_url_secret_uri
+  neo4j_password_secret_uri   = module.secrets.neo4j_password_secret_uri
+  neo4j_password              = module.data.neo4j_password
+  openmetadata_mysql_fqdn     = module.data.openmetadata_mysql_fqdn
+  openmetadata_mysql_login    = module.data.openmetadata_mysql_login
+  openmetadata_mysql_password = module.data.openmetadata_mysql_password
 }

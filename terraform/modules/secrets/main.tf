@@ -13,7 +13,7 @@ resource "azurerm_key_vault" "main" {
   resource_group_name        = var.resource_group_name
   tenant_id                  = var.tenant_id
   sku_name                   = "standard"
-  enable_rbac_authorization  = false
+  rbac_authorization_enabled = false
   purge_protection_enabled   = false # dev only; prod must enable
   soft_delete_retention_days = 7
 
@@ -77,6 +77,18 @@ resource "azurerm_key_vault_secret" "redis_url" {
 resource "azurerm_key_vault_secret" "neo4j_password" {
   name         = "neo4j-password"
   value        = var.neo4j_password
+  key_vault_id = azurerm_key_vault.main.id
+  tags         = var.tags
+
+  depends_on = [azurerm_key_vault_access_policy.deployer]
+}
+
+# Recorded for audit/rotation visibility only — no app reads this back via
+# KV (OpenMetadata's MySQL is internal to the OpenMetadata server component;
+# nothing else in DataWise talks to it), same reasoning as postgres_admin_password.
+resource "azurerm_key_vault_secret" "openmetadata_mysql_password" {
+  name         = "openmetadata-mysql-password"
+  value        = var.openmetadata_mysql_password
   key_vault_id = azurerm_key_vault.main.id
   tags         = var.tags
 

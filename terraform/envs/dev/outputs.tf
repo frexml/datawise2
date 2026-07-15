@@ -12,12 +12,27 @@ output "acr_name" {
   value       = module.registry.acr_name
 }
 
-output "backend_fqdn" {
-  value = module.apps.backend_fqdn
+output "web_fqdn" {
+  value = module.apps.web_fqdn
 }
 
-output "frontend_fqdn" {
-  value = module.apps.frontend_fqdn
+output "service_url" {
+  description = "Public HTTPS URL of the app — printed by scripts/deploy_azure.sh"
+  value       = module.apps.web_fqdn != null ? "https://${module.apps.web_fqdn}" : null
+}
+
+output "openmetadata_server_fqdn" {
+  value = module.apps.openmetadata_server_fqdn
+}
+
+output "openmetadata_url" {
+  description = "Public HTTPS URL of the OpenMetadata governance catalog"
+  value       = module.apps.openmetadata_server_fqdn != null ? "https://${module.apps.openmetadata_server_fqdn}" : null
+}
+
+output "openmetadata_migrate_job_name" {
+  description = "Container App Job name — trigger with: az containerapp job start -n <this> -g <resource_group_name>"
+  value       = module.apps.openmetadata_migrate_job_name
 }
 
 output "key_vault_name" {

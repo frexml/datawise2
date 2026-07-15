@@ -25,3 +25,7 @@ output "redis_url_secret_uri" {
 output "neo4j_password_secret_uri" {
   value = azurerm_key_vault_secret.neo4j_password.versionless_id
 }
+
+output "openmetadata_mysql_password_secret_uri" {
+  value = azurerm_key_vault_secret.openmetadata_mysql_password.versionless_id
+}

@@ -1,0 +1,15 @@
+# Bare port, no hostname — Caddy serves plain HTTP and never attempts ACME/
+# TLS cert provisioning. Azure Container Apps ingress terminates TLS and
+# forwards HTTPS traffic to this container as plain HTTP on :8080.
+:8080 {
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle {
+		root * /app/frontend/dist
+		encode gzip
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -28,7 +28,7 @@ variable "created_on" {
 
 variable "image_tag" {
   type        = string
-  description = "Container image tag deployed to the three Container Apps. Use 'bootstrap' for the very first apply before any images have been pushed."
+  description = "Container image tag deployed to web/worker/openmetadata_server. Use 'bootstrap' for the very first apply before any images have been pushed."
 }
 
 variable "openai_api_key" {

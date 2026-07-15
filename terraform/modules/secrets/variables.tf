@@ -49,6 +49,11 @@ variable "neo4j_password" {
   sensitive = true
 }
 
+variable "openmetadata_mysql_password" {
+  type      = string
+  sensitive = true
+}
+
 variable "tags" {
   type = map(string)
 }

@@ -46,7 +46,7 @@ variable "key_vault_uri" {
 
 variable "image_tag" {
   type        = string
-  description = "Image tag for backend/frontend/worker. Use 'bootstrap' for the first apply (uses a placeholder image) and a real tag thereafter."
+  description = "Image tag for web/worker. Use 'bootstrap' for the first apply (uses a placeholder image) and a real tag thereafter."
 }
 
 variable "openai_model" {
@@ -65,14 +65,9 @@ variable "redis_url_secret_uri" {
   type = string
 }
 
-variable "backend_repo" {
+variable "web_repo" {
   type    = string
-  default = "dsx-backend"
-}
-
-variable "frontend_repo" {
-  type    = string
-  default = "dsx-frontend"
+  default = "dsx-web"
 }
 
 variable "worker_repo" {
@@ -105,4 +100,18 @@ variable "neo4j_password" {
   type        = string
   sensitive   = true
   description = "Plaintext Neo4j password — used only to build the neo4j container's own inline NEO4J_AUTH secret (composite 'neo4j/<password>' string, which Key Vault stores as the bare password only)."
+}
+
+variable "openmetadata_mysql_fqdn" {
+  type = string
+}
+
+variable "openmetadata_mysql_login" {
+  type = string
+}
+
+variable "openmetadata_mysql_password" {
+  type        = string
+  sensitive   = true
+  description = "Plaintext OpenMetadata MySQL admin password — used directly as this module's own inline container secret, same pattern as neo4j_password."
 }

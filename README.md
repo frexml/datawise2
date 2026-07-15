@@ -191,12 +191,15 @@ A dark-mode toggle (persisted, `prefers-color-scheme`-aware) is available from t
 │   ├── nginx.conf.template       # Runtime-templated reverse proxy
 │   ├── vite.config.js            # Dev proxy for /api → backend
 │   └── Dockerfile                # node build → nginx:alpine serve
-├── terraform/                    # Azure IaC (see terraform/README.md) — does not yet provision OpenMetadata
+├── terraform/                    # Azure IaC (see terraform/README.md) — provisions the full stack incl. OpenMetadata
+├── deploy/                       # Caddyfile + supervisord.conf for the Azure "web" image
 ├── docs/                         # Design notes, deploy patterns
 ├── datawise-docs/                # Product vision docs, use cases (reviewed against, not consumed by, the app)
-├── Dockerfile                    # python:3.12-slim + uv (backend + worker image)
+├── Dockerfile                    # python:3.12-slim + uv (backend + worker image — local dev + Azure worker)
+├── Dockerfile.web                # Azure-only: Caddy + supervisord + backend + built frontend, one image/URL
 ├── pyproject.toml / uv.lock      # uv-managed Python deps
 ├── docker-compose.yml            # Local dev stack — app services + OpenMetadata catalog stack
+├── DEPLOY-AZURE.md               # Azure deploy quickstart (see terraform/README.md for full detail)
 └── .env.example                  # Required env vars
 ```
 
@@ -309,22 +312,25 @@ All config flows through env vars. Sensitive values come from a `.env` file loca
 
 ## Deployment
 
-The project deploys to **Azure Container Apps** with managed Postgres, managed Redis, self-hosted Neo4j, Key Vault, and Azure Files. Infrastructure is fully described in Terraform under `terraform/`.
+The project deploys to **Azure Container Apps** with managed Postgres, managed Redis, self-hosted Neo4j, a self-hosted OpenMetadata stack, Key Vault, and Azure Files. Infrastructure is fully described in Terraform under `terraform/`.
 
-See **[`terraform/README.md`](terraform/README.md)** for the end-to-end runbook (state bootstrap, first apply, image build/push, second apply, rollout patterns).
+See **[`DEPLOY-AZURE.md`](DEPLOY-AZURE.md)** for the one-command deploy (`./scripts/deploy_azure.sh`), or **[`terraform/README.md`](terraform/README.md)** for the full manual runbook and every architectural decision behind it.
 
-The compose services map to four Container Apps in a shared environment:
+The backend and frontend are combined into one image (`Dockerfile.web`, Caddy + supervisord — see `deploy/`) so the app is one Container App with one public URL, same as local dev's same-origin `/api/*` calls. The compose services map to Container Apps in a shared environment as follows:
 
-| Compose service | Container App                | Ingress                    |
-| --------------- | ----------------------------- | --------------------------- |
-| `backend`       | `ca-dsxlineage-dev-backend`   | public :8000                |
-| `frontend`      | `ca-dsxlineage-dev-frontend`  | public :80                  |
-| `celery_worker` | `ca-dsxlineage-dev-worker`    | none                        |
-| `neo4j`         | `ca-dsxlineage-dev-neo4j`     | internal only, TCP :7687    |
+| Compose service(s)                        | Container App / managed resource | Ingress                  |
+| ------------------------------------------ | ----------------------------- | ------------------------- |
+| `backend` + `frontend`                     | `ca-dsxlineage-dev-web`        | public :8080              |
+| `celery_worker`                            | `ca-dsxlineage-dev-worker`     | none                      |
+| `neo4j`                                    | `ca-dsxlineage-dev-neo4j`      | internal only, TCP :7687  |
+| `openmetadata_mysql`                       | MySQL Flexible Server (managed, not a Container App) | private, TLS |
+| `openmetadata_elasticsearch`               | `ca-dsxlineage-dev-om-es`      | internal only, TCP :9200  |
+| `openmetadata_server`                      | `ca-dsxlineage-dev-om-server`  | public :8585              |
+| *(one-shot migration, no compose equivalent)* | `caj-dsxlineage-dev-om-migrate` (Container Apps **Job**) | none |
 
-Postgres and Redis are managed Azure PaaS (Flexible Server / Cache for Redis), not containers — Neo4j has no equivalent managed offering, so it runs self-hosted as a fourth Container App with an Azure Files-backed volume for `/data` and a Terraform-generated password sourced from Key Vault.
+Postgres, Redis, and OpenMetadata's MySQL are all managed Azure PaaS (Flexible Server / Cache for Redis / Flexible Server again), not containers. Neo4j and OpenMetadata's Elasticsearch have no Azure-managed equivalent, so they run self-hosted — Neo4j on an Azure Files-backed volume, Elasticsearch ephemeral (same tradeoff as local dev) — with Terraform-generated passwords sourced from Key Vault. (MySQL was self-hosted on Azure Files too, briefly — InnoDB's redo-log file locking doesn't work over SMB, so it crash-looped; a managed Flexible Server, same pattern as Postgres, was the fix.) `openmetadata_ingestion` (Airflow) is dropped entirely in Azure — nothing schedules jobs through it locally either, so it wasn't worth a fourth self-hosted app.
 
-**OpenMetadata is not yet provisioned in Terraform** — it currently only runs via the local docker-compose stack. Standing it up in Azure would follow the same self-hosted-Container-App pattern as Neo4j (its own MySQL and Elasticsearch have no Azure-managed equivalent either), plus swapping the default local admin credentials for a real bot token sourced from Key Vault.
+`openmetadata_ingestion` aside, this is now feature-complete parity with local dev, including the Governance Catalog tab — it wasn't previously provisioned in Terraform at all.
 
 ---
 
@@ -335,7 +341,7 @@ Postgres and Redis are managed Azure PaaS (Flexible Server / Cache for Redis), n
 **Data:** PostgreSQL (system of record), Neo4j Community (graph mirror + inefficiency detection), Redis (Celery broker), Azure Files (shared uploads)
 **Governance:** OpenMetadata (open-source data catalog — tables, pipelines, lineage), pushed via plain REST (not the full `openmetadata-ingestion` SDK)
 **Cloud:** Azure Container Apps, Azure Container Registry, Azure Key Vault, Azure Database for PostgreSQL Flexible Server, Azure Cache for Redis, Azure Storage, Azure Log Analytics
-**IaC:** Terraform (azurerm ~> 3.110)
+**IaC:** Terraform (azurerm ~> 4.20)
 
 ---
 
@@ -360,7 +366,7 @@ These are acceptable for dev but **must be addressed before prod**:
 - No Front Door / WAF in front of public ingress.
 - Container Apps auto-scaling uses replica bounds only; no KEDA HTTP/queue triggers configured.
 - CORS in backend is wide-open (`allow_origins=["*"]`); tighten before exposing publicly.
-- Neo4j Community has no clustering/HA — single replica; acceptable for a demo, not for production lineage-of-record.
+- Neo4j Community and OpenMetadata's self-hosted MySQL/Elasticsearch have no clustering/HA — single replica each, acceptable for a demo, not for production lineage-of-record or governance-of-record.
 - Review-gate identity is a free-text reviewer name, not authenticated — fine for a demo, needs real auth/SSO before production use.
 - OpenMetadata catalog push authenticates as the default local admin account (`admin@open-metadata.org`/`admin`) — replace with a scoped bot token before any shared or production deployment.
 - Business-glossary/term-linking to the catalog is not implemented — only tables, a pipeline, and lineage edges are pushed; column-to-business-term mapping would need a glossary source that doesn't exist yet.
