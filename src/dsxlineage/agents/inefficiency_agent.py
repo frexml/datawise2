@@ -10,8 +10,7 @@ patterns here are structural (graph-topology) rather than the SQL-regex
 patterns (redundant JOIN/aggregation) used by SQL-dialect ETL tools — the
 honest signal available from the current graph schema (Job/Stage/LINKS_TO).
 """
-from dsxlineage.db.graph import get_driver
-from dsxlineage.core.config import settings
+from dsxlineage.db.graph import run_cypher
 
 # Demo-scale thresholds — tune per estate in config/dialects/inefficiency_thresholds.yaml
 # once this graduates beyond prototype scope.
@@ -101,37 +100,38 @@ _QUERIES = [
 
 def detect_inefficiencies(job_id: int) -> list[dict]:
     """Run all inefficiency queries for a job, persist findings to Neo4j, return them."""
-    driver = get_driver()
-    findings = []
-    with driver.session(database=settings.NEO4J_DATABASE) as session:
-        for q in _QUERIES:
-            params = {"job_id": job_id, **q["params"]}
-            for record in session.run(q["cypher"], **params):
-                findings.append({
-                    "pattern_type": q["pattern_type"],
-                    "severity": q["severity"],
-                    "description": q["describe"](record),
-                    "signature": q["signature"](record),
-                })
+    results = run_cypher([
+        {"cypher": q["cypher"], "params": {"job_id": job_id, **q["params"]}}
+        for q in _QUERIES
+    ])
 
-        for finding in findings:
-            session.run(
-                """
-                MERGE (p:InefficiencyPattern {
-                    job_id: $job_id,
-                    pattern_type: $pattern_type,
-                    description: $description
-                })
-                SET p.severity = $severity, p.signature = $signature
-                WITH p
-                MATCH (j:Job {job_id: $job_id})
-                MERGE (j)-[:HAS_PATTERN]->(p)
+    findings = []
+    for q, rows in zip(_QUERIES, results):
+        for record in rows:
+            findings.append({
+                "pattern_type": q["pattern_type"],
+                "severity": q["severity"],
+                "description": q["describe"](record),
+                "signature": q["signature"](record),
+            })
+
+    if findings:
+        run_cypher([
+            {
+                "cypher": """
+                    MERGE (p:InefficiencyPattern {
+                        job_id: $job_id,
+                        pattern_type: $pattern_type,
+                        description: $description
+                    })
+                    SET p.severity = $severity, p.signature = $signature
+                    WITH p
+                    MATCH (j:Job {job_id: $job_id})
+                    MERGE (j)-[:HAS_PATTERN]->(p)
                 """,
-                job_id=job_id,
-                pattern_type=finding["pattern_type"],
-                description=finding["description"],
-                severity=finding["severity"],
-                signature=finding["signature"],
-            )
+                "params": {"job_id": job_id, **finding},
+            }
+            for finding in findings
+        ])
 
     return findings

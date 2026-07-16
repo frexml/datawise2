@@ -273,18 +273,15 @@ def generate_estimate_for_job(job_id: int) -> dict:
 
         inefficiencies: list[dict] = []
         try:
-            from dsxlineage.db.graph import get_driver
+            from dsxlineage.db.graph import run_cypher
 
-            driver = get_driver()
-            with driver.session(database=settings.NEO4J_DATABASE) as session:
-                records = session.run(
-                    """
+            inefficiencies = run_cypher([{
+                "cypher": """
                     MATCH (:Job {job_id: $job_id})-[:HAS_PATTERN]->(p:InefficiencyPattern)
                     RETURN p.pattern_type AS pattern_type, p.severity AS severity, p.description AS description
-                    """,
-                    job_id=job_id,
-                )
-                inefficiencies = [dict(r) for r in records]
+                """,
+                "params": {"job_id": job_id},
+            }])[0]
         except Exception as exc:  # noqa: BLE001 — best-effort, same guard as /api/stats
             print(f"Warning: could not fetch inefficiency patterns for ScopeIQ estimate (job {job_id}): {exc}")
 

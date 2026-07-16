@@ -102,16 +102,13 @@ def _fetch_inefficiency_counts_by_job() -> dict[int, int]:
     """{job_id: pattern_count} across all jobs, in one Neo4j round trip.
     Best-effort — same guard as /api/stats, must not fail the endpoint."""
     try:
-        from dsxlineage.db.graph import get_driver
-        from dsxlineage.core.config import settings
+        from dsxlineage.db.graph import run_cypher
 
-        driver = get_driver()
-        with driver.session(database=settings.NEO4J_DATABASE) as session:
-            records = session.run(
-                "MATCH (j:Job)-[:HAS_PATTERN]->(p:InefficiencyPattern) "
-                "RETURN j.job_id AS job_id, count(p) AS count"
-            )
-            return {r["job_id"]: r["count"] for r in records}
+        rows = run_cypher([{
+            "cypher": "MATCH (j:Job)-[:HAS_PATTERN]->(p:InefficiencyPattern) "
+                      "RETURN j.job_id AS job_id, count(p) AS count",
+        }])[0]
+        return {r["job_id"]: r["count"] for r in rows}
     except Exception as exc:  # noqa: BLE001
         print(f"Warning: could not fetch inefficiency counts from Neo4j: {exc}")
         return {}
@@ -126,17 +123,14 @@ def _fetch_recurring_patterns(jobs_by_id: dict[int, dict]) -> dict:
     jobs — "the same join/pattern appears in N+ jobs" per the docs' config
     thresholds. Best-effort, same Neo4j-outage guard as the rest of this file."""
     try:
-        from dsxlineage.db.graph import get_driver
-        from dsxlineage.core.config import settings
+        from dsxlineage.db.graph import run_cypher
 
-        driver = get_driver()
-        with driver.session(database=settings.NEO4J_DATABASE) as session:
-            records = list(session.run(
-                "MATCH (j:Job)-[:HAS_PATTERN]->(p:InefficiencyPattern) "
-                "WHERE p.signature IS NOT NULL "
-                "RETURN j.job_id AS job_id, p.pattern_type AS pattern_type, "
-                "p.signature AS signature, p.description AS description"
-            ))
+        records = run_cypher([{
+            "cypher": "MATCH (j:Job)-[:HAS_PATTERN]->(p:InefficiencyPattern) "
+                      "WHERE p.signature IS NOT NULL "
+                      "RETURN j.job_id AS job_id, p.pattern_type AS pattern_type, "
+                      "p.signature AS signature, p.description AS description",
+        }])[0]
     except Exception as exc:  # noqa: BLE001
         print(f"Warning: could not fetch recurring patterns from Neo4j: {exc}")
         return {"patterns": [], "truncated": False}
@@ -331,13 +325,10 @@ def get_stats(db: Session = Depends(get_db)):
 
     inefficiencies_count = 0
     try:
-        from dsxlineage.db.graph import get_driver
-        from dsxlineage.core.config import settings
+        from dsxlineage.db.graph import run_cypher
 
-        driver = get_driver()
-        with driver.session(database=settings.NEO4J_DATABASE) as session:
-            record = session.run("MATCH (p:InefficiencyPattern) RETURN count(p) AS count").single()
-            inefficiencies_count = record["count"] if record else 0
+        rows = run_cypher([{"cypher": "MATCH (p:InefficiencyPattern) RETURN count(p) AS count"}])[0]
+        inefficiencies_count = rows[0]["count"] if rows else 0
     except Exception as exc:  # noqa: BLE001 — stats must not fail if Neo4j is unreachable
         print(f"Warning: could not fetch inefficiency count from Neo4j: {exc}")
 
@@ -675,23 +666,19 @@ def get_end_to_end_lineage(job_id: int, db: Session = Depends(get_db)):
 
 @router.get("/jobs/{job_id}/inefficiencies")
 def get_inefficiencies(job_id: int, db: Session = Depends(get_db)):
-    from dsxlineage.db.graph import get_driver
-    from dsxlineage.core.config import settings
+    from dsxlineage.db.graph import run_cypher
 
     job = db.query(models.Job).filter(models.Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    driver = get_driver()
-    with driver.session(database=settings.NEO4J_DATABASE) as session:
-        records = session.run(
-            """
+    return run_cypher([{
+        "cypher": """
             MATCH (:Job {job_id: $job_id})-[:HAS_PATTERN]->(p:InefficiencyPattern)
             RETURN p.pattern_type AS pattern_type, p.severity AS severity, p.description AS description
-            """,
-            job_id=job_id,
-        )
-        return [dict(r) for r in records]
+        """,
+        "params": {"job_id": job_id},
+    }])[0]
 
 
 @router.get("/jobs/{job_id}/export/s2t")

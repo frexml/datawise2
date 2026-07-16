@@ -212,7 +212,6 @@ dependencies = [
     { name = "langchain" },
     { name = "langchain-openai" },
     { name = "langgraph" },
-    { name = "neo4j" },
     { name = "openai" },
     { name = "openpyxl" },
     { name = "psycopg2-binary" },
@@ -221,6 +220,7 @@ dependencies = [
     { name = "python-multipart" },
     { name = "redis" },
     { name = "reportlab" },
+    { name = "requests" },
     { name = "sqlalchemy" },
     { name = "uvicorn" },
 ]
@@ -237,7 +237,6 @@ requires-dist = [
     { name = "langchain", specifier = ">=0.1.0" },
     { name = "langchain-openai", specifier = ">=0.0.2" },
     { name = "langgraph", specifier = ">=0.0.26" },
-    { name = "neo4j", specifier = ">=5.15.0,<6" },
     { name = "openai", specifier = ">=1.3.0" },
     { name = "openpyxl", specifier = ">=3.1.0,<4" },
     { name = "psycopg2-binary", specifier = "==2.9.9" },
@@ -246,6 +245,7 @@ requires-dist = [
     { name = "python-multipart", specifier = "==0.0.6" },
     { name = "redis", specifier = "==5.0.1" },
     { name = "reportlab", specifier = ">=4.0.0,<5" },
+    { name = "requests", specifier = ">=2.31.0,<3" },
     { name = "sqlalchemy", specifier = "==2.0.23" },
     { name = "uvicorn", specifier = "==0.24.0" },
 ]
@@ -633,18 +633,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e8/53/18bc9169517c274681402f3714d1975ff687e8e175a9fea2b8087db99747/langsmith-0.10.0.tar.gz", hash = "sha256:1bc97a28e4b7a0f2e2f5419668592b3bf460ba5d886991ad725fb2778aa2e236", size = 4708392, upload-time = "2026-07-08T13:28:28.081Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/64/cf/41d4077d82dce88fb8f6c02938dd5937b5a74cd67bfd7bdb5206277752ca/langsmith-0.10.0-py3-none-any.whl", hash = "sha256:63aec1105b776b8c65a32b002b29ada02469cd26c91beeb2fc2831b247f4da27", size = 652557, upload-time = "2026-07-08T13:28:26.366Z" },
-]
-
-[[package]]
-name = "neo4j"
-version = "5.28.4"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pytz" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/62/aa/83baca8f9e5e5ba1a00722067a4bf3c088c5c02019a7b485e94c8cf05d39/neo4j-5.28.4.tar.gz", hash = "sha256:4a2d8d6eb8c2da0bc87a30e96e2c179fbc0045665626482901ca3dcc9c2b1811", size = 232608, upload-time = "2026-05-04T08:00:55.426Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d9/fd/d46f29f4089a00a7d4894f5e1739288c2a42622b72ea7161a226b73ff4fa/neo4j-5.28.4-py3-none-any.whl", hash = "sha256:ba87c423fd2a1fbe6a116c47ac96cfbe7d8c419d24d2f5611e5674283dddf7b9", size = 313927, upload-time = "2026-05-04T08:00:52.005Z" },
 ]
 
 [[package]]
@@ -1048,15 +1036,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/2d/23/abcfad10c3348cb6358400f8adbc21b523bbc6c954494fd0974428068672/python_multipart-0.0.6.tar.gz", hash = "sha256:e9925a80bb668529f1b67c7fdb0a5dacdd7cbfc6fb0bff3ea443fe22bdd62132", size = 31024, upload-time = "2023-02-27T16:40:10.091Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b4/ff/b1e11d8bffb5e0e1b6d27f402eeedbeb9be6df2cdbc09356a1ae49806dbf/python_multipart-0.0.6-py3-none-any.whl", hash = "sha256:ee698bab5ef148b0a760751c261902cd096e57e10558e11aca17646b74ee1c18", size = 45711, upload-time = "2023-02-27T16:40:14.113Z" },
-]
-
-[[package]]
-name = "pytz"
-version = "2026.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ff/46/dd499ec9038423421951e4fad73051febaa13d2df82b4064f87af8b8c0c3/pytz-2026.2.tar.gz", hash = "sha256:0e60b47b29f21574376f218fe21abc009894a2321ea16c6754f3cad6eb7cdd6a", size = 320861, upload-time = "2026-05-04T01:35:29.667Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ec/dd/96da98f892250475bdf2328112d7468abdd4acc7b902b6af23f4ed958ea0/pytz-2026.2-py2.py3-none-any.whl", hash = "sha256:04156e608bee23d3792fd45c94ae47fae1036688e75032eea2e3bf0323d1f126", size = 510141, upload-time = "2026-05-04T01:35:27.408Z" },
 ]
 
 [[package]]

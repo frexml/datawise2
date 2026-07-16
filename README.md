@@ -300,7 +300,7 @@ All config flows through env vars. Sensitive values come from a `.env` file loca
 | `DATABASE_URL` | no | If set, wins over `POSTGRES_*` components |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_SERVER` / `POSTGRES_PORT` / `POSTGRES_DB` | no | Default to docker-compose values |
 | `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND` | no | Both default to local Redis; in Azure both point to Azure Cache (`rediss://…?ssl_cert_reqs=CERT_REQUIRED`) |
-| `NEO4J_URI` | no (default `bolt://neo4j:7687`) | Self-hosted Neo4j Community — internal-only in Azure |
+| `NEO4J_HTTP_URL` | no (default `http://neo4j:7474`) | Self-hosted Neo4j Community, queried via its transactional Cypher HTTP endpoint (not bolt) — external in Azure, since internal TCP ingress proved unreliable there |
 | `NEO4J_USER` / `NEO4J_PASSWORD` / `NEO4J_DATABASE` | no | Password is Terraform-generated and Key-Vault-sourced in Azure |
 | `OPENMETADATA_API_URL` | no (default `http://openmetadata_server:8585/api/v1`) | Container-to-container URL the backend/worker call |
 | `OPENMETADATA_UI_URL` | no (default `http://localhost:8585`) | Browser-facing URL used to build `Job.catalog_url` links |
@@ -322,13 +322,13 @@ The backend and frontend are combined into one image (`Dockerfile.web`, Caddy + 
 | ------------------------------------------ | ----------------------------- | ------------------------- |
 | `backend` + `frontend`                     | `ca-dsxlineage-dev-web`        | public :8080              |
 | `celery_worker`                            | `ca-dsxlineage-dev-worker`     | none                      |
-| `neo4j`                                    | `ca-dsxlineage-dev-neo4j`      | internal only, TCP :7687  |
+| `neo4j`                                    | `ca-dsxlineage-dev-neo4j`      | public :443 (HTTP query API, not bolt) |
 | `openmetadata_mysql`                       | MySQL Flexible Server (managed, not a Container App) | private, TLS |
-| `openmetadata_elasticsearch`               | `ca-dsxlineage-dev-om-es`      | internal only, TCP :9200  |
+| `openmetadata_elasticsearch`               | `ca-dsxlineage-dev-om-es`      | public :443               |
 | `openmetadata_server`                      | `ca-dsxlineage-dev-om-server`  | public :8585              |
 | *(one-shot migration, no compose equivalent)* | `caj-dsxlineage-dev-om-migrate` (Container Apps **Job**) | none |
 
-Postgres, Redis, and OpenMetadata's MySQL are all managed Azure PaaS (Flexible Server / Cache for Redis / Flexible Server again), not containers. Neo4j and OpenMetadata's Elasticsearch have no Azure-managed equivalent, so they run self-hosted — Neo4j on an Azure Files-backed volume, Elasticsearch ephemeral (same tradeoff as local dev) — with Terraform-generated passwords sourced from Key Vault. (MySQL was self-hosted on Azure Files too, briefly — InnoDB's redo-log file locking doesn't work over SMB, so it crash-looped; a managed Flexible Server, same pattern as Postgres, was the fix.) `openmetadata_ingestion` (Airflow) is dropped entirely in Azure — nothing schedules jobs through it locally either, so it wasn't worth a fourth self-hosted app.
+Postgres, Redis, and OpenMetadata's MySQL are all managed Azure PaaS (Flexible Server / Cache for Redis / Flexible Server again), not containers. Neo4j and OpenMetadata's Elasticsearch have no Azure-managed equivalent, so they run self-hosted — Neo4j on an Azure Files-backed volume, Elasticsearch ephemeral (same tradeoff as local dev) — with Terraform-generated passwords sourced from Key Vault. (MySQL was self-hosted on Azure Files too, briefly — InnoDB's redo-log file locking doesn't work over SMB, so it crash-looped; a managed Flexible Server, same pattern as Postgres, was the fix.) Both Neo4j and Elasticsearch ended up on **public** ingress, not internal — internal TCP ingress proved unreliable in this Container Apps Environment (every bolt-driver connection to Neo4j hit its ~60s timeout), and external TCP ingress needs a custom VNET this environment doesn't have. The fix for both was the same: talk HTTP instead of the native wire protocol (Neo4j's transactional Cypher HTTP endpoint instead of bolt; Elasticsearch's REST API was already HTTP), then use external+auto ingress like every other app here. Both stay password-protected — this is a different port for the same credential, not a new class of exposure. `openmetadata_ingestion` (Airflow) is dropped entirely in Azure — nothing schedules jobs through it locally either, so it wasn't worth a fourth self-hosted app.
 
 `openmetadata_ingestion` aside, this is now feature-complete parity with local dev, including the Governance Catalog tab — it wasn't previously provisioned in Terraform at all.
 

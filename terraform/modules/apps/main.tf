@@ -48,23 +48,22 @@ resource "azurerm_container_app_environment_storage" "neo4j_data" {
   access_mode                  = "ReadWrite"
 }
 
-# ─── Neo4j Community (self-hosted, internal-only) ─────────────────────
-# Public image — no ACR registry needed. Internal TCP ingress is unreliable
-# in this Container Apps Environment — confirmed via web (a regular,
-# always-on Container App, not a Job) repeatedly failing "Couldn't connect
-# to ca-...-neo4j.internal...:7687" on every request, hitting the Neo4j
-# driver's ~60s connection timeout each time before the inefficiency-count
-# lookups give up (caught, so the page still renders — just slowly, with
-# those counts stuck at 0). External TCP ingress (bolt is raw TCP, not
-# HTTP) is NOT a fix here: Azure rejects it outright with
-# ContainerAppTcpRequiresVnet — external TCP ingress requires a custom VNET
-# on the Container Apps Environment, which this one doesn't have. A real
-# fix needs either (a) a custom VNET (a bigger infra change, affects the
-# whole environment), or (b) switching db/graph.py from the bolt driver to
-# Neo4j's HTTP query API so it can use the same external+auto(HTTP) ingress
-# pattern already proven to work for openmetadata_elasticsearch — neither
-# attempted yet; left internal/unreliable for now rather than risk more
-# downtime mid-incident.
+# ─── Neo4j Community (self-hosted) ─────────────────────────────────────
+# Public image — no ACR registry needed. External HTTP ingress on Neo4j's
+# browser port (7474), not internal bolt (7687): internal TCP ingress is
+# unreliable in this Container Apps Environment (confirmed via web, a
+# regular always-on Container App, repeatedly failing to reach it over
+# bolt), and external TCP ingress is rejected outright by Azure with
+# ContainerAppTcpRequiresVnet (requires a custom VNET on the environment,
+# which this one doesn't have). db/graph.py talks to Neo4j's transactional
+# Cypher HTTP endpoint instead — same interface the Neo4j Browser itself
+# uses, enabled by default, no extra server config — over the same
+# external+auto(HTTP) ingress pattern already proven to work for
+# openmetadata_elasticsearch.
+# Tradeoff: Neo4j becomes reachable from the public internet. Mitigated by
+# requiring the Terraform-generated NEO4J_AUTH password via HTTP Basic
+# Auth — the same credential that would have gated bolt access either way,
+# so this is not a new class of exposure, just a different port for it.
 resource "azurerm_container_app" "neo4j" {
   name                         = "ca-${var.name_prefix}-neo4j"
   container_app_environment_id = azurerm_container_app_environment.main.id
@@ -106,10 +105,9 @@ resource "azurerm_container_app" "neo4j" {
   }
 
   ingress {
-    external_enabled = false
-    target_port      = 7687
-    exposed_port     = 7687
-    transport        = "tcp"
+    external_enabled = true
+    target_port      = 7474
+    transport        = "auto"
 
     traffic_weight {
       latest_revision = true
@@ -201,8 +199,8 @@ resource "azurerm_container_app" "web" {
         value = var.openai_model
       }
       env {
-        name  = "NEO4J_URI"
-        value = "bolt://${azurerm_container_app.neo4j.ingress[0].fqdn}:7687"
+        name  = "NEO4J_HTTP_URL"
+        value = "https://${azurerm_container_app.neo4j.ingress[0].fqdn}"
       }
       env {
         name  = "NEO4J_USER"
@@ -325,8 +323,8 @@ resource "azurerm_container_app" "worker" {
         value = var.openai_model
       }
       env {
-        name  = "NEO4J_URI"
-        value = "bolt://${azurerm_container_app.neo4j.ingress[0].fqdn}:7687"
+        name  = "NEO4J_HTTP_URL"
+        value = "https://${azurerm_container_app.neo4j.ingress[0].fqdn}"
       }
       env {
         name  = "NEO4J_USER"

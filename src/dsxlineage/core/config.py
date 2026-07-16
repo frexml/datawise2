@@ -21,7 +21,13 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
 
-    NEO4J_URI: str = "bolt://neo4j:7687"
+    # HTTP, not bolt: bolt needs raw TCP, and internal TCP ingress is
+    # unreliable on this project's Azure Container Apps Environment (see
+    # terraform/modules/apps/main.tf's neo4j resource comment) — every
+    # bolt-driver connection attempt hit its ~60s connection timeout. Neo4j's
+    # transactional Cypher HTTP endpoint runs on the same port as the
+    # browser UI and needs no extra server-side config.
+    NEO4J_HTTP_URL: str = "http://neo4j:7474"
     NEO4J_USER: str = "neo4j"
     NEO4J_PASSWORD: str = "changeme-devpassword"
     NEO4J_DATABASE: str = "neo4j"
