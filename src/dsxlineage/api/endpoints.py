@@ -174,31 +174,46 @@ def _fetch_recurring_patterns(jobs_by_id: dict[int, dict]) -> dict:
 def get_portfolio(db: Session = Depends(get_db)):
     """Coverage breakdown by domain and by wave, for portfolio-scale
     engagements (many jobs grouped into named domains/waves) rather than
-    the single flat number /api/stats reports."""
+    the single flat number /api/stats reports.
 
-    completed_ids = {
-        j.id for j in db.query(models.Job.id).filter(models.Job.status == "COMPLETED").all()
-    }
+    Fetches each table exactly once and aggregates in Python — this used to
+    query Review per domain/wave bucket (O(domains + waves) round trips on
+    top of the fixed queries), which was invisible against a loopback dev
+    Postgres but made this endpoint dominate page-load time once every round
+    trip is a real network hop to a managed Postgres instance."""
+
+    job_rows = db.query(
+        models.Job.id, models.Job.filename, models.Job.domain, models.Job.wave,
+        models.Job.priority, models.Job.status, models.Job.catalog_pushed_at,
+    ).all()
+    completed_ids = {r.id for r in job_rows if r.status == "COMPLETED"}
+    catalog_pushed_ids = {r.id for r in job_rows if r.catalog_pushed_at is not None}
+
     ineff_by_job = _fetch_inefficiency_counts_by_job()
     scopeiq_by_job = {
-        e.job_id: e.total_days_adjusted
-        for e in db.query(models.ScopeIQEstimate).filter(models.ScopeIQEstimate.status == "completed").all()
+        job_id: total_days_adjusted
+        for job_id, total_days_adjusted in db.query(
+            models.ScopeIQEstimate.job_id, models.ScopeIQEstimate.total_days_adjusted
+        ).filter(models.ScopeIQEstimate.status == "completed").all()
     }
-    catalog_pushed_ids = {
-        j.id for j in db.query(models.Job.id).filter(models.Job.catalog_pushed_at.isnot(None)).all()
-    }
+
+    reviews_by_job: dict[int, list[tuple]] = {}
+    for job_id, status, created_at, reviewed_at in db.query(
+        models.Review.job_id, models.Review.status, models.Review.created_at, models.Review.reviewed_at
+    ).filter(models.Review.target_type == "executive_summary").all():
+        reviews_by_job.setdefault(job_id, []).append((status, created_at, reviewed_at))
+
     now = datetime.now(timezone.utc)
     sla_cutoff_hours = _REVIEW_SLA_HOURS
 
-    def _breakdown(group_field) -> list[dict]:
-        jobs = db.query(models.Job.id, group_field, models.Job.priority).all()
+    def _breakdown(group_value) -> list[dict]:
         buckets: dict[str, dict] = {}
-        for job_id, group_value, is_priority in jobs:
-            key = group_value or "Unassigned"
-            buckets.setdefault(key, {"job_ids": [], "priority_job_ids": []})
-            buckets[key]["job_ids"].append(job_id)
-            if is_priority:
-                buckets[key]["priority_job_ids"].append(job_id)
+        for r in job_rows:
+            key = group_value(r) or "Unassigned"
+            bucket = buckets.setdefault(key, {"job_ids": [], "priority_job_ids": []})
+            bucket["job_ids"].append(r.id)
+            if r.priority:
+                bucket["priority_job_ids"].append(r.id)
 
         rows = []
         for key, bucket in buckets.items():
@@ -207,34 +222,35 @@ def get_portfolio(db: Session = Depends(get_db)):
             total_jobs = len(job_ids)
             completed_jobs = sum(1 for jid in job_ids if jid in completed_ids)
 
-            reviews = (
-                db.query(models.Review)
-                .filter(models.Review.job_id.in_(job_ids), models.Review.target_type == "executive_summary")
-                .all()
-            )
+            reviews = [
+                (jid, status, created_at, reviewed_at)
+                for jid in job_ids
+                for status, created_at, reviewed_at in reviews_by_job.get(jid, [])
+            ]
             total_reviews = len(reviews)
-            approved_reviews = sum(1 for r in reviews if r.status == "approved")
+            approved_reviews = sum(1 for _, status, _, _ in reviews if status == "approved")
             coverage_pct = round((approved_reviews / total_reviews) * 100) if total_reviews else 0
 
-            priority_reviews = [r for r in reviews if r.job_id in priority_job_ids]
+            priority_reviews = [r for r in reviews if r[0] in priority_job_ids]
             priority_total_reviews = len(priority_reviews)
-            priority_approved_reviews = sum(1 for r in priority_reviews if r.status == "approved")
+            priority_approved_reviews = sum(1 for _, status, _, _ in priority_reviews if status == "approved")
             priority_coverage_pct = (
                 round((priority_approved_reviews / priority_total_reviews) * 100)
                 if priority_total_reviews else 0
             )
 
             turnaround_days = [
-                (r.reviewed_at - r.created_at).total_seconds() / 86400
-                for r in reviews if r.status == "approved" and r.reviewed_at and r.created_at
+                (reviewed_at - created_at).total_seconds() / 86400
+                for _, status, created_at, reviewed_at in reviews
+                if status == "approved" and reviewed_at and created_at
             ]
             avg_turnaround_days = round(sum(turnaround_days) / len(turnaround_days), 1) if turnaround_days else None
 
             overdue_reviews = sum(
-                1 for r in reviews
-                if r.status in ("pending_review", "rejected", "regenerating")
-                and r.created_at
-                and (now - r.created_at).total_seconds() / 3600 > sla_cutoff_hours
+                1 for _, status, created_at, _ in reviews
+                if status in ("pending_review", "rejected", "regenerating")
+                and created_at
+                and (now - created_at).total_seconds() / 3600 > sla_cutoff_hours
             )
 
             inefficiencies_count = sum(ineff_by_job.get(jid, 0) for jid in job_ids)
@@ -265,15 +281,15 @@ def get_portfolio(db: Session = Depends(get_db)):
         rows.sort(key=lambda r: (r["name"] == "Unassigned", r["name"]))
         return rows
 
-    by_domain = _breakdown(models.Job.domain)
-    by_wave = _breakdown(models.Job.wave)
+    by_domain = _breakdown(lambda r: r.domain)
+    by_wave = _breakdown(lambda r: r.wave)
 
-    domains = sorted({r["name"] for r in by_domain if r["name"] != "Unassigned"})
-    waves = sorted({r["name"] for r in by_wave if r["name"] != "Unassigned"})
+    domains = sorted({r.domain for r in job_rows if r.domain})
+    waves = sorted({r.wave for r in job_rows if r.wave})
 
     jobs_by_id = {
-        j.id: {"id": j.id, "filename": j.filename, "domain": j.domain, "wave": j.wave}
-        for j in db.query(models.Job.id, models.Job.filename, models.Job.domain, models.Job.wave).all()
+        r.id: {"id": r.id, "filename": r.filename, "domain": r.domain, "wave": r.wave}
+        for r in job_rows
     }
     recurring = _fetch_recurring_patterns(jobs_by_id)
 
@@ -289,22 +305,29 @@ def get_portfolio(db: Session = Depends(get_db)):
 
 @router.get("/stats")
 def get_stats(db: Session = Depends(get_db)):
-    """Aggregate KPIs for the Dashboard landing page."""
-    total_jobs = db.query(models.Job).count()
-    completed_jobs = db.query(models.Job).filter(models.Job.status == "COMPLETED").count()
-    failed_jobs = db.query(models.Job).filter(models.Job.status == "FAILED").count()
+    """Aggregate KPIs for the Dashboard landing page.
 
+    One query per table instead of 7 separate .count() round trips — each
+    was a real network hop to a managed Postgres instance, not a loopback
+    dev DB, so this endpoint's latency used to scale with the query count."""
+    job_statuses = [
+        (status, catalog_pushed_at)
+        for status, catalog_pushed_at in db.query(models.Job.status, models.Job.catalog_pushed_at).all()
+    ]
+    total_jobs = len(job_statuses)
+    completed_jobs = sum(1 for status, _ in job_statuses if status == "COMPLETED")
+    failed_jobs = sum(1 for status, _ in job_statuses if status == "FAILED")
+    catalog_pushed_count = sum(1 for _, pushed_at in job_statuses if pushed_at is not None)
+
+    review_statuses = [s for (s,) in db.query(models.Review.status).all()]
+    total_reviews = len(review_statuses)
     # "pending_reviews" means "needs a reviewer's attention" — includes items
     # rejected-but-not-yet-resolved (reviewer still has to pick Edit or Re-run)
     # and items currently regenerating, not just untouched ones.
-    pending_reviews = db.query(models.Review).filter(
-        models.Review.status.in_(["pending_review", "rejected", "regenerating"])
-    ).count()
-    approved_reviews = db.query(models.Review).filter(models.Review.status == "approved").count()
-    rejected_reviews = db.query(models.Review).filter(models.Review.status == "rejected").count()
-    total_reviews = db.query(models.Review).count()
+    pending_reviews = sum(1 for s in review_statuses if s in ("pending_review", "rejected", "regenerating"))
+    approved_reviews = sum(1 for s in review_statuses if s == "approved")
+    rejected_reviews = sum(1 for s in review_statuses if s == "rejected")
     review_coverage_pct = round((approved_reviews / total_reviews) * 100) if total_reviews else 0
-    catalog_pushed_count = db.query(models.Job).filter(models.Job.catalog_pushed_at.isnot(None)).count()
 
     inefficiencies_count = 0
     try:

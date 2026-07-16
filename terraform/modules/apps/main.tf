@@ -49,8 +49,22 @@ resource "azurerm_container_app_environment_storage" "neo4j_data" {
 }
 
 # ─── Neo4j Community (self-hosted, internal-only) ─────────────────────
-# Public image — no ACR registry needed. Internal TCP ingress means only
-# other Container Apps in this environment (backend/worker) can reach it.
+# Public image — no ACR registry needed. Internal TCP ingress is unreliable
+# in this Container Apps Environment — confirmed via web (a regular,
+# always-on Container App, not a Job) repeatedly failing "Couldn't connect
+# to ca-...-neo4j.internal...:7687" on every request, hitting the Neo4j
+# driver's ~60s connection timeout each time before the inefficiency-count
+# lookups give up (caught, so the page still renders — just slowly, with
+# those counts stuck at 0). External TCP ingress (bolt is raw TCP, not
+# HTTP) is NOT a fix here: Azure rejects it outright with
+# ContainerAppTcpRequiresVnet — external TCP ingress requires a custom VNET
+# on the Container Apps Environment, which this one doesn't have. A real
+# fix needs either (a) a custom VNET (a bigger infra change, affects the
+# whole environment), or (b) switching db/graph.py from the bolt driver to
+# Neo4j's HTTP query API so it can use the same external+auto(HTTP) ingress
+# pattern already proven to work for openmetadata_elasticsearch — neither
+# attempted yet; left internal/unreliable for now rather than risk more
+# downtime mid-incident.
 resource "azurerm_container_app" "neo4j" {
   name                         = "ca-${var.name_prefix}-neo4j"
   container_app_environment_id = azurerm_container_app_environment.main.id
