@@ -1,12 +1,12 @@
 """Parser for Informatica PowerCenter repository exports (.xml).
 
-Like SSIS's .dtsx, this is genuine XML — but PowerCenter exports use no XML
+Like SSIS's .dtsx, this is genuine XML - but PowerCenter exports use no XML
 namespace at all (plain tags: POWERMART/REPOSITORY/FOLDER/...), unlike SSIS's
 DTS-prefixed, namespaced format. A plain ElementTree walk is all this needs.
 
 Column-level lineage here is richer than DataStage or SSIS out of the box:
 Informatica's <CONNECTOR> elements are field-level edges between named
-instances, not just stage-to-stage links — the analyzer groups them by
+instances, not just stage-to-stage links - the analyzer groups them by
 instance pair into stage-level links while keeping the field mapping detail.
 """
 import xml.etree.ElementTree as ET

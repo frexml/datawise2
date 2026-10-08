@@ -30,7 +30,7 @@ def generate_s2t_register(job_id: int, db: Session) -> io.BytesIO:
 
     rows = db.query(models.Lineage).filter(models.Lineage.job_id == job_id).all()
 
-    # Medallion tiers are estate-wide, not per-job — see classify_medallion_tiers.
+    # Medallion tiers are estate-wide, not per-job - see classify_medallion_tiers.
     all_source_tables = {
         r[0] for r in db.query(models.Lineage.source_table)
         .filter(models.Lineage.source_table.isnot(None)).distinct().all()

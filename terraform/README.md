@@ -13,7 +13,7 @@ Infrastructure-as-Code for the dev environment of the DataWise lineage platform 
 | MySQL Flexible Server | OpenMetadata's backing store | B_Standard_B1ms |
 | Azure Cache for Redis | Celery broker + result backend (TLS) | Basic C0 |
 | Azure Storage Account | Shared file shares (uploads, Neo4j data) | Standard LRS |
-| Key Vault | OpenAI key, DB password, DB URL, Redis URL, Neo4j password, OpenMetadata mysql password | standard |
+| Key Vault | OpenRouter key, DB password, DB URL, Redis URL, Neo4j password, OpenMetadata mysql password | standard |
 | Log Analytics Workspace | Container Apps logs | PerGB2018 |
 | Container Apps Environment | Hosts all apps + registers the file shares | Consumption |
 | Container App `ca-…-web` | FastAPI + built frontend behind Caddy, one image, public ingress :8080 | 1 CPU / 2Gi, 1–3 replicas |
@@ -59,7 +59,7 @@ terraform/
 ## One-time bootstrap
 
 ```bash
-# 0a. Issue / rotate the OpenAI key (https://platform.openai.com/api-keys).
+# 0a. Issue / rotate the OpenRouter key (https://openrouter.ai/keys).
 #     Never commit it.
 # 0b. Authenticate to Azure.
 az login
@@ -78,7 +78,7 @@ The rest of this file is the manual, step-by-step version of what `../scripts/de
 cd terraform/envs/dev
 
 # Sensitive vars come from env, never .tfvars.
-export TF_VAR_openai_api_key="<your-key>"
+export TF_VAR_openrouter_api_key="<your-key>"
 export TF_VAR_postgres_admin_password="$(openssl rand -base64 24)"
 
 terraform init
@@ -159,7 +159,7 @@ terraform apply -var-file=dev.tfvars.example \
 | `az containerapp job execution list` never reaches `Succeeded` | Migrate job failing against mysql/ES | `az containerapp job logs show -n <migrate job> -g rg-dsxlineage-dev` |
 | `rediss:// URL must have parameter ssl_cert_reqs` | Celery's redis backend requires the parameter | Already fixed: `data` module's `redis_connection_url` appends `?ssl_cert_reqs=CERT_REQUIRED`. |
 | Worker `FileNotFoundError: /app/uploads/...` | Web app and worker filesystems aren't shared | Already fixed: Azure Files share mounted at `/app/uploads` on both. |
-| OpenAI 401 on `sk-proj-…<suffix>` | Key has been revoked (OpenAI auto-detects leaked keys) | Rotate at https://platform.openai.com/api-keys, set `TF_VAR_openai_api_key`, `terraform apply`, bump image tag to force revision refresh. |
+| 401 from OpenRouter | Key has been revoked or is invalid | Rotate at https://openrouter.ai/keys, set `TF_VAR_openrouter_api_key`, `terraform apply`, bump image tag to force revision refresh. |
 | ACR push → `authentication required` | Token expired (~3h lifetime) | `az acr login --name "$ACR_NAME"` |
 
 ## Known dev compromises (must fix before prod)

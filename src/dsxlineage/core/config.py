@@ -18,12 +18,16 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://redis:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://redis:6379/0"
 
-    OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o"
+    # OpenRouter (OpenAI-compatible endpoint) - replaces direct OpenAI/Anthropic
+    # API keys. Model IDs must use OpenRouter's provider-prefixed form, e.g.
+    # "openai/gpt-4o" or "anthropic/claude-sonnet-5".
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    OPENROUTER_MODEL: str = "openai/gpt-4o"
 
     # HTTP, not bolt: bolt needs raw TCP, and internal TCP ingress is
     # unreliable on this project's Azure Container Apps Environment (see
-    # terraform/modules/apps/main.tf's neo4j resource comment) — every
+    # terraform/modules/apps/main.tf's neo4j resource comment) - every
     # bolt-driver connection attempt hit its ~60s connection timeout. Neo4j's
     # transactional Cypher HTTP endpoint runs on the same port as the
     # browser UI and needs no extra server-side config.

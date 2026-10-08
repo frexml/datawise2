@@ -1,7 +1,7 @@
 """Shared LLM-text-to-reportlab formatting, used by every generated PDF.
 
 LLM output routinely contains markdown (**bold**, `code` identifiers) that
-reportlab's Paragraph doesn't understand natively — it uses a small XML tag
+reportlab's Paragraph doesn't understand natively - it uses a small XML tag
 set instead. This converts the common cases and escapes everything else so
 stray '<'/'&' in generated text can't break the Paragraph XML parser.
 """
@@ -17,7 +17,7 @@ def markdown_to_reportlab(text: str | None, strip_leading_title: bool = True) ->
     if not text:
         return "Not available."
     if strip_leading_title:
-        # Strip a leading **Title** line — it usually duplicates a heading we already render.
+        # Strip a leading **Title** line - it usually duplicates a heading we already render.
         text = _LEADING_TITLE_RE.sub("", text, count=1)
     escaped = saxutils.escape(text)
     escaped = _CODE_RE.sub(lambda m: f'<font face="Courier">{m.group(1)}</font>', escaped)

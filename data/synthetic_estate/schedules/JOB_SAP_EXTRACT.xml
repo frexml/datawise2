@@ -1,0 +1,5 @@
+        <?xml version="1.0"?>
+        <Schedule name="JOB_SAP_EXTRACT" type="Control-M" schedule="01:00" frequency="daily">
+            <DependsOn>ETL_SAP_ORDERS_TO_DW</DependsOn>
+<DependsOn>ETL_SAP_CUSTOMER_TO_DW</DependsOn>
+        </Schedule>

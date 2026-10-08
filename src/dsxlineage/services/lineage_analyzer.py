@@ -231,12 +231,12 @@ def analyze_lineage_with_llm(lineage_record: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def build_stage_lineage(stages: List[models.Stage], links: List[models.Link]) -> List[Dict[str, Any]]:
-    """Stage-to-stage lineage, one row per link — built from the Stage/Link
+    """Stage-to-stage lineage, one row per link - built from the Stage/Link
     DB tables, which exist for every job regardless of dialect.
 
     Replaces a legacy lookup that read a pre-bundled CSV from
     data/end_to_end_linage/{basename}_stage_lineage.csv keyed by the
-    uploaded filename — those files only ever existed for 2 sample jobs, so
+    uploaded filename - those files only ever existed for 2 sample jobs, so
     every other job silently got an empty tab. The frontend renders this
     tab generically from whatever keys are present (no hardcoded column
     names), so this shape doesn't need to match the old CSV's columns.
@@ -269,9 +269,9 @@ def classify_medallion_tiers(all_source_tables: set, all_target_tables: set) -> 
     Must be computed across the whole estate (all jobs), not per job: within
     one job's own Lineage rows, source_table/target_table are the true path
     endpoints (find_all_paths only records stages with zero incoming or zero
-    outgoing links) — a table can never be "both" within a single job's
+    outgoing links) - a table can never be "both" within a single job's
     rows. A table only earns "silver" when a *different* job's source table
-    matches this job's target table (or vice versa) — e.g. a staging table
+    matches this job's target table (or vice versa) - e.g. a staging table
     one job writes and another job reads, the textbook Silver-layer case.
     """
     tiers: Dict[str, str] = {}

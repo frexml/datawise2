@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<workbook>
+<dashboard name="RECON_DASH"><title>Reconciliation status</title>
+<datasource caption="VW_RECON_STATUS"><relation table="VW_RECON_STATUS" type="table"/></datasource>
+</dashboard>
+</workbook>

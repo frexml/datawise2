@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<workbook>
+<dashboard name="KYC_PENDING_REPORT"><title>Pending KYC cases</title>
+<datasource caption="VW_KYC_PENDING"><relation table="VW_KYC_PENDING" type="table"/></datasource>
+</dashboard>
+</workbook>

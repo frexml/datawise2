@@ -1,1 +1,8 @@
-/* Tailwind is loaded via CDN in index.html for simplicity in this setup */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estate graph flash for sync-scroll */
+.dw-stage-flash {
+  animation: dwStageFlash 0.8s ease-in-out 2;
+}

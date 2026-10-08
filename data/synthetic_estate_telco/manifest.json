@@ -1,0 +1,17 @@
+{
+  "generated_at": "2026-10-08T19:12:26.928872+00:00",
+  "seed": 42,
+  "today": "2026-10-08",
+  "estate_type": "telecom",
+  "counts": {
+    "ddl_files": 24,
+    "procedures": 3,
+    "etl_jobs": 3,
+    "schedules": 2,
+    "dashboards": 3,
+    "csv_samples": 8,
+    "expected_lineage_edges": 31,
+    "chat_bench": 100,
+    "total_expected_edges": 31
+  }
+}

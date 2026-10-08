@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<cognosReport name="CHURN_DASH" description="Churn risk by segment">
+<query><source table="VW_CHURN_RISK"/></query>
+</cognosReport>

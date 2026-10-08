@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<DTS:Executable xmlns:DTS="www.microsoft.com/SqlServer/Dts" DTS:refId="Package" DTS:CreationName="SSIS.Package.3" DTS:ObjectName="ETL_NMS_ALARM_TO_PERF">
+<DTS:Executables>
+<DTS:Executable DTS:refId="Package\Data Flow Task" DTS:CreationName="SSIS.Pipeline.3" DTS:ObjectName="Data Flow Task">
+<DTS:ObjectData><pipeline><components>
+<component refId="Package\Data Flow Task\OLE DB Source" componentClassID="Microsoft.OLEDBSource" name="OLEDB_NMS_ALARM" description="Source NMS_ALARM"/>
+<component refId="Package\Data Flow Task\OLE DB Destination" componentClassID="Microsoft.OLEDBDestination" name="OLEDB_DW_TELCO.NETWORK_PERF" description="Target DW_TELCO.NETWORK_PERF"/>
+</components><paths>
+<path refId="Package\Data Flow Task\Path" name="NMS_ALARM_to_DW_TELCO.NETWORK_PERF" startId="Package\Data Flow Task\OLE DB Source" endId="Package\Data Flow Task\OLE DB Destination"/>
+</paths></pipeline></DTS:ObjectData>
+</DTS:Executable>
+</DTS:Executables>
+</DTS:Executable>

@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<workbook>
+<dashboard name="SALES_PIPELINE_DASH"><title>Opportunity pipeline by stage</title>
+<datasource caption="VW_SALES_PIPELINE_V"><relation table="VW_SALES_PIPELINE_V" type="table"/></datasource>
+</dashboard>
+</workbook>

@@ -22,28 +22,6 @@
         document.documentElement.classList.add('dark');
       }
     </script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      // tailwind.config must be set AFTER the CDN script has defined `window.tailwind`.
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            keyframes: {
-              'march-x': { to: { backgroundPosition: '16px 0' } },
-              'arrow-travel-x': {
-                '0%, 100%': { transform: 'translateX(0)', opacity: '0.4' },
-                '50%': { transform: 'translateX(6px)', opacity: '1' },
-              },
-            },
-            animation: {
-              'march-x': 'march-x 0.5s linear infinite',
-              'arrow-travel-x': 'arrow-travel-x 1s ease-in-out infinite',
-            },
-          },
-        },
-      };
-    </script>
   </head>
   <body>
     <div id="root"></div>

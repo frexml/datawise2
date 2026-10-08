@@ -1,0 +1,5 @@
+        <?xml version="1.0"?>
+        <Schedule name="JOB_CRM_EXTRACT" type="Control-M" schedule="01:20" frequency="daily">
+            <DependsOn>ETL_CRM_ACCOUNT_TO_DW</DependsOn>
+<DependsOn>ETL_CRM_OPP_TO_DW</DependsOn>
+        </Schedule>

@@ -1,0 +1,5 @@
+        <?xml version="1.0"?>
+        <Schedule name="JOB_RISK_PIPELINE" type="Control-M" schedule="02:45" frequency="daily">
+            <DependsOn>ETL_RISK_STAGING_LOAD</DependsOn>
+<DependsOn>PROC_CALC_RISK</DependsOn>
+        </Schedule>

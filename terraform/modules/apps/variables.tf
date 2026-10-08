@@ -49,11 +49,11 @@ variable "image_tag" {
   description = "Image tag for web/worker. Use 'bootstrap' for the first apply (uses a placeholder image) and a real tag thereafter."
 }
 
-variable "openai_model" {
+variable "openrouter_model" {
   type = string
 }
 
-variable "openai_api_key_secret_uri" {
+variable "openrouter_api_key_secret_uri" {
   type = string
 }
 

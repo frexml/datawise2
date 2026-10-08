@@ -1,0 +1,945 @@
+[
+  {
+    "question": "What feeds VW_RISK_EXPOSURE?",
+    "expected_citations": [
+      "DW.RISK_EXPOSURE",
+      "DW.KYC_STATUS",
+      "DW.CUSTOMER_DIM"
+    ],
+    "anchor": "VW_RISK_EXPOSURE",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Which sources are upstream of VW_RISK_EXPOSURE?",
+    "expected_citations": [
+      "DW.RISK_EXPOSURE",
+      "DW.KYC_STATUS",
+      "DW.CUSTOMER_DIM"
+    ],
+    "anchor": "VW_RISK_EXPOSURE",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Show the lineage feeding VW_RISK_EXPOSURE?",
+    "expected_citations": [
+      "DW.RISK_EXPOSURE",
+      "DW.KYC_STATUS",
+      "DW.CUSTOMER_DIM"
+    ],
+    "anchor": "VW_RISK_EXPOSURE",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What feeds VW_RISK_DASHBOARD?",
+    "expected_citations": [
+      "VW_RISK_EXPOSURE"
+    ],
+    "anchor": "VW_RISK_DASHBOARD",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Which sources are upstream of VW_RISK_DASHBOARD?",
+    "expected_citations": [
+      "VW_RISK_EXPOSURE"
+    ],
+    "anchor": "VW_RISK_DASHBOARD",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Show the lineage feeding VW_RISK_DASHBOARD?",
+    "expected_citations": [
+      "VW_RISK_EXPOSURE"
+    ],
+    "anchor": "VW_RISK_DASHBOARD",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Which tables does PROC_CALC_RISK read?",
+    "expected_citations": [
+      "DW.RISK_STAGING",
+      "DW.KYC_STATUS"
+    ],
+    "anchor": "PROC_CALC_RISK",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "List tables read by PROC_CALC_RISK read?",
+    "expected_citations": [
+      "DW.RISK_STAGING",
+      "DW.KYC_STATUS"
+    ],
+    "anchor": "PROC_CALC_RISK",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Which tables does PROC_CALC_RISK read? (variant 2)",
+    "expected_citations": [
+      "DW.RISK_STAGING",
+      "DW.KYC_STATUS"
+    ],
+    "anchor": "PROC_CALC_RISK",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What does PROC_CALC_RISK write to?",
+    "expected_citations": [
+      "DW.RISK_EXPOSURE",
+      "DW.RISK_RATING"
+    ],
+    "anchor": "PROC_CALC_RISK",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Which objects does PROC_CALC_RISK write to?",
+    "expected_citations": [
+      "DW.RISK_EXPOSURE",
+      "DW.RISK_RATING"
+    ],
+    "anchor": "PROC_CALC_RISK",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What does PROC_CALC_RISK write to? (variant 2)",
+    "expected_citations": [
+      "DW.RISK_EXPOSURE",
+      "DW.RISK_RATING"
+    ],
+    "anchor": "PROC_CALC_RISK",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What is upstream of RISK_REPORT dashboard?",
+    "expected_citations": [
+      "VW_RISK_DASHBOARD",
+      "VW_RISK_EXPOSURE",
+      "DW.RISK_EXPOSURE"
+    ],
+    "anchor": "RISK_REPORT",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Show upstream lineage for RISK_REPORT dashboard?",
+    "expected_citations": [
+      "VW_RISK_DASHBOARD",
+      "VW_RISK_EXPOSURE",
+      "DW.RISK_EXPOSURE"
+    ],
+    "anchor": "RISK_REPORT",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What is upstream of RISK_REPORT dashboard? (variant 2)",
+    "expected_citations": [
+      "VW_RISK_DASHBOARD",
+      "VW_RISK_EXPOSURE",
+      "DW.RISK_EXPOSURE"
+    ],
+    "anchor": "RISK_REPORT",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What does ETL_SAP_ORDERS_TO_DW write?",
+    "expected_citations": [
+      "DW.FACT_ORDERS"
+    ],
+    "anchor": "ETL_SAP_ORDERS_TO_DW",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Which objects does ETL_SAP_ORDERS_TO_DW write?",
+    "expected_citations": [
+      "DW.FACT_ORDERS"
+    ],
+    "anchor": "ETL_SAP_ORDERS_TO_DW",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What does ETL_SAP_ORDERS_TO_DW write? (variant 2)",
+    "expected_citations": [
+      "DW.FACT_ORDERS"
+    ],
+    "anchor": "ETL_SAP_ORDERS_TO_DW",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Which views depend on DW.CUSTOMER_DIM?",
+    "expected_citations": [
+      "VW_CUSTOMER_CURRENT",
+      "VW_CUSTOMER_MASTER",
+      "VW_ORDER_SUMMARY"
+    ],
+    "anchor": "DW.CUSTOMER_DIM",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Which views are downstream of DW.CUSTOMER_DIM?",
+    "expected_citations": [
+      "VW_CUSTOMER_CURRENT",
+      "VW_CUSTOMER_MASTER",
+      "VW_ORDER_SUMMARY"
+    ],
+    "anchor": "DW.CUSTOMER_DIM",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Which views depend on DW.CUSTOMER_DIM? (variant 2)",
+    "expected_citations": [
+      "VW_CUSTOMER_CURRENT",
+      "VW_CUSTOMER_MASTER",
+      "VW_ORDER_SUMMARY"
+    ],
+    "anchor": "DW.CUSTOMER_DIM",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What is the lineage of VW_SALES_PIPELINE_V?",
+    "expected_citations": [
+      "DW.SALES_PIPELINE",
+      "DW.ACCOUNT_DIM"
+    ],
+    "anchor": "VW_SALES_PIPELINE_V",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What is the lineage of VW_SALES_PIPELINE_V? (variant 1)",
+    "expected_citations": [
+      "DW.SALES_PIPELINE",
+      "DW.ACCOUNT_DIM"
+    ],
+    "anchor": "VW_SALES_PIPELINE_V",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What is the lineage of VW_SALES_PIPELINE_V? (variant 2)",
+    "expected_citations": [
+      "DW.SALES_PIPELINE",
+      "DW.ACCOUNT_DIM"
+    ],
+    "anchor": "VW_SALES_PIPELINE_V",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What feeds DW.FACT_ORDERS?",
+    "expected_citations": [
+      "SAP_ORDERS",
+      "ETL_SAP_ORDERS_TO_DW"
+    ],
+    "anchor": "DW.FACT_ORDERS",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Which sources are upstream of DW.FACT_ORDERS?",
+    "expected_citations": [
+      "SAP_ORDERS",
+      "ETL_SAP_ORDERS_TO_DW"
+    ],
+    "anchor": "DW.FACT_ORDERS",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Show the lineage feeding DW.FACT_ORDERS?",
+    "expected_citations": [
+      "SAP_ORDERS",
+      "ETL_SAP_ORDERS_TO_DW"
+    ],
+    "anchor": "DW.FACT_ORDERS",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Which dashboards use VW_REVENUE_DAILY?",
+    "expected_citations": [
+      "REVENUE_DASH"
+    ],
+    "anchor": "VW_REVENUE_DAILY",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Which dashboards render VW_REVENUE_DAILY?",
+    "expected_citations": [
+      "REVENUE_DASH"
+    ],
+    "anchor": "VW_REVENUE_DAILY",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Which dashboards use VW_REVENUE_DAILY? (variant 2)",
+    "expected_citations": [
+      "REVENUE_DASH"
+    ],
+    "anchor": "VW_REVENUE_DAILY",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What breaks if I drop VW_RISK_EXPOSURE?",
+    "expected_citations": [
+      "VW_RISK_DASHBOARD",
+      "RISK_REPORT"
+    ],
+    "anchor": "VW_RISK_EXPOSURE",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "What breaks if I drop VW_RISK_EXPOSURE? (variant 1)",
+    "expected_citations": [
+      "VW_RISK_DASHBOARD",
+      "RISK_REPORT"
+    ],
+    "anchor": "VW_RISK_EXPOSURE",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "If I delete VW_RISK_EXPOSURE?",
+    "expected_citations": [
+      "VW_RISK_DASHBOARD",
+      "RISK_REPORT"
+    ],
+    "anchor": "VW_RISK_EXPOSURE",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "Impact of dropping DW.CUSTOMER_DIM?",
+    "expected_citations": [
+      "VW_CUSTOMER_CURRENT",
+      "VW_CUSTOMER_MASTER",
+      "PROC_LOAD_CUSTOMER_DIM"
+    ],
+    "anchor": "DW.CUSTOMER_DIM",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "Impact of dropping DW.CUSTOMER_DIM? (variant 1)",
+    "expected_citations": [
+      "VW_CUSTOMER_CURRENT",
+      "VW_CUSTOMER_MASTER",
+      "PROC_LOAD_CUSTOMER_DIM"
+    ],
+    "anchor": "DW.CUSTOMER_DIM",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "Downstream impact of removing DW.CUSTOMER_DIM?",
+    "expected_citations": [
+      "VW_CUSTOMER_CURRENT",
+      "VW_CUSTOMER_MASTER",
+      "PROC_LOAD_CUSTOMER_DIM"
+    ],
+    "anchor": "DW.CUSTOMER_DIM",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "What depends on DW.FACT_ORDERS?",
+    "expected_citations": [
+      "VW_ORDER_SUMMARY",
+      "VW_REVENUE_DAILY",
+      "PROC_DAILY_RECON"
+    ],
+    "anchor": "DW.FACT_ORDERS",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "What depends on DW.FACT_ORDERS? (variant 1)",
+    "expected_citations": [
+      "VW_ORDER_SUMMARY",
+      "VW_REVENUE_DAILY",
+      "PROC_DAILY_RECON"
+    ],
+    "anchor": "DW.FACT_ORDERS",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "Which objects depend on DW.FACT_ORDERS?",
+    "expected_citations": [
+      "VW_ORDER_SUMMARY",
+      "VW_REVENUE_DAILY",
+      "PROC_DAILY_RECON"
+    ],
+    "anchor": "DW.FACT_ORDERS",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "Blast radius of PROC_CALC_RISK?",
+    "expected_citations": [
+      "DW.RISK_EXPOSURE",
+      "VW_RISK_BASE"
+    ],
+    "anchor": "PROC_CALC_RISK",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "Blast radius of PROC_CALC_RISK? (variant 1)",
+    "expected_citations": [
+      "DW.RISK_EXPOSURE",
+      "VW_RISK_BASE"
+    ],
+    "anchor": "PROC_CALC_RISK",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "Impact radius for PROC_CALC_RISK?",
+    "expected_citations": [
+      "DW.RISK_EXPOSURE",
+      "VW_RISK_BASE"
+    ],
+    "anchor": "PROC_CALC_RISK",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "If I change SAP_ORDERS, what is affected?",
+    "expected_citations": [
+      "ETL_SAP_ORDERS_TO_DW",
+      "DW.FACT_ORDERS"
+    ],
+    "anchor": "SAP_ORDERS",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "If I change SAP_ORDERS, what is affected? (variant 1)",
+    "expected_citations": [
+      "ETL_SAP_ORDERS_TO_DW",
+      "DW.FACT_ORDERS"
+    ],
+    "anchor": "SAP_ORDERS",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "If I modify SAP_ORDERS, what is affected?",
+    "expected_citations": [
+      "ETL_SAP_ORDERS_TO_DW",
+      "DW.FACT_ORDERS"
+    ],
+    "anchor": "SAP_ORDERS",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "What breaks if I drop VW_CUSTOMER_CURRENT?",
+    "expected_citations": [],
+    "anchor": "VW_CUSTOMER_CURRENT",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "What breaks if I drop VW_CUSTOMER_CURRENT? (variant 1)",
+    "expected_citations": [],
+    "anchor": "VW_CUSTOMER_CURRENT",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "If I delete VW_CUSTOMER_CURRENT?",
+    "expected_citations": [],
+    "anchor": "VW_CUSTOMER_CURRENT",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "Downstream of STG_CUSTOMER?",
+    "expected_citations": [
+      "DW.CUSTOMER_SCD2",
+      "PROC_SCD2_MERGE"
+    ],
+    "anchor": "STG_CUSTOMER",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "Downstream of STG_CUSTOMER? (variant 1)",
+    "expected_citations": [
+      "DW.CUSTOMER_SCD2",
+      "PROC_SCD2_MERGE"
+    ],
+    "anchor": "STG_CUSTOMER",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "What is downstream of STG_CUSTOMER?",
+    "expected_citations": [
+      "DW.CUSTOMER_SCD2",
+      "PROC_SCD2_MERGE"
+    ],
+    "anchor": "STG_CUSTOMER",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "Impact of dropping CRM_ACCOUNT?",
+    "expected_citations": [
+      "ETL_CRM_ACCOUNT_TO_DW",
+      "DW.ACCOUNT_DIM"
+    ],
+    "anchor": "CRM_ACCOUNT",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "Impact of dropping CRM_ACCOUNT? (variant 1)",
+    "expected_citations": [
+      "ETL_CRM_ACCOUNT_TO_DW",
+      "DW.ACCOUNT_DIM"
+    ],
+    "anchor": "CRM_ACCOUNT",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "Downstream impact of removing CRM_ACCOUNT?",
+    "expected_citations": [
+      "ETL_CRM_ACCOUNT_TO_DW",
+      "DW.ACCOUNT_DIM"
+    ],
+    "anchor": "CRM_ACCOUNT",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "What depends on DW.RISK_EXPOSURE?",
+    "expected_citations": [
+      "VW_RISK_EXPOSURE",
+      "VW_RISK_BASE",
+      "PROC_DYNAMIC_RISK"
+    ],
+    "anchor": "DW.RISK_EXPOSURE",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "What depends on DW.RISK_EXPOSURE? (variant 1)",
+    "expected_citations": [
+      "VW_RISK_EXPOSURE",
+      "VW_RISK_BASE",
+      "PROC_DYNAMIC_RISK"
+    ],
+    "anchor": "DW.RISK_EXPOSURE",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "Which objects depend on DW.RISK_EXPOSURE?",
+    "expected_citations": [
+      "VW_RISK_EXPOSURE",
+      "VW_RISK_BASE",
+      "PROC_DYNAMIC_RISK"
+    ],
+    "anchor": "DW.RISK_EXPOSURE",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "Blast radius of DW.GL_BALANCE?",
+    "expected_citations": [
+      "VW_GL_DAILY"
+    ],
+    "anchor": "DW.GL_BALANCE",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "Blast radius of DW.GL_BALANCE? (variant 1)",
+    "expected_citations": [
+      "VW_GL_DAILY"
+    ],
+    "anchor": "DW.GL_BALANCE",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "Impact radius for DW.GL_BALANCE?",
+    "expected_citations": [
+      "VW_GL_DAILY"
+    ],
+    "anchor": "DW.GL_BALANCE",
+    "category": "impact",
+    "answerable": true
+  },
+  {
+    "question": "Which tables are orphaned / never read?",
+    "expected_citations": [
+      "DW.TMP_OLD_CUSTOMER",
+      "DW.TMP_OLD_ORDERS",
+      "DW.TMP_STAGING_2022"
+    ],
+    "anchor": "orphan",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "Which tables are orphaned / never read? (variant 1)",
+    "expected_citations": [
+      "DW.TMP_OLD_CUSTOMER",
+      "DW.TMP_OLD_ORDERS",
+      "DW.TMP_STAGING_2022"
+    ],
+    "anchor": "orphan",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "Show unused views",
+    "expected_citations": [],
+    "anchor": "orphan",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "Show unused views (variant 1)",
+    "expected_citations": [],
+    "anchor": "orphan",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "What are the hot tables by fan-in?",
+    "expected_citations": [
+      "DW.FACT_ORDERS",
+      "DW.CUSTOMER_DIM"
+    ],
+    "anchor": "hot",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "What are the hot tables by fan-in? (variant 1)",
+    "expected_citations": [
+      "DW.FACT_ORDERS",
+      "DW.CUSTOMER_DIM"
+    ],
+    "anchor": "hot",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "Which SPs have dynamic SQL?",
+    "expected_citations": [
+      "PROC_DYNAMIC_RISK"
+    ],
+    "anchor": "dynamic",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "Which SPs have dynamic SQL? (variant 1)",
+    "expected_citations": [
+      "PROC_DYNAMIC_RISK"
+    ],
+    "anchor": "dynamic",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "List orphan STG tables",
+    "expected_citations": [
+      "DW.TMP_OLD_CUSTOMER"
+    ],
+    "anchor": "orphan",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "List orphan STG tables (variant 1)",
+    "expected_citations": [
+      "DW.TMP_OLD_CUSTOMER"
+    ],
+    "anchor": "orphan",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "What is the most depended-on view?",
+    "expected_citations": [
+      "VW_RISK_EXPOSURE"
+    ],
+    "anchor": "hot",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "What is the most depended-on view? (variant 1)",
+    "expected_citations": [
+      "VW_RISK_EXPOSURE"
+    ],
+    "anchor": "hot",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "Show dead code",
+    "expected_citations": [
+      "DW.TMP_STAGING_2022"
+    ],
+    "anchor": "orphan",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "Show dead code (variant 1)",
+    "expected_citations": [
+      "DW.TMP_STAGING_2022"
+    ],
+    "anchor": "orphan",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "Which procedures use cursors?",
+    "expected_citations": [
+      "PROC_CURSOR_PROCESS"
+    ],
+    "anchor": "cursor",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "Which procedures use cursors? (variant 1)",
+    "expected_citations": [
+      "PROC_CURSOR_PROCESS"
+    ],
+    "anchor": "cursor",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "Hot tables in DW schema?",
+    "expected_citations": [
+      "DW.FACT_ORDERS"
+    ],
+    "anchor": "hot",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "Hot tables in DW schema? (variant 1)",
+    "expected_citations": [
+      "DW.FACT_ORDERS"
+    ],
+    "anchor": "hot",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "Unused dashboards?",
+    "expected_citations": [],
+    "anchor": "orphan",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "Unused dashboards? (variant 1)",
+    "expected_citations": [],
+    "anchor": "orphan",
+    "category": "orphan_usage",
+    "answerable": true
+  },
+  {
+    "question": "Which SPs are highest complexity?",
+    "expected_citations": [
+      "PROC_CALC_RISK",
+      "PROC_SCD2_MERGE",
+      "PROC_LOAN_APPROVAL"
+    ],
+    "anchor": "complexity",
+    "category": "complexity",
+    "answerable": true
+  },
+  {
+    "question": "Which SPs are highest complexity? (variant 1)",
+    "expected_citations": [
+      "PROC_CALC_RISK",
+      "PROC_SCD2_MERGE",
+      "PROC_LOAN_APPROVAL"
+    ],
+    "anchor": "complexity",
+    "category": "complexity",
+    "answerable": true
+  },
+  {
+    "question": "Recommend a Snowflake migration wedge",
+    "expected_citations": [
+      "DW.FACT_ORDERS",
+      "DW.CUSTOMER_DIM"
+    ],
+    "anchor": "wedge",
+    "category": "complexity",
+    "answerable": true
+  },
+  {
+    "question": "Recommend a Snowflake migration wedge (variant 1)",
+    "expected_citations": [
+      "DW.FACT_ORDERS",
+      "DW.CUSTOMER_DIM"
+    ],
+    "anchor": "wedge",
+    "category": "complexity",
+    "answerable": true
+  },
+  {
+    "question": "Show circular dependencies",
+    "expected_citations": [
+      "JOB_CIRCULAR_A",
+      "JOB_CIRCULAR_B"
+    ],
+    "anchor": "circular",
+    "category": "complexity",
+    "answerable": true
+  },
+  {
+    "question": "Show circular dependencies (variant 1)",
+    "expected_citations": [
+      "JOB_CIRCULAR_A",
+      "JOB_CIRCULAR_B"
+    ],
+    "anchor": "circular",
+    "category": "complexity",
+    "answerable": true
+  },
+  {
+    "question": "Which views have dynamic predicates?",
+    "expected_citations": [
+      "VW_DYNAMIC_RISK"
+    ],
+    "anchor": "dynamic",
+    "category": "complexity",
+    "answerable": true
+  },
+  {
+    "question": "Which views have dynamic predicates? (variant 1)",
+    "expected_citations": [
+      "VW_DYNAMIC_RISK"
+    ],
+    "anchor": "dynamic",
+    "category": "complexity",
+    "answerable": true
+  },
+  {
+    "question": "Complexity of PROC_LOAN_APPROVAL?",
+    "expected_citations": [
+      "PROC_LOAN_APPROVAL"
+    ],
+    "anchor": "complexity",
+    "category": "complexity",
+    "answerable": true
+  },
+  {
+    "question": "Complexity of PROC_LOAN_APPROVAL? (variant 1)",
+    "expected_citations": [
+      "PROC_LOAN_APPROVAL"
+    ],
+    "anchor": "complexity",
+    "category": "complexity",
+    "answerable": true
+  },
+  {
+    "question": "What is the CEO's favorite color?",
+    "expected_citations": [],
+    "anchor": "unanswerable",
+    "category": "unanswerable",
+    "answerable": false
+  },
+  {
+    "question": "Who owns the production database password?",
+    "expected_citations": [],
+    "anchor": "unanswerable",
+    "category": "unanswerable",
+    "answerable": false
+  },
+  {
+    "question": "What is the Snowflake account private key?",
+    "expected_citations": [],
+    "anchor": "unanswerable",
+    "category": "unanswerable",
+    "answerable": false
+  },
+  {
+    "question": "Tell me about table UNICORN_FACT",
+    "expected_citations": [],
+    "anchor": "unanswerable",
+    "category": "unanswerable",
+    "answerable": false
+  },
+  {
+    "question": "What is the PII for customer 123?",
+    "expected_citations": [],
+    "anchor": "unanswerable",
+    "category": "unanswerable",
+    "answerable": false
+  },
+  {
+    "question": "Predict next quarter revenue",
+    "expected_citations": [],
+    "anchor": "unanswerable",
+    "category": "unanswerable",
+    "answerable": false
+  },
+  {
+    "question": "What is the secret encryption key?",
+    "expected_citations": [],
+    "anchor": "unanswerable",
+    "category": "unanswerable",
+    "answerable": false
+  },
+  {
+    "question": "Who is the highest paid employee?",
+    "expected_citations": [],
+    "anchor": "unanswerable",
+    "category": "unanswerable",
+    "answerable": false
+  },
+  {
+    "question": "What is the production DDL for HR schema?",
+    "expected_citations": [],
+    "anchor": "unanswerable",
+    "category": "unanswerable",
+    "answerable": false
+  },
+  {
+    "question": "Generate a Snowflake private key for me",
+    "expected_citations": [],
+    "anchor": "unanswerable",
+    "category": "unanswerable",
+    "answerable": false
+  }
+]

@@ -13,7 +13,8 @@ class Job(Base):
     __tablename__ = "jobs"
 
     id = Column(Integer, primary_key=True, index=True)
-    filename = Column(String, index=True)
+    filename = Column(String, index=True)  # original filename as uploaded, e.g. "MyJob.dsx"
+    stored_filename = Column(String)  # UUID-based name actually on disk under uploads/ - lets us find the raw file again later (e.g. for the Raw vs. Scaffold comparison view), since the original filename isn't unique/safe to use as a disk path
     status = Column(String, default="PENDING") # PENDING, PROCESSING, COMPLETED, FAILED
     current_stage = Column(String)  # parsing, analyzing, mapping_lineage, generating_summaries,
                                      # saving_results, detecting_inefficiencies, completed
@@ -114,7 +115,7 @@ class Review(Base):
     """Human review/approval audit trail for LLM-generated summaries.
 
     Decoupled from Job.status (PENDING/PROCESSING/COMPLETED/FAILED), which
-    tracks pipeline execution only — the frontend polls and branches on that
+    tracks pipeline execution only - the frontend polls and branches on that
     field and must not be affected by review state.
     """
     __tablename__ = "reviews"
@@ -135,7 +136,7 @@ class Review(Base):
 class ScopeIQEstimate(Base):
     """Per-job delivery-effort estimate produced by the ScopeIQ agent.
 
-    One row per job (regenerating overwrites in place, like Result) — this
+    One row per job (regenerating overwrites in place, like Result) - this
     is a derived analytical product, not an audit trail like Review.
     """
     __tablename__ = "scopeiq_estimates"

@@ -1,7 +1,7 @@
 """Converts the raw SSIS parse tree (ssis_parser.parse_dtsx output) into the
 same {job_properties, components: {stages, links, annotations, containers,
 others}} shape DataStage's DSXAnalyzer produces, and the same {edges, ...}
-shape partner_extractor.extract_partner_connections produces — so every
+shape partner_extractor.extract_partner_connections produces - so every
 downstream agent (DeepAnalyzerAgent, worker.py persistence, lineage_analyzer)
 works unchanged regardless of source dialect.
 """
@@ -95,7 +95,7 @@ def analyze_ssis(parsed_data: dict) -> dict:
 
 
 def extract_ssis_lineage(analysis_result: dict) -> dict:
-    """SSIS equivalent of partner_extractor.extract_partner_connections —
+    """SSIS equivalent of partner_extractor.extract_partner_connections -
     paths already carry direct start/end references, so no pin-string
     parsing is needed; this just resolves stage names for the edges list
     worker.py expects."""

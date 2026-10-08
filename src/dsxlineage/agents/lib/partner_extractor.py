@@ -95,11 +95,11 @@ class PartnerExtractor:
         for record in ds_records:
             ole_type = record.get("OLEType", "")
 
-            # Only process stage records — includes Parallel-job stages
+            # Only process stage records - includes Parallel-job stages
             # (OLEType contains "Stage") AND Sequence/batch-job activities
             # (CJSJobActivity / CJSRoutineActivity / CJSSequencer), which
             # DSXAnalyzer also classifies as stages (detailed_analyzer.py)
-            # but whose OLEType doesn't contain "Stage" — without this,
+            # but whose OLEType doesn't contain "Stage" - without this,
             # every edge sourced from a Sequence job's activities resolves
             # to "Unknown", producing zero lineage for the whole job.
             is_stage = "Stage" in ole_type or ole_type in (

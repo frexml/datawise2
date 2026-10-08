@@ -1,0 +1,17 @@
+{
+  "numeric_epsilon": 0.01,
+  "temporal_tolerance_seconds": 1,
+  "collation": "case_insensitive",
+  "null_equals_empty": false,
+  "masked_columns": [
+    "DW.FACT_ORDERS.GENERATED_KEY",
+    "DW.AUDIT_LOG.CHANGED_AT",
+    "DW.ETL_RUN_LOG.STARTED_AT"
+  ],
+  "sampling": {
+    "method": "hash_stratified",
+    "pk": "CUSTOMER_ID",
+    "default_n": 10000,
+    "bound_95": "3/n"
+  }
+}

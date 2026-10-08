@@ -1,0 +1,5 @@
+        <?xml version="1.0"?>
+        <Schedule name="JOB_MARKET_DAILY" type="Control-M" schedule="06:00" frequency="daily">
+            <DependsOn>ETL_MARKET_DATA_LOAD</DependsOn>
+<DependsOn>PROC_MARKET_LOAD</DependsOn>
+        </Schedule>

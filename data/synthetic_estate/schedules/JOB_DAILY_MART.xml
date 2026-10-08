@@ -1,0 +1,5 @@
+        <?xml version="1.0"?>
+        <Schedule name="JOB_DAILY_MART" type="Control-M" schedule="03:30" frequency="daily">
+            <DependsOn>PROC_BRANCH_ROLLUP</DependsOn>
+<DependsOn>PROC_DAILY_RECON</DependsOn>
+        </Schedule>

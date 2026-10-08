@@ -1,15 +1,12 @@
 locals {
   # First apply uses image_tag="bootstrap": creates everything EXCEPT the
-  # image-backed Container Apps (web, worker, openmetadata_server). Build/push
-  # images, run the openmetadata_migrate job, then re-apply with a real tag.
-  # Avoids placeholder-image health-probe failures and lets the migrate job
-  # run against a healthy, schema-free MySQL before the server ever starts.
+  # image-backed Container Apps (web, worker). Build/push images, then
+  # re-apply with a real tag. Avoids placeholder-image health-probe failures.
+  # Estate-only: OpenMetadata stack removed — ledger is the publish layer.
   apps_enabled = var.image_tag != "bootstrap" ? 1 : 0
 
   web_image    = "${var.acr_login_server}/${var.web_repo}:${var.image_tag}"
   worker_image = "${var.acr_login_server}/${var.worker_repo}:${var.image_tag}"
-
-  openmetadata_server_fqdn = local.apps_enabled == 1 ? azurerm_container_app.openmetadata_server[0].ingress[0].fqdn : ""
 }
 
 resource "azurerm_log_analytics_workspace" "main" {
@@ -49,21 +46,10 @@ resource "azurerm_container_app_environment_storage" "neo4j_data" {
 }
 
 # ─── Neo4j Community (self-hosted) ─────────────────────────────────────
-# Public image — no ACR registry needed. External HTTP ingress on Neo4j's
-# browser port (7474), not internal bolt (7687): internal TCP ingress is
-# unreliable in this Container Apps Environment (confirmed via web, a
-# regular always-on Container App, repeatedly failing to reach it over
-# bolt), and external TCP ingress is rejected outright by Azure with
-# ContainerAppTcpRequiresVnet (requires a custom VNET on the environment,
-# which this one doesn't have). db/graph.py talks to Neo4j's transactional
-# Cypher HTTP endpoint instead — same interface the Neo4j Browser itself
-# uses, enabled by default, no extra server config — over the same
-# external+auto(HTTP) ingress pattern already proven to work for
-# openmetadata_elasticsearch.
-# Tradeoff: Neo4j becomes reachable from the public internet. Mitigated by
-# requiring the Terraform-generated NEO4J_AUTH password via HTTP Basic
-# Auth — the same credential that would have gated bolt access either way,
-# so this is not a new class of exposure, just a different port for it.
+# Self-hosted Neo4j Community (no managed Azure PaaS offering exists for it,
+# unlike Postgres/Redis above) — Terraform owns and generates its password.
+# Public HTTP ingress on 7474 (browser + Cypher HTTP API). Internal bolt (7687)
+# is unreliable in this CAE (ingress timeout), so db/graph.py uses HTTP.
 resource "azurerm_container_app" "neo4j" {
   name                         = "ca-${var.name_prefix}-neo4j"
   container_app_environment_id = azurerm_container_app_environment.main.id
@@ -117,11 +103,6 @@ resource "azurerm_container_app" "neo4j" {
 }
 
 # ─── Web (FastAPI + Vite build behind Caddy, one image, one URL) ──────
-# Replaces the old separate backend/frontend Container Apps. Caddy listens on
-# :8080, serves the built frontend statically, and reverse-proxies /api/* to
-# the backend on 127.0.0.1:8000 inside the same container — no cross-FQDN
-# proxying, no CORS, no Host-header/SNI gymnastics (see terraform/README.md's
-# old troubleshooting entry for what that used to require).
 resource "azurerm_container_app" "web" {
   count = local.apps_enabled
 
@@ -148,8 +129,8 @@ resource "azurerm_container_app" "web" {
   }
 
   secret {
-    name                = "openai-api-key"
-    key_vault_secret_id = var.openai_api_key_secret_uri
+    name                = "openrouter-api-key"
+    key_vault_secret_id = var.openrouter_api_key_secret_uri
     identity            = var.identity_id
   }
   secret {
@@ -176,11 +157,11 @@ resource "azurerm_container_app" "web" {
       name   = "web"
       image  = local.web_image
       cpu    = 1.0
-      memory = "2Gi" # backend + frontend static serving + Caddy in one container
+      memory = "2Gi"
 
       env {
-        name        = "OPENAI_API_KEY"
-        secret_name = "openai-api-key"
+        name        = "OPENROUTER_API_KEY"
+        secret_name = "openrouter-api-key"
       }
       env {
         name        = "DATABASE_URL"
@@ -195,8 +176,8 @@ resource "azurerm_container_app" "web" {
         secret_name = "redis-url"
       }
       env {
-        name  = "OPENAI_MODEL"
-        value = var.openai_model
+        name  = "OPENROUTER_MODEL"
+        value = var.openrouter_model
       }
       env {
         name  = "NEO4J_HTTP_URL"
@@ -209,14 +190,6 @@ resource "azurerm_container_app" "web" {
       env {
         name        = "NEO4J_PASSWORD"
         secret_name = "neo4j-password"
-      }
-      env {
-        name  = "OPENMETADATA_API_URL"
-        value = "https://${local.openmetadata_server_fqdn}/api/v1"
-      }
-      env {
-        name  = "OPENMETADATA_UI_URL"
-        value = "https://${local.openmetadata_server_fqdn}"
       }
 
       volume_mounts {
@@ -271,8 +244,8 @@ resource "azurerm_container_app" "worker" {
   }
 
   secret {
-    name                = "openai-api-key"
-    key_vault_secret_id = var.openai_api_key_secret_uri
+    name                = "openrouter-api-key"
+    key_vault_secret_id = var.openrouter_api_key_secret_uri
     identity            = var.identity_id
   }
   secret {
@@ -303,8 +276,8 @@ resource "azurerm_container_app" "worker" {
       command = ["celery", "-A", "dsxlineage.worker.celery_app", "worker", "--loglevel=info"]
 
       env {
-        name        = "OPENAI_API_KEY"
-        secret_name = "openai-api-key"
+        name        = "OPENROUTER_API_KEY"
+        secret_name = "openrouter-api-key"
       }
       env {
         name        = "DATABASE_URL"
@@ -319,8 +292,8 @@ resource "azurerm_container_app" "worker" {
         secret_name = "redis-url"
       }
       env {
-        name  = "OPENAI_MODEL"
-        value = var.openai_model
+        name  = "OPENROUTER_MODEL"
+        value = var.openrouter_model
       }
       env {
         name  = "NEO4J_HTTP_URL"
@@ -333,14 +306,6 @@ resource "azurerm_container_app" "worker" {
       env {
         name        = "NEO4J_PASSWORD"
         secret_name = "neo4j-password"
-      }
-      env {
-        name  = "OPENMETADATA_API_URL"
-        value = "https://${local.openmetadata_server_fqdn}/api/v1"
-      }
-      env {
-        name  = "OPENMETADATA_UI_URL"
-        value = "https://${local.openmetadata_server_fqdn}"
       }
 
       volume_mounts {
@@ -357,251 +322,5 @@ resource "azurerm_container_app" "worker" {
   }
 }
 
-# OpenMetadata's MySQL is a managed azurerm_mysql_flexible_server (module
-# "data") — NOT self-hosted here. InnoDB's redo-log file locking doesn't work
-# over Azure Files (SMB); it crash-looped with "Unable to lock
-# ./#innodb_redo/#ib_redo0" the one time this was tried as a Container App.
-# Elasticsearch below stays self-hosted since it has no such managed Azure
-# equivalent and doesn't share MySQL's file-locking requirements.
-
-# ─── OpenMetadata Elasticsearch (self-hosted, internal-only) ──────────
-# Ephemeral storage — same tradeoff already documented for local dev: index
-# bootstrapping takes a bit after a fresh start, but nothing here is a
-# system of record (Postgres/mysql are).
-resource "azurerm_container_app" "openmetadata_elasticsearch" {
-  name                         = "ca-${var.name_prefix}-om-es"
-  container_app_environment_id = azurerm_container_app_environment.main.id
-  resource_group_name          = var.resource_group_name
-  revision_mode                = "Single"
-  tags                         = var.tags
-
-  template {
-    min_replicas = 1
-    max_replicas = 1
-
-    container {
-      name   = "elasticsearch"
-      image  = "docker.elastic.co/elasticsearch/elasticsearch:7.16.3"
-      cpu    = 1.0
-      memory = "2Gi"
-
-      env {
-        name  = "discovery.type"
-        value = "single-node"
-      }
-      env {
-        name  = "ES_JAVA_OPTS"
-        value = "-Xms512m -Xmx512m"
-      }
-    }
-  }
-
-  # External, not internal-only: Container Apps Jobs (openmetadata_migrate)
-  # don't reliably reach internal-ingress-only sibling apps in the same
-  # environment — confirmed via a real failed migrate run where DNS resolved
-  # the internal FQDN fine but every TCP connect attempt timed out, while ES
-  # itself was independently confirmed healthy (its own logs showed a clean,
-  # continuously-green cluster). openmetadata_server (a regular Container
-  # App, not a Job) will also reach ES fine over this same external ingress.
-  # Tradeoff: ES has no built-in auth (xpack.security.enabled=false, matching
-  # local dev) and only holds a derived search index of catalog metadata —
-  # not the source of truth (MySQL is) — but this is still a real exposure.
-  ingress {
-    external_enabled = true
-    target_port      = 9200
-    transport        = "auto"
-
-    traffic_weight {
-      latest_revision = true
-      percentage      = 100
-    }
-  }
-}
-
-# ─── OpenMetadata schema migration (one-shot job) ──────────────────────
-# openmetadata_server's own entrypoint does NOT run this — a fresh MySQL
-# volume crash-loops forever on "Table 'openmetadata_db.ACT_GE_PROPERTY'
-# doesn't exist" without it (same root cause fixed locally in
-# docker-compose.yml's openmetadata_migrate service). Azure Container Apps
-# has no docker-compose-style health-gated startup ordering, so this runs as
-# a manually-triggered Job: the deploy script starts it and waits for
-# completion between the bootstrap apply (creates mysql/ES) and the release
-# apply (creates openmetadata_server). Idempotent — safe to (re)run on an
-# already-migrated database too.
-resource "azurerm_container_app_job" "openmetadata_migrate" {
-  name                         = "caj-${var.name_prefix}-om-migrate"
-  container_app_environment_id = azurerm_container_app_environment.main.id
-  resource_group_name          = var.resource_group_name
-  location                     = var.location
-  tags                         = var.tags
-
-  replica_timeout_in_seconds = 600
-  replica_retry_limit        = 1
-
-  manual_trigger_config {
-    parallelism              = 1
-    replica_completion_count = 1
-  }
-
-  secret {
-    name  = "mysql-password"
-    value = var.openmetadata_mysql_password
-  }
-
-  template {
-    container {
-      name    = "migrate"
-      image   = "openmetadata/server:1.12.6"
-      cpu     = 1.0
-      memory  = "2Gi"
-      command = ["/opt/openmetadata/bootstrap/openmetadata-ops.sh", "migrate"]
-
-      env {
-        name  = "DB_DRIVER_CLASS"
-        value = "com.mysql.cj.jdbc.Driver"
-      }
-      env {
-        name  = "DB_SCHEME"
-        value = "mysql"
-      }
-      # DB_USE_SSL is not a real openmetadata.yaml key — the JDBC URL's query
-      # string comes from DB_PARAMS alone, which defaults to "...&useSSL=false&...".
-      # Azure Database for MySQL Flexible Server enforces require_secure_transport=ON,
-      # so connecting with the default (SSL off) is rejected outright with
-      # "Connections using insecure transport are prohibited" — this override is required.
-      env {
-        name  = "DB_PARAMS"
-        value = "allowPublicKeyRetrieval=true&useSSL=true&requireSSL=true&serverTimezone=UTC"
-      }
-      env {
-        name  = "DB_USER"
-        value = var.openmetadata_mysql_login
-      }
-      env {
-        name        = "DB_USER_PASSWORD"
-        secret_name = "mysql-password"
-      }
-      env {
-        name  = "DB_HOST"
-        value = var.openmetadata_mysql_fqdn
-      }
-      env {
-        name  = "DB_PORT"
-        value = "3306"
-      }
-      env {
-        name  = "OM_DATABASE"
-        value = "openmetadata_db"
-      }
-      env {
-        name  = "ELASTICSEARCH_HOST"
-        value = azurerm_container_app.openmetadata_elasticsearch.ingress[0].fqdn
-      }
-      env {
-        name  = "ELASTICSEARCH_PORT"
-        value = "443" # external ingress always terminates TLS on 443, proxying to the container's 9200 internally
-      }
-      env {
-        name  = "ELASTICSEARCH_SCHEME"
-        value = "https"
-      }
-    }
-  }
-}
-
-# ─── OpenMetadata server (governance catalog UI + API) ─────────────────
-# External ingress: the catalog_url DataWise pushes to Job records must be
-# browser-clickable, and the backend/worker call the same FQDN server-side.
-# Gated on apps_enabled like web/worker — only created on the release apply,
-# once openmetadata_migrate has already run successfully against mysql.
-resource "azurerm_container_app" "openmetadata_server" {
-  count = local.apps_enabled
-
-  name                         = "ca-${var.name_prefix}-om-server"
-  container_app_environment_id = azurerm_container_app_environment.main.id
-  resource_group_name          = var.resource_group_name
-  revision_mode                = "Single"
-  tags                         = var.tags
-
-  secret {
-    name  = "mysql-password"
-    value = var.openmetadata_mysql_password
-  }
-
-  template {
-    min_replicas = 1
-    max_replicas = 1
-
-    container {
-      name   = "server"
-      image  = "openmetadata/server:1.12.6"
-      cpu    = 2.0
-      memory = "4Gi" # JVM — undersizing this is the single most common OpenMetadata deploy failure
-
-      env {
-        name  = "DB_DRIVER_CLASS"
-        value = "com.mysql.cj.jdbc.Driver"
-      }
-      env {
-        name  = "DB_SCHEME"
-        value = "mysql"
-      }
-      # DB_USE_SSL is not a real openmetadata.yaml key — the JDBC URL's query
-      # string comes from DB_PARAMS alone, which defaults to "...&useSSL=false&...".
-      # Azure Database for MySQL Flexible Server enforces require_secure_transport=ON,
-      # so connecting with the default (SSL off) is rejected outright with
-      # "Connections using insecure transport are prohibited" — this override is required.
-      env {
-        name  = "DB_PARAMS"
-        value = "allowPublicKeyRetrieval=true&useSSL=true&requireSSL=true&serverTimezone=UTC"
-      }
-      env {
-        name  = "DB_USER"
-        value = var.openmetadata_mysql_login
-      }
-      env {
-        name        = "DB_USER_PASSWORD"
-        secret_name = "mysql-password"
-      }
-      env {
-        name  = "DB_HOST"
-        value = var.openmetadata_mysql_fqdn
-      }
-      env {
-        name  = "DB_PORT"
-        value = "3306"
-      }
-      env {
-        name  = "OM_DATABASE"
-        value = "openmetadata_db"
-      }
-      env {
-        name  = "ELASTICSEARCH_HOST"
-        value = azurerm_container_app.openmetadata_elasticsearch.ingress[0].fqdn
-      }
-      env {
-        name  = "ELASTICSEARCH_PORT"
-        value = "443" # external ingress always terminates TLS on 443, proxying to the container's 9200 internally
-      }
-      env {
-        name  = "ELASTICSEARCH_SCHEME"
-        value = "https"
-      }
-      env {
-        name  = "SERVER_HOST_API_URL"
-        value = "https://ca-${var.name_prefix}-om-server.${azurerm_container_app_environment.main.default_domain}/api"
-      }
-    }
-  }
-
-  ingress {
-    external_enabled = true
-    target_port      = 8585
-    transport        = "auto"
-
-    traffic_weight {
-      latest_revision = true
-      percentage      = 100
-    }
-  }
-}
+# Estate-only: OpenMetadata stack (mysql, elasticsearch, migrate job, server)
+# removed — ledger is the publish layer. See archive/etl-v1 and tag v1-etl-final.

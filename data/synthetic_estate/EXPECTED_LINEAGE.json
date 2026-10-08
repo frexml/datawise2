@@ -1,0 +1,779 @@
+[
+  {
+    "source": "DW.CUSTOMER_DIM",
+    "target": "VW_CUSTOMER_CURRENT",
+    "type": "VIEW_DEPENDS",
+    "complexity": "simple"
+  },
+  {
+    "source": "DW.CUSTOMER_DIM",
+    "target": "VW_CUSTOMER_MASTER",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.KYC_STATUS",
+    "target": "VW_CUSTOMER_MASTER",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.FACT_ORDERS",
+    "target": "VW_ORDER_SUMMARY",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.CUSTOMER_DIM",
+    "target": "VW_ORDER_SUMMARY",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.PRODUCT_DIM",
+    "target": "VW_ORDER_SUMMARY",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.RISK_EXPOSURE",
+    "target": "VW_RISK_BASE",
+    "type": "VIEW_DEPENDS",
+    "complexity": "simple"
+  },
+  {
+    "source": "DW.RISK_EXPOSURE",
+    "target": "VW_RISK_BASE",
+    "type": "VIEW_DEPENDS",
+    "complexity": "simple"
+  },
+  {
+    "source": "DW.RISK_EXPOSURE",
+    "target": "VW_RISK_EXPOSURE",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.KYC_STATUS",
+    "target": "VW_RISK_EXPOSURE",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.CUSTOMER_DIM",
+    "target": "VW_RISK_EXPOSURE",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.RISK_EXPOSURE",
+    "target": "VW_RISK_EXPOSURE",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "VW_RISK_EXPOSURE",
+    "target": "VW_RISK_DASHBOARD",
+    "type": "VIEW_DEPENDS",
+    "complexity": "nested_view"
+  },
+  {
+    "source": "DW.SALES_PIPELINE",
+    "target": "VW_SALES_PIPELINE_V",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.ACCOUNT_DIM",
+    "target": "VW_SALES_PIPELINE_V",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.FACT_ORDERS",
+    "target": "VW_REVENUE_DAILY",
+    "type": "VIEW_DEPENDS",
+    "complexity": "aggregate"
+  },
+  {
+    "source": "DW.BRANCH_DIM",
+    "target": "VW_BRANCH_PERFORMANCE",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.BRANCH_PERF",
+    "target": "VW_BRANCH_PERFORMANCE",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.KYC_STATUS",
+    "target": "VW_KYC_PENDING",
+    "type": "VIEW_DEPENDS",
+    "complexity": "simple"
+  },
+  {
+    "source": "DW.LOAN_FACT",
+    "target": "VW_LOAN_PIPELINE",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.CUSTOMER_DIM",
+    "target": "VW_LOAN_PIPELINE",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.MARKET_FACT",
+    "target": "VW_MARKET_SNAPSHOT",
+    "type": "VIEW_DEPENDS",
+    "complexity": "simple"
+  },
+  {
+    "source": "DW.MARKET_FACT",
+    "target": "VW_MARKET_SNAPSHOT",
+    "type": "VIEW_DEPENDS",
+    "complexity": "simple"
+  },
+  {
+    "source": "FLAT_FILES.STG_CAMPAIGN",
+    "target": "VW_CAMPAIGN_ROI",
+    "type": "VIEW_DEPENDS",
+    "complexity": "cross_system"
+  },
+  {
+    "source": "DW.CAMPAIGN_FACT",
+    "target": "VW_CAMPAIGN_ROI",
+    "type": "VIEW_DEPENDS",
+    "complexity": "cross_system"
+  },
+  {
+    "source": "DW.CUSTOMER_SCD2",
+    "target": "VW_CUSTOMER_SCD_CURRENT",
+    "type": "VIEW_DEPENDS",
+    "complexity": "simple"
+  },
+  {
+    "source": "DW.FACT_INVOICE",
+    "target": "VW_INVOICE_SUMMARY",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.FACT_ORDERS",
+    "target": "VW_INVOICE_SUMMARY",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.FACT_PAYMENT",
+    "target": "VW_PAYMENT_RECON",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.PAYMENT_ALLOC",
+    "target": "VW_PAYMENT_RECON",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.RISK_STAGING",
+    "target": "VW_RISK_STAGING_V",
+    "type": "VIEW_DEPENDS",
+    "complexity": "simple"
+  },
+  {
+    "source": "DW.FACT_ORDERS",
+    "target": "VW_TOP_CUSTOMERS",
+    "type": "VIEW_DEPENDS",
+    "complexity": "aggregate"
+  },
+  {
+    "source": "DW.FACT_ORDERS",
+    "target": "VW_REGION_REVENUE",
+    "type": "VIEW_DEPENDS",
+    "complexity": "aggregate"
+  },
+  {
+    "source": "DW.CUSTOMER_DIM",
+    "target": "VW_REGION_REVENUE",
+    "type": "VIEW_DEPENDS",
+    "complexity": "aggregate"
+  },
+  {
+    "source": "DW.RISK_EXPOSURE",
+    "target": "VW_DYNAMIC_RISK",
+    "type": "VIEW_DEPENDS",
+    "complexity": "dynamic"
+  },
+  {
+    "source": "DW.ORDER_LINE",
+    "target": "VW_ORDER_LINE_DETAIL",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.FACT_ORDERS",
+    "target": "VW_ORDER_LINE_DETAIL",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW.GL_BALANCE",
+    "target": "VW_GL_DAILY",
+    "type": "VIEW_DEPENDS",
+    "complexity": "aggregate"
+  },
+  {
+    "source": "DW.RECONCILIATION",
+    "target": "VW_RECON_STATUS",
+    "type": "VIEW_DEPENDS",
+    "complexity": "simple"
+  },
+  {
+    "source": "DW.RECONCILIATION",
+    "target": "VW_RECON_STATUS",
+    "type": "VIEW_DEPENDS",
+    "complexity": "simple"
+  },
+  {
+    "source": "DW.AUDIT_LOG",
+    "target": "VW_AUDIT_RECENT",
+    "type": "VIEW_DEPENDS",
+    "complexity": "simple"
+  },
+  {
+    "source": "SAP_CUSTOMER",
+    "target": "PROC_LOAD_CUSTOMER_DIM",
+    "type": "SP_READS"
+  },
+  {
+    "source": "STG_CUSTOMER",
+    "target": "PROC_LOAD_CUSTOMER_DIM",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_LOAD_CUSTOMER_DIM",
+    "target": "DW.CUSTOMER_DIM",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "SAP_ORDERS",
+    "target": "PROC_LOAD_ORDERS",
+    "type": "SP_READS"
+  },
+  {
+    "source": "SAP_PRODUCT",
+    "target": "PROC_LOAD_ORDERS",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_LOAD_ORDERS",
+    "target": "DW.FACT_ORDERS",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "PROC_LOAD_ORDERS",
+    "target": "DW.ORDER_LINE",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "DW.RISK_STAGING",
+    "target": "PROC_CALC_RISK",
+    "type": "SP_READS"
+  },
+  {
+    "source": "DW.KYC_STATUS",
+    "target": "PROC_CALC_RISK",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_CALC_RISK",
+    "target": "DW.RISK_EXPOSURE",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "PROC_CALC_RISK",
+    "target": "DW.RISK_RATING",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "STG_KYC_DOC",
+    "target": "PROC_UPDATE_KYC",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_UPDATE_KYC",
+    "target": "DW.KYC_STATUS",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "DW.FACT_ORDERS",
+    "target": "PROC_DAILY_RECON",
+    "type": "SP_READS"
+  },
+  {
+    "source": "DW.FACT_INVOICE",
+    "target": "PROC_DAILY_RECON",
+    "type": "SP_READS"
+  },
+  {
+    "source": "DW.FACT_PAYMENT",
+    "target": "PROC_DAILY_RECON",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_DAILY_RECON",
+    "target": "DW.RECONCILIATION",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "DW.RISK_EXPOSURE",
+    "target": "PROC_DYNAMIC_RISK",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_DYNAMIC_RISK",
+    "target": "VW_DYNAMIC_RISK",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "PROC_DYNAMIC_RISK",
+    "target": "UNRESOLVED_DYNAMIC",
+    "type": "UNRESOLVED",
+    "reason": "EXECUTE IMMEDIATE"
+  },
+  {
+    "source": "DW.FACT_ORDERS",
+    "target": "PROC_CURSOR_PROCESS",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_CURSOR_PROCESS",
+    "target": "DW.BRANCH_PERF",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "STG_CUSTOMER",
+    "target": "PROC_SCD2_MERGE",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_SCD2_MERGE",
+    "target": "DW.CUSTOMER_SCD2",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "PROC_SCD2_MERGE",
+    "target": "DW.CUSTOMER_DIM",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "SAP_GL_ENTRY",
+    "target": "PROC_GL_POST",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_GL_POST",
+    "target": "DW.GL_BALANCE",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "STG_MARKET_DATA",
+    "target": "PROC_MARKET_LOAD",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_MARKET_LOAD",
+    "target": "DW.MARKET_FACT",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "STG_CAMPAIGN",
+    "target": "PROC_CAMPAIGN_ROI",
+    "type": "SP_READS"
+  },
+  {
+    "source": "DW.CAMPAIGN_FACT",
+    "target": "PROC_CAMPAIGN_ROI",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_CAMPAIGN_ROI",
+    "target": "DW.CAMPAIGN_FACT",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "STG_LOAN_APP",
+    "target": "PROC_LOAN_APPROVAL",
+    "type": "SP_READS"
+  },
+  {
+    "source": "DW.KYC_STATUS",
+    "target": "PROC_LOAN_APPROVAL",
+    "type": "SP_READS"
+  },
+  {
+    "source": "DW.RISK_RATING",
+    "target": "PROC_LOAN_APPROVAL",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_LOAN_APPROVAL",
+    "target": "DW.LOAN_FACT",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "DW.FACT_ORDERS",
+    "target": "PROC_BRANCH_ROLLUP",
+    "type": "SP_READS"
+  },
+  {
+    "source": "DW.BRANCH_DIM",
+    "target": "PROC_BRANCH_ROLLUP",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_BRANCH_ROLLUP",
+    "target": "DW.BRANCH_PERF",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "DW.CUSTOMER_DIM",
+    "target": "PROC_AUDIT_TRAIL",
+    "type": "SP_READS"
+  },
+  {
+    "source": "DW.FACT_ORDERS",
+    "target": "PROC_AUDIT_TRAIL",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_AUDIT_TRAIL",
+    "target": "DW.AUDIT_LOG",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "STG_CUSTOMER",
+    "target": "PROC_NULL_HANDLING",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_NULL_HANDLING",
+    "target": "DW.CUSTOMER_DIM",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "DW.FACT_ORDERS",
+    "target": "PROC_DECIMAL_CALC",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_DECIMAL_CALC",
+    "target": "DW.FACT_INVOICE",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "DW.CUSTOMER_DIM",
+    "target": "PROC_GENERATE_KEYS",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_GENERATE_KEYS",
+    "target": "DW.FACT_ORDERS",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "PROC_RECON_MASTER",
+    "target": "PROC_DAILY_RECON",
+    "type": "SP_CALLS"
+  },
+  {
+    "source": "PROC_RECON_MASTER",
+    "target": "PROC_AUDIT_TRAIL",
+    "type": "SP_CALLS"
+  },
+  {
+    "source": "SAP_ORDERS",
+    "target": "ETL_SAP_ORDERS_TO_DW",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_SAP_ORDERS_TO_DW",
+    "target": "DW.FACT_ORDERS",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "SAP_CUSTOMER",
+    "target": "ETL_SAP_CUSTOMER_TO_DW",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_SAP_CUSTOMER_TO_DW",
+    "target": "DW.CUSTOMER_DIM",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "CRM_ACCOUNT",
+    "target": "ETL_CRM_ACCOUNT_TO_DW",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_CRM_ACCOUNT_TO_DW",
+    "target": "DW.ACCOUNT_DIM",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "CRM_OPPORTUNITY",
+    "target": "ETL_CRM_OPP_TO_DW",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_CRM_OPP_TO_DW",
+    "target": "DW.FACT_OPPORTUNITY",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "STG_CUSTOMER",
+    "target": "ETL_STG_CUSTOMER_MERGE",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_STG_CUSTOMER_MERGE",
+    "target": "DW.CUSTOMER_SCD2",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "STG_TRANSACTION",
+    "target": "ETL_STG_TXN_TO_FACT",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_STG_TXN_TO_FACT",
+    "target": "DW.FACT_TRANSACTION",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "STG_RISK_RAW",
+    "target": "ETL_RISK_STAGING_LOAD",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_RISK_STAGING_LOAD",
+    "target": "DW.RISK_STAGING",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "STG_MARKET_DATA",
+    "target": "ETL_MARKET_DATA_LOAD",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_MARKET_DATA_LOAD",
+    "target": "DW.MARKET_FACT",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "SAP_GL_ENTRY",
+    "target": "ETL_GL_ENTRY_LOAD",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_GL_ENTRY_LOAD",
+    "target": "DW.GL_BALANCE",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "STG_KYC_DOC",
+    "target": "ETL_KYC_LOAD",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_KYC_LOAD",
+    "target": "DW.KYC_STATUS",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "STG_BRANCH",
+    "target": "ETL_BRANCH_LOAD",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_BRANCH_LOAD",
+    "target": "DW.BRANCH_DIM",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "STG_LOAN_APP",
+    "target": "ETL_LOAN_APP_LOAD",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_LOAN_APP_LOAD",
+    "target": "DW.LOAN_FACT",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "DW.FACT_ORDERS",
+    "target": "ETL_RECON_LOAD",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_RECON_LOAD",
+    "target": "DW.RECONCILIATION",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "DW.AUDIT_LOG",
+    "target": "ETL_AUDIT_LOAD",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_AUDIT_LOAD",
+    "target": "DW.ETL_RUN_LOG",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "ETL_SAP_ORDERS_TO_DW",
+    "target": "JOB_SAP_EXTRACT",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "ETL_SAP_CUSTOMER_TO_DW",
+    "target": "JOB_SAP_EXTRACT",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "ETL_CRM_ACCOUNT_TO_DW",
+    "target": "JOB_CRM_EXTRACT",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "ETL_CRM_OPP_TO_DW",
+    "target": "JOB_CRM_EXTRACT",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "ETL_STG_CUSTOMER_MERGE",
+    "target": "JOB_STG_LOAD",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "ETL_KYC_LOAD",
+    "target": "JOB_STG_LOAD",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "ETL_RISK_STAGING_LOAD",
+    "target": "JOB_RISK_PIPELINE",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "PROC_CALC_RISK",
+    "target": "JOB_RISK_PIPELINE",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "PROC_BRANCH_ROLLUP",
+    "target": "JOB_DAILY_MART",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "PROC_DAILY_RECON",
+    "target": "JOB_DAILY_MART",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "ETL_GL_ENTRY_LOAD",
+    "target": "JOB_GL_CLOSE",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "PROC_GL_POST",
+    "target": "JOB_GL_CLOSE",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "ETL_MARKET_DATA_LOAD",
+    "target": "JOB_MARKET_DAILY",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "PROC_MARKET_LOAD",
+    "target": "JOB_MARKET_DAILY",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "ETL_KYC_LOAD",
+    "target": "JOB_KYC_REFRESH",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "PROC_UPDATE_KYC",
+    "target": "JOB_KYC_REFRESH",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "JOB_CIRCULAR_B",
+    "target": "JOB_CIRCULAR_A",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "JOB_CIRCULAR_A",
+    "target": "JOB_CIRCULAR_B",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "ETL_BRANCH_LOAD",
+    "target": "JOB_WEEKLY_BRANCH",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "PROC_RECON_MASTER",
+    "target": "JOB_RECON_MASTER",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "VW_RISK_DASHBOARD",
+    "target": "RISK_REPORT",
+    "type": "DASHBOARD_RENDERS"
+  },
+  {
+    "source": "VW_SALES_PIPELINE_V",
+    "target": "SALES_PIPELINE_DASH",
+    "type": "DASHBOARD_RENDERS"
+  },
+  {
+    "source": "VW_REVENUE_DAILY",
+    "target": "REVENUE_DASH",
+    "type": "DASHBOARD_RENDERS"
+  },
+  {
+    "source": "VW_BRANCH_PERFORMANCE",
+    "target": "BRANCH_PERF_DASH",
+    "type": "DASHBOARD_RENDERS"
+  },
+  {
+    "source": "VW_KYC_PENDING",
+    "target": "KYC_PENDING_REPORT",
+    "type": "DASHBOARD_RENDERS"
+  },
+  {
+    "source": "VW_LOAN_PIPELINE",
+    "target": "LOAN_PIPELINE_REPORT",
+    "type": "DASHBOARD_RENDERS"
+  },
+  {
+    "source": "VW_MARKET_SNAPSHOT",
+    "target": "MARKET_SNAPSHOT_REPORT",
+    "type": "DASHBOARD_RENDERS"
+  },
+  {
+    "source": "VW_RECON_STATUS",
+    "target": "RECON_DASH",
+    "type": "DASHBOARD_RENDERS"
+  }
+]

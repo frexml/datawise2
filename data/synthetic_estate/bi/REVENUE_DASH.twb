@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<workbook>
+<dashboard name="REVENUE_DASH"><title>Daily revenue trend</title>
+<datasource caption="VW_REVENUE_DAILY"><relation table="VW_REVENUE_DAILY" type="table"/></datasource>
+</dashboard>
+</workbook>

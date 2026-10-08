@@ -1,14 +1,14 @@
 """Parser for SSIS (.dtsx) package exports.
 
 Unlike DataStage's .dsx (a proprietary BEGIN/END text-block format), .dtsx
-is genuine namespaced XML — this is a straightforward ElementTree walk, no
+is genuine namespaced XML - this is a straightforward ElementTree walk, no
 hand-rolled grammar needed.
 
 Only "Microsoft.Pipeline" executables (Data Flow Tasks) are parsed down to
 component/path/column detail, since that's where column-level lineage
 lives. Other task types (Execute SQL, Script, etc.) and containers
-(Sequence, ForLoop) are still surfaced — as opaque stages or recursed into
-respectively — so a package with mixed task types doesn't fail to parse,
+(Sequence, ForLoop) are still surfaced - as opaque stages or recursed into
+respectively - so a package with mixed task types doesn't fail to parse,
 it just won't have lineage detail for the non-pipeline tasks.
 """
 import xml.etree.ElementTree as ET
@@ -108,7 +108,7 @@ def _parse_pipeline(pipeline_el) -> dict:
 
 def _parse_opaque_task(executable) -> dict:
     """Best-effort property capture for non-Pipeline executables (Execute
-    SQL, Script Task, etc.) — no per-vendor schema assumed, just flatten
+    SQL, Script Task, etc.) - no per-vendor schema assumed, just flatten
     whatever attributes the ObjectData subtree exposes."""
     properties = {}
     obj_data = executable.find("DTS:ObjectData", _NS)

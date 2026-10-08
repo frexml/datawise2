@@ -1,0 +1,5 @@
+        <?xml version="1.0"?>
+        <Schedule name="JOB_TELCO_CHURN" type="Control-M" schedule="03:00" frequency="daily">
+            <DependsOn>ETL_CDR_RAW_TO_FACT</DependsOn>
+<DependsOn>PROC_CHURN_SCORE</DependsOn>
+        </Schedule>

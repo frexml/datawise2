@@ -24,7 +24,7 @@ variable "app_identity_object_id" {
   description = "Object ID of the user-assigned identity used by Container Apps — gets get/list rights only"
 }
 
-variable "openai_api_key" {
+variable "openrouter_api_key" {
   type      = string
   sensitive = true
 }
@@ -45,11 +45,6 @@ variable "redis_connection_url" {
 }
 
 variable "neo4j_password" {
-  type      = string
-  sensitive = true
-}
-
-variable "openmetadata_mysql_password" {
   type      = string
   sensitive = true
 }

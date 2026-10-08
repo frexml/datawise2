@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<workbook>
+<dashboard name="MARKET_SNAPSHOT_REPORT"><title>Market data snapshot</title>
+<datasource caption="VW_MARKET_SNAPSHOT"><relation table="VW_MARKET_SNAPSHOT" type="table"/></datasource>
+</dashboard>
+</workbook>

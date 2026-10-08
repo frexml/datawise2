@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<Schedule name="JOB_RECON_MASTER" type="DataStage Sequence" schedule="07:00" frequency="daily">
+    <DependsOn>PROC_RECON_MASTER</DependsOn>
+</Schedule>

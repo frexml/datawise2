@@ -30,12 +30,15 @@ az account show >/dev/null 2>&1 || { echo "Not logged into Azure. Run: az login"
 
 # Sensitive vars: shell env wins, then .env, then error. Never sourced from
 # dev.tfvars.example — that file is committed and non-sensitive-only.
-if [ -z "${TF_VAR_openai_api_key:-}" ] && [ -f "$REPO_ROOT/.env" ]; then
-  TF_VAR_openai_api_key="$(grep -E '^OPENAI_API_KEY=' "$REPO_ROOT/.env" | head -1 | cut -d= -f2-)"
-  export TF_VAR_openai_api_key
+if [ -z "${TF_VAR_openrouter_api_key:-}" ] && [ -f "$REPO_ROOT/.env" ]; then
+  # `|| true` matters: under `set -euo pipefail`, a `.env` with no matching
+  # line makes grep exit 1, which kills the whole script right here — before
+  # the check below ever runs — silently.
+  TF_VAR_openrouter_api_key="$(grep -E '^OPENROUTER_API_KEY=' "$REPO_ROOT/.env" | head -1 | cut -d= -f2- || true)"
+  export TF_VAR_openrouter_api_key
 fi
-if [ -z "${TF_VAR_openai_api_key:-}" ]; then
-  echo "No OpenAI API key found. Export TF_VAR_openai_api_key, or set OPENAI_API_KEY in .env." >&2
+if [ -z "${TF_VAR_openrouter_api_key:-}" ]; then
+  echo "No OpenRouter API key found. Export TF_VAR_openrouter_api_key, or set OPENROUTER_API_KEY in .env." >&2
   exit 1
 fi
 

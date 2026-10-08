@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { useParams, Link } from 'react-router-dom';
 import ReactJson from 'react-json-view';
@@ -15,6 +15,8 @@ import 'reactflow/dist/style.css';
 import Markdown from 'react-markdown';
 import dagre from 'dagre';
 import { toPng } from 'html-to-image';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const getLayoutedElements = (nodes, edges, direction = 'TB') => {
     const dagreGraph = new dagre.graphlib.Graph({ compound: true });
@@ -176,7 +178,7 @@ const JobDetails = () => {
             setLoadingLineage(true);
             setLoadingStageLineage(true);
 
-            const [resultRes, lineageRes, stageLineageRes, reviewsRes, inefficienciesRes, scopeiqRes] =
+            const [resultRes, lineageRes, stageLineageRes, reviewsRes, inefficienciesRes, scopeiqRes, rawSourceRes] =
                 await Promise.allSettled([
                     axios.get(`/api/results/${jobId}`),
                     axios.get(`/api/jobs/${jobId}/lineage`),
@@ -184,6 +186,7 @@ const JobDetails = () => {
                     axios.get(`/api/jobs/${jobId}/reviews`),
                     axios.get(`/api/jobs/${jobId}/inefficiencies`),
                     axios.get(`/api/jobs/${jobId}/scopeiq`),
+                    axios.get(`/api/jobs/${jobId}/raw-source`),
                 ]);
             if (cancelled) return;
 
@@ -204,6 +207,11 @@ const JobDetails = () => {
 
             if (scopeiqRes.status === 'fulfilled') setScopeiq(scopeiqRes.value.data);
             else console.error('Failed to load ScopeIQ estimate:', scopeiqRes.reason);
+
+            if (rawSourceRes.status === 'fulfilled') setRawSource(rawSourceRes.value.data);
+            else if (rawSourceRes.reason?.response?.status !== 404)
+                console.error('Failed to load raw source:', rawSourceRes.reason);
+            // 404 is expected for jobs uploaded before Job.stored_filename existed — rawSource stays null.
 
             setLoadingLineage(false);
             setLoadingStageLineage(false);
@@ -713,6 +721,22 @@ const JobDetails = () => {
     const [stageLineageSearchTerm, setStageLineageSearchTerm] = useState('');
     const [isFullscreen, setIsFullscreen] = useState(false);
 
+    // Translate Job tab (legacy vs. modern side-by-side). rawSource stays
+    // null (silently) for jobs uploaded before Job.stored_filename existed
+    // — not an error state. Generation is user-initiated via the modal
+    // (runTranslation), not auto-fetched on tab open, and cached per target
+    // for the lifetime of this page view so re-picking the same target is instant.
+    const [rawSource, setRawSource] = useState(null);
+    const [scaffoldTarget, setScaffoldTarget] = useState('pyspark');
+    const [scaffoldCache, setScaffoldCache] = useState({ pyspark: null, glue: null });
+    const scaffoldContent = scaffoldCache[scaffoldTarget];
+    const [showTranslateModal, setShowTranslateModal] = useState(false);
+    const [translating, setTranslating] = useState(false);
+    const [translatePhaseIdx, setTranslatePhaseIdx] = useState(0);
+    const [translateError, setTranslateError] = useState(null);
+    const rawPaneRef = useRef(null);
+    const scaffoldPaneRef = useRef(null);
+
     // Inefficiency detection findings (Neo4j-backed, best-effort)
     const [inefficiencies, setInefficiencies] = useState([]);
     const [scopeiq, setScopeiq] = useState(null);
@@ -745,6 +769,116 @@ const JobDetails = () => {
             }, 100);
         }
     }, [reactFlowInstance, nodes.length]);
+
+    // Translation is generated server-side on demand (real work: deterministic
+    // extraction + a scoped LLM pass for unresolved expressions — not
+    // instant), so it's user-initiated via the modal rather than auto-fetched.
+    // The animated phase list is a best-effort visualization of real backend
+    // work, not literal progress telemetry — it advances on a timer while the
+    // request is in flight and jumps to "done" only once the response lands.
+    const TRANSLATE_PHASES = [
+        'Reading the legacy job definition…',
+        'Extracting keys, paths, and column derivations…',
+        'Resolving expressions deterministically…',
+        'Translating remaining expressions with AI…',
+        'Assembling the pipeline…',
+    ];
+
+    const openTranslateTab = useCallback(() => {
+        setActiveTab('rawCompare');
+        setTranslateError(null);
+        setTranslating(false);
+        setShowTranslateModal(true);
+    }, []);
+
+    const runTranslation = useCallback((target) => {
+        setTranslateError(null);
+        setScaffoldTarget(target);
+
+        if (scaffoldCache[target]) {
+            setShowTranslateModal(false);
+            return;
+        }
+
+        setTranslating(true);
+        setTranslatePhaseIdx(0);
+        const phaseTimer = setInterval(() => {
+            setTranslatePhaseIdx((i) => Math.min(i + 1, TRANSLATE_PHASES.length - 1));
+        }, 1400);
+
+        axios.get(`/api/jobs/${jobId}/export/migration-scaffold`, { params: { target } })
+            .then((res) => {
+                setScaffoldCache((prev) => ({ ...prev, [target]: res.data }));
+                setTranslatePhaseIdx(TRANSLATE_PHASES.length); // "done" — all steps checked
+                setTimeout(() => {
+                    setShowTranslateModal(false);
+                    setTranslating(false);
+                }, 700);
+            })
+            .catch((err) => {
+                console.error('Failed to translate job:', err);
+                setTranslateError('Translation failed — please try again.');
+                setTranslating(false);
+            })
+            .finally(() => clearInterval(phaseTimer));
+    }, [jobId, scaffoldCache]);
+
+    // Highlight matching pipeline stages across both panes so a user can
+    // visually track a stage while scrolling. The scaffold side is exact
+    // (built from its own generated headers); the raw-source side is a
+    // best-effort heuristic — any line containing the stage's name text.
+    const STAGE_HEADER_RE = /^# (.+?)  \[(\w+), original type: .*\]$/;
+    const STAGE_COLORS = [
+        '#f59e0b', '#0ea5e9', '#10b981', '#d946ef', '#f43f5e',
+        '#84cc16', '#06b6d4', '#fb923c', '#8b5cf6', '#ec4899',
+    ];
+
+    const { scaffoldLineToStage, stageOrder } = useMemo(() => {
+        if (!scaffoldContent) return { scaffoldLineToStage: [], stageOrder: [] };
+        const lines = scaffoldContent.split('\n');
+        const headers = [];
+        lines.forEach((line, idx) => {
+            const m = STAGE_HEADER_RE.exec(line);
+            if (m) headers.push({ idx, stage: m[1] });
+        });
+        const lineToStage = new Array(lines.length).fill(null);
+        headers.forEach((h, i) => {
+            const blockStart = Math.max(0, h.idx - 2); // include the blank + rule line drawn above the header
+            const blockEnd = i + 1 < headers.length ? Math.max(0, headers[i + 1].idx - 2) : lines.length;
+            for (let li = blockStart; li < blockEnd; li++) lineToStage[li] = h.stage;
+        });
+        return { scaffoldLineToStage: lineToStage, stageOrder: headers.map((h) => h.stage) };
+    }, [scaffoldContent]);
+
+    const rawLineToStage = useMemo(() => {
+        if (!rawSource?.content || !stageOrder.length) return [];
+        const namesSorted = [...stageOrder].sort((a, b) => b.length - a.length);
+        return rawSource.content.split('\n').map((line) => {
+            for (const name of namesSorted) {
+                if (name.length >= 3 && line.includes(name)) return name;
+            }
+            return null;
+        });
+    }, [rawSource, stageOrder]);
+
+    const colorForStage = useCallback(
+        (stage) => {
+            const idx = stageOrder.indexOf(stage);
+            return idx === -1 ? null : STAGE_COLORS[idx % STAGE_COLORS.length];
+        },
+        [stageOrder]
+    );
+
+    const scrollToStage = useCallback((containerRef, stage) => {
+        const container = containerRef.current;
+        if (!container || !stage) return;
+        const escaped = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(stage) : stage;
+        const el = container.querySelector(`[data-stage="${escaped}"]`);
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('dw-stage-flash');
+        setTimeout(() => el.classList.remove('dw-stage-flash'), 900);
+    }, []);
 
     const onPaneClick = useCallback(() => {
         setSelectedNode(null);
@@ -1146,10 +1280,11 @@ const JobDetails = () => {
                     { key: 'stageLineage', label: 'Stage Lineage', icon: '🔀' },
                     { key: 'e2eLineage', label: 'End-to-End Lineage', icon: '🔗' },
                     { key: 'scopeiq', label: 'ScopeIQ Estimate', icon: '📦' },
+                    { key: 'rawCompare', label: 'Translate Job', icon: '🔄' },
                 ].map((tab) => (
                     <button
                         key={tab.key}
-                        onClick={() => setActiveTab(tab.key)}
+                        onClick={() => (tab.key === 'rawCompare' ? openTranslateTab() : setActiveTab(tab.key))}
                         className={
                             'px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors flex items-center gap-1.5 ' +
                             (activeTab === tab.key
@@ -1243,6 +1378,20 @@ const JobDetails = () => {
                         className="px-3 py-1 bg-slate-700 text-white text-sm rounded hover:bg-slate-800 transition-colors inline-flex items-center"
                     >
                         🏛️ Evidence Pack (PDF)
+                    </a>
+                    <a
+                        href={`/api/jobs/${jobId}/export/migration-scaffold?target=pyspark`}
+                        title="Auto-translated PySpark job — real keys/paths/derivations where recoverable, everything else flagged for review"
+                        className="px-3 py-1 bg-purple-700 text-white text-sm rounded hover:bg-purple-800 transition-colors inline-flex items-center"
+                    >
+                        ⚡ Spark Job
+                    </a>
+                    <a
+                        href={`/api/jobs/${jobId}/export/migration-scaffold?target=glue`}
+                        title="Same translation as the Spark job, wrapped in AWS Glue job boilerplate"
+                        className="px-3 py-1 bg-purple-900 text-white text-sm rounded hover:bg-purple-950 transition-colors inline-flex items-center"
+                    >
+                        🧱 Glue Job
                     </a>
                     <button
                         onClick={() => setIsFullscreen(!isFullscreen)}
@@ -1643,6 +1792,245 @@ const JobDetails = () => {
                         onGenerate={generateScopeiqEstimate}
                         jobId={jobId}
                     />
+                </div>
+            )}
+
+            {/* Translate Job tab: legacy source vs. modern job, side by side */}
+            {activeTab === 'rawCompare' && (
+                <div className="bg-gray-50 dark:bg-gray-900/40 border-b dark:border-gray-700 shadow-sm">
+                    <style>{`
+                        @keyframes dwStageFlash { 0%, 100% { box-shadow: inset 0 0 0 9999px rgba(0,0,0,0); } 30% { box-shadow: inset 0 0 0 9999px rgba(255,255,255,0.35); } }
+                        .dw-stage-flash { animation: dwStageFlash 0.9s ease-out; }
+                    `}</style>
+                    <div className="px-6 py-3 flex justify-between items-center border-b dark:border-gray-700">
+                        <div>
+                            <h2 className="text-md font-bold text-gray-700 dark:text-gray-300">🔄 Translate Job — Legacy vs. Modern</h2>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                Matching colors mark the same pipeline stage in both files — click a highlighted line to jump to its counterpart. Anything the translation couldn't confidently resolve is flagged inline in the modern job, not silently guessed.
+                            </p>
+                        </div>
+                        {scaffoldContent && (
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => runTranslation('pyspark')}
+                                    className={
+                                        'px-3 py-1 text-sm rounded transition-colors ' +
+                                        (scaffoldTarget === 'pyspark'
+                                            ? 'bg-purple-700 text-white'
+                                            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600')
+                                    }
+                                >
+                                    ⚡ Spark Job
+                                </button>
+                                <button
+                                    onClick={() => runTranslation('glue')}
+                                    className={
+                                        'px-3 py-1 text-sm rounded transition-colors ' +
+                                        (scaffoldTarget === 'glue'
+                                            ? 'bg-purple-900 text-white'
+                                            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600')
+                                    }
+                                >
+                                    🧱 Glue Job
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {job?.status !== 'COMPLETED' ? (
+                        <p className="px-6 py-8 text-center text-gray-500 dark:text-gray-400 italic">
+                            Available once the job finishes processing.
+                        </p>
+                    ) : !scaffoldContent ? (
+                        <div className="px-6 py-16 text-center">
+                            <p className="text-gray-500 dark:text-gray-400 mb-4">No modern job generated yet for this pipeline.</p>
+                            <button
+                                onClick={openTranslateTab}
+                                className="px-4 py-2 bg-purple-700 text-white text-sm rounded hover:bg-purple-800 transition-colors"
+                            >
+                                🔄 Translate Job
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 gap-px bg-gray-300 dark:bg-gray-700" style={{ height: '800px' }}>
+                            <div className="bg-white dark:bg-gray-800 flex flex-col overflow-hidden">
+                                <div className="px-4 py-2 border-b dark:border-gray-700 bg-gray-100 dark:bg-gray-700">
+                                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                        📄 Legacy Job{rawSource ? `: ${rawSource.filename}` : ''}
+                                    </span>
+                                </div>
+                                <div ref={rawPaneRef} className="flex-1 overflow-auto">
+                                    {!rawSource ? (
+                                        <p className="p-4 text-gray-500 dark:text-gray-400 italic text-sm">
+                                            Raw source isn't available for this job (uploaded before this feature existed).
+                                        </p>
+                                    ) : (
+                                        <SyntaxHighlighter
+                                            language={/\.(dtsx|xml)$/i.test(rawSource.filename) ? 'xml' : 'text'}
+                                            style={oneDark}
+                                            customStyle={{ margin: 0, minHeight: '100%', fontSize: '0.8rem' }}
+                                            showLineNumbers
+                                            wrapLines
+                                            lineProps={(lineNumber) => {
+                                                const stage = rawLineToStage[lineNumber - 1];
+                                                if (!stage) return {};
+                                                const color = colorForStage(stage);
+                                                return {
+                                                    'data-stage': stage,
+                                                    title: `Stage: ${stage} — click to jump to the matching block`,
+                                                    style: { backgroundColor: `${color}33`, cursor: 'pointer', display: 'block' },
+                                                    onClick: () => scrollToStage(scaffoldPaneRef, stage),
+                                                };
+                                            }}
+                                        >
+                                            {rawSource.content}
+                                        </SyntaxHighlighter>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="bg-white dark:bg-gray-800 flex flex-col overflow-hidden">
+                                <div className="px-4 py-2 border-b dark:border-gray-700 bg-gray-100 dark:bg-gray-700 flex items-center justify-between">
+                                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                        {scaffoldTarget === 'pyspark' ? '⚡ Spark Job' : '🧱 Glue Job'}
+                                    </span>
+                                    <a
+                                        href={`/api/jobs/${jobId}/export/migration-scaffold?target=${scaffoldTarget}`}
+                                        className="text-xs px-2 py-1 bg-purple-700 text-white rounded hover:bg-purple-800 transition-colors"
+                                    >
+                                        ⬇ Download
+                                    </a>
+                                </div>
+                                <div ref={scaffoldPaneRef} className="flex-1 overflow-auto">
+                                    <SyntaxHighlighter
+                                        language="python"
+                                        style={oneDark}
+                                        customStyle={{ margin: 0, minHeight: '100%', fontSize: '0.8rem' }}
+                                        showLineNumbers
+                                        wrapLines
+                                        lineProps={(lineNumber) => {
+                                            const stage = scaffoldLineToStage[lineNumber - 1];
+                                            if (!stage) return {};
+                                            const color = colorForStage(stage);
+                                            return {
+                                                'data-stage': stage,
+                                                title: `Stage: ${stage} — click to jump to the matching block`,
+                                                style: { backgroundColor: `${color}33`, cursor: 'pointer', display: 'block' },
+                                                onClick: () => scrollToStage(rawPaneRef, stage),
+                                            };
+                                        }}
+                                    >
+                                        {scaffoldContent}
+                                    </SyntaxHighlighter>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Translate Job modal: target picker → animated progress */}
+            {showTranslateModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg overflow-hidden">
+                        <div className="px-6 py-4 border-b dark:border-gray-700 flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">🔄 Translate Job</h3>
+                            {!translating && (
+                                <button
+                                    onClick={() => setShowTranslateModal(false)}
+                                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none"
+                                >
+                                    &times;
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="px-6 py-5">
+                            {!translating ? (
+                                <>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                                        Choose a modern target. Real keys, paths, and column derivations are carried over
+                                        from the legacy job wherever they can be extracted — anything uncertain is flagged
+                                        for review in the result, not guessed silently.
+                                    </p>
+                                    {translateError && (
+                                        <div className="mb-4 px-3 py-2 rounded bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm">
+                                            {translateError}
+                                        </div>
+                                    )}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            onClick={() => runTranslation('pyspark')}
+                                            className="group border-2 border-purple-200 dark:border-purple-800 hover:border-purple-600 dark:hover:border-purple-500 rounded-lg p-4 text-left transition-colors"
+                                        >
+                                            <div className="text-2xl mb-1">⚡</div>
+                                            <div className="font-semibold text-gray-800 dark:text-gray-100 group-hover:text-purple-700 dark:group-hover:text-purple-400">
+                                                Spark Job
+                                            </div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Standalone PySpark script</div>
+                                        </button>
+                                        <button
+                                            onClick={() => runTranslation('glue')}
+                                            className="group border-2 border-purple-200 dark:border-purple-800 hover:border-purple-600 dark:hover:border-purple-500 rounded-lg p-4 text-left transition-colors"
+                                        >
+                                            <div className="text-2xl mb-1">🧱</div>
+                                            <div className="font-semibold text-gray-800 dark:text-gray-100 group-hover:text-purple-700 dark:group-hover:text-purple-400">
+                                                Glue Job
+                                            </div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">AWS Glue job boilerplate</div>
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="py-2">
+                                    <div className="flex items-center gap-3 mb-5">
+                                        {translatePhaseIdx >= TRANSLATE_PHASES.length ? (
+                                            <div className="h-9 w-9 rounded-full bg-green-500 text-white flex items-center justify-center flex-shrink-0 text-lg">
+                                                ✓
+                                            </div>
+                                        ) : (
+                                            <div className="h-9 w-9 rounded-full border-4 border-purple-200 dark:border-purple-900 border-t-purple-600 dark:border-t-purple-400 animate-spin flex-shrink-0" />
+                                        )}
+                                        <div>
+                                            <div className="font-semibold text-gray-800 dark:text-gray-100">
+                                                {translatePhaseIdx >= TRANSLATE_PHASES.length
+                                                    ? 'Done!'
+                                                    : `Translating to ${scaffoldTarget === 'pyspark' ? 'Spark' : 'Glue'}…`}
+                                            </div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">This can take a moment for large jobs.</div>
+                                        </div>
+                                    </div>
+                                    <ul className="space-y-2">
+                                        {TRANSLATE_PHASES.map((phase, i) => (
+                                            <li key={phase} className="flex items-center gap-2 text-sm">
+                                                <span
+                                                    className={
+                                                        'w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] ' +
+                                                        (i < translatePhaseIdx
+                                                            ? 'bg-green-500 text-white'
+                                                            : i === translatePhaseIdx
+                                                            ? 'bg-purple-600 text-white animate-pulse'
+                                                            : 'bg-gray-200 dark:bg-gray-700')
+                                                    }
+                                                >
+                                                    {i < translatePhaseIdx ? '✓' : ''}
+                                                </span>
+                                                <span className={i <= translatePhaseIdx ? 'text-gray-800 dark:text-gray-100' : 'text-gray-400 dark:text-gray-600'}>
+                                                    {phase}
+                                                </span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    <div className="mt-4 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-purple-600 transition-all duration-700 ease-out"
+                                            style={{ width: `${Math.min(100, ((translatePhaseIdx + 1) / TRANSLATE_PHASES.length) * 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

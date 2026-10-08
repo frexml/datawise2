@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<cognosReport name="LOAN_PIPELINE_REPORT" description="Loan applications by status">
+<query><source table="VW_LOAN_PIPELINE"/></query>
+</cognosReport>

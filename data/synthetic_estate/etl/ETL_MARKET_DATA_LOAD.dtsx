@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<DTS:Executable xmlns:DTS="www.microsoft.com/SqlServer/Dts" DTS:refId="Package" DTS:CreationName="SSIS.Package.3" DTS:ObjectName="ETL_MARKET_DATA_LOAD">
+<DTS:Executables>
+<DTS:Executable DTS:refId="Package\Data Flow Task" DTS:CreationName="SSIS.Pipeline.3" DTS:ObjectName="Data Flow Task">
+<DTS:ObjectData><pipeline><components>
+<component refId="Package\Data Flow Task\OLE DB Source" componentClassID="Microsoft.OLEDBSource" name="OLEDB_STG_MARKET_DATA" description="Source STG_MARKET_DATA"/>
+<component refId="Package\Data Flow Task\OLE DB Destination" componentClassID="Microsoft.OLEDBDestination" name="OLEDB_DW.MARKET_FACT" description="Target DW.MARKET_FACT"/>
+</components><paths>
+<path refId="Package\Data Flow Task\Path" name="STG_MARKET_DATA_to_DW.MARKET_FACT" startId="Package\Data Flow Task\OLE DB Source" endId="Package\Data Flow Task\OLE DB Destination"/>
+</paths></pipeline></DTS:ObjectData>
+</DTS:Executable>
+</DTS:Executables>
+</DTS:Executable>

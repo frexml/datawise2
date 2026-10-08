@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<cognosReport name="NETWORK_DASH_TELCO" description="Network performance">
+<query><source table="VW_NETWORK_DASH"/></query>
+</cognosReport>

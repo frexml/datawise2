@@ -37,6 +37,7 @@ async def upload_file(
     # Create Job record
     job = models.Job(
         filename=file.filename,
+        stored_filename=unique_filename,
         status="PENDING",
         domain=(domain or "").strip() or None,
         wave=(wave or "").strip() or None,
@@ -100,7 +101,7 @@ def update_job_tags(job_id: int, update: JobTagUpdate, db: Session = Depends(get
 
 def _fetch_inefficiency_counts_by_job() -> dict[int, int]:
     """{job_id: pattern_count} across all jobs, in one Neo4j round trip.
-    Best-effort — same guard as /api/stats, must not fail the endpoint."""
+    Best-effort - same guard as /api/stats, must not fail the endpoint."""
     try:
         from dsxlineage.db.graph import run_cypher
 
@@ -120,7 +121,7 @@ _RECURRING_PATTERN_LIMIT = 20
 
 def _fetch_recurring_patterns(jobs_by_id: dict[int, dict]) -> dict:
     """Patterns whose signature (see inefficiency_agent.py) recurs across 2+
-    jobs — "the same join/pattern appears in N+ jobs" per the docs' config
+    jobs - "the same join/pattern appears in N+ jobs" per the docs' config
     thresholds. Best-effort, same Neo4j-outage guard as the rest of this file."""
     try:
         from dsxlineage.db.graph import run_cypher
@@ -170,7 +171,7 @@ def get_portfolio(db: Session = Depends(get_db)):
     engagements (many jobs grouped into named domains/waves) rather than
     the single flat number /api/stats reports.
 
-    Fetches each table exactly once and aggregates in Python — this used to
+    Fetches each table exactly once and aggregates in Python - this used to
     query Review per domain/wave bucket (O(domains + waves) round trips on
     top of the fixed queries), which was invisible against a loopback dev
     Postgres but made this endpoint dominate page-load time once every round
@@ -301,7 +302,7 @@ def get_portfolio(db: Session = Depends(get_db)):
 def get_stats(db: Session = Depends(get_db)):
     """Aggregate KPIs for the Dashboard landing page.
 
-    One query per table instead of 7 separate .count() round trips — each
+    One query per table instead of 7 separate .count() round trips - each
     was a real network hop to a managed Postgres instance, not a loopback
     dev DB, so this endpoint's latency used to scale with the query count."""
     job_statuses = [
@@ -315,7 +316,7 @@ def get_stats(db: Session = Depends(get_db)):
 
     review_statuses = [s for (s,) in db.query(models.Review.status).all()]
     total_reviews = len(review_statuses)
-    # "pending_reviews" means "needs a reviewer's attention" — includes items
+    # "pending_reviews" means "needs a reviewer's attention" - includes items
     # rejected-but-not-yet-resolved (reviewer still has to pick Edit or Re-run)
     # and items currently regenerating, not just untouched ones.
     pending_reviews = sum(1 for s in review_statuses if s in ("pending_review", "rejected", "regenerating"))
@@ -329,7 +330,7 @@ def get_stats(db: Session = Depends(get_db)):
 
         rows = run_cypher([{"cypher": "MATCH (p:InefficiencyPattern) RETURN count(p) AS count"}])[0]
         inefficiencies_count = rows[0]["count"] if rows else 0
-    except Exception as exc:  # noqa: BLE001 — stats must not fail if Neo4j is unreachable
+    except Exception as exc:  # noqa: BLE001 - stats must not fail if Neo4j is unreachable
         print(f"Warning: could not fetch inefficiency count from Neo4j: {exc}")
 
     return {
@@ -456,8 +457,8 @@ _PREVIEW_LEN = 240
 def list_all_reviews(status: str | None = "open", db: Session = Depends(get_db)):
     """Cross-job review queue.
 
-    Defaults to "open" — pending_review, rejected (awaiting the reviewer's
-    edit-or-rerun choice), and regenerating — i.e. anything not yet resolved.
+    Defaults to "open" - pending_review, rejected (awaiting the reviewer's
+    edit-or-rerun choice), and regenerating - i.e. anything not yet resolved.
     Pass status=all for everything, or an exact status value to filter to it.
     """
     query = db.query(models.Review)
@@ -541,7 +542,7 @@ class ReviewEdit(BaseModel):
 
 @router.post("/reviews/{review_id}/edit")
 def edit_review(review_id: int, edit: ReviewEdit, db: Session = Depends(get_db)):
-    """Hand-edit a rejected summary and approve it in the same action —
+    """Hand-edit a rejected summary and approve it in the same action -
     editing the text IS the review decision here, so there's no separate
     approve step."""
     review = db.query(models.Review).filter(models.Review.id == review_id).first()
@@ -579,7 +580,7 @@ def edit_review(review_id: int, edit: ReviewEdit, db: Session = Depends(get_db))
 @router.post("/reviews/{review_id}/rerun")
 def rerun_review(review_id: int, db: Session = Depends(get_db)):
     """Regenerate a rejected summary with the rejection feedback fed back
-    into the LLM prompt. Runs async — the review sits in "regenerating"
+    into the LLM prompt. Runs async - the review sits in "regenerating"
     until the Celery task flips it back to "pending_review"."""
     from dsxlineage.worker import regenerate_summary_task
 
@@ -612,7 +613,7 @@ def get_link_explanation(link_id: int, db: Session = Depends(get_db)):
     return {"llm_explanation": link.llm_explanation}
 
 def _fetch_global_lineage_table_sets(db: Session) -> tuple[set, set]:
-    """Distinct source/target table names across ALL jobs' Lineage rows —
+    """Distinct source/target table names across ALL jobs' Lineage rows -
     needed for medallion tier classification, which only makes sense
     estate-wide (see lineage_analyzer.classify_medallion_tiers)."""
     source_tables = {
@@ -779,6 +780,50 @@ def export_evidence_pack(job_id: int, db: Session = Depends(get_db)):
     )
 
 
+@router.get("/jobs/{job_id}/raw-source")
+def get_raw_source(job_id: int, db: Session = Depends(get_db)):
+    """Original uploaded file's text content, for the Raw vs. Scaffold
+    comparison view. Jobs uploaded before Job.stored_filename existed (see
+    migrations/2026-07-16_job_stored_filename.sql) have no recoverable file."""
+    job = db.query(models.Job).filter(models.Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if not job.stored_filename:
+        raise HTTPException(status_code=404, detail="Raw source file is not available for this job")
+
+    raw_path = os.path.join(UPLOAD_DIR, job.stored_filename)
+    if not os.path.exists(raw_path):
+        raise HTTPException(status_code=404, detail="Raw source file is missing from disk")
+
+    with open(raw_path, "r", encoding="utf-8", errors="replace") as f:
+        content = f.read()
+
+    return {"filename": job.filename, "content": content}
+
+
+@router.get("/jobs/{job_id}/export/migration-scaffold")
+async def export_migration_scaffold(job_id: int, target: str = "pyspark", db: Session = Depends(get_db)):
+    """Downloadable PySpark/Glue skeleton wired from the job's stage/link
+    graph. For DataStage jobs with a recoverable raw source, real
+    derivation/key/path data drives the scaffold; otherwise it falls back to
+    structure + AI-summary TODOs. See services/migration_scaffold.py's
+    module docstring for the exact fidelity boundaries."""
+    from dsxlineage.services.migration_scaffold import generate_migration_scaffold
+
+    job = db.query(models.Job).filter(models.Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if target not in ("pyspark", "glue"):
+        raise HTTPException(status_code=400, detail="target must be 'pyspark' or 'glue'")
+
+    buffer = await generate_migration_scaffold(job_id, db, target=target)
+    suffix = "spark_scaffold" if target == "pyspark" else "glue_scaffold"
+    filename = f"{os.path.splitext(job.filename)[0]}_{suffix}.py"
+    return StreamingResponse(
+        buffer,
+        media_type="text/x-python",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/jobs/{job_id}/stage-lineage")
@@ -787,7 +832,7 @@ def get_stage_lineage(job_id: int, db: Session = Depends(get_db)):
 
     Previously read a pre-bundled CSV keyed by the uploaded filename, which
     only ever existed for 2 sample jobs and silently returned [] for every
-    other job — the same class of bug the /lineage endpoint's docstring
+    other job - the same class of bug the /lineage endpoint's docstring
     already documents having been fixed for End-to-End Lineage.
     """
     from dsxlineage.services.lineage_analyzer import build_stage_lineage
@@ -808,30 +853,14 @@ def delete_job(job_id: int, db: Session = Depends(get_db)):
     
     # Delete associated results
     db.query(models.Result).filter(models.Result.job_id == job_id).delete()
-    
-    # Delete file from disk
-    # We need to find the file path. We stored filename but not full path in Job model.
-    # But we know the upload dir. However, we generated a unique filename.
-    # Wait, we didn't store the unique filename in the DB, only the original filename.
-    # Let's check the upload logic.
-    # We generated unique_filename but stored file.filename in DB.
-    # This is a small issue. We can't easily find the file on disk if we didn't store the unique path.
-    # But wait, the worker receives the absolute path.
-    # Let's check if we can just delete the job and results for now, and maybe leave the file or try to find it.
-    # Actually, for a proper implementation, we should have stored the file path.
-    # But for now, let's just delete the DB records. The file on disk is less critical to clean up immediately 
-    # unless we want to be perfect.
-    # Let's see if we can improve this.
-    # In upload_file:
-    # unique_filename = f"{uuid.uuid4()}{file_ext}"
-    # file_path = os.path.join(UPLOAD_DIR, unique_filename)
-    # job = models.Job(filename=file.filename, status="PENDING")
-    
-    # We should probably add a file_path column to Job model.
-    # But that requires migration.
-    # Let's stick to deleting from DB for now to avoid schema changes if possible.
-    # The user just wants to "delete uploaded files from the UI", which implies removing them from the list.
-    
+
+    # Delete the raw uploaded file from disk, if we know where it is (jobs
+    # uploaded before stored_filename existed have no way to locate theirs).
+    if job.stored_filename:
+        raw_path = os.path.join(UPLOAD_DIR, job.stored_filename)
+        if os.path.exists(raw_path):
+            os.remove(raw_path)
+
     db.delete(job)
     db.commit()
     

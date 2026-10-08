@@ -112,9 +112,10 @@ def _complexity_tier(total_days: float) -> str:
 class ScopeIQAgent:
     def __init__(self) -> None:
         base_llm = ChatOpenAI(
-            model=settings.OPENAI_MODEL,
+            model=settings.OPENROUTER_MODEL,
             temperature=0,
-            api_key=settings.OPENAI_API_KEY,
+            api_key=settings.OPENROUTER_API_KEY,
+            base_url=settings.OPENROUTER_BASE_URL,
             max_tokens=_MAX_TOKENS,
         )
         self._decompose_llm = base_llm.with_structured_output(ScopeDecomposition)
@@ -156,7 +157,7 @@ class ScopeIQAgent:
             "Job context:\n" + job_context + "\n\n"
             "For each of the four fixed research dimensions below, write a 1-3 sentence "
             "scope brief that narrows down what is actually relevant to research for THIS "
-            "specific job — not a generic description of the dimension:\n"
+            "specific job - not a generic description of the dimension:\n"
             "- tech_stack\n- compliance_regulatory\n- integration_patterns\n- delivery_risk"
         ))
         return await self._decompose_llm.ainvoke([system, human])
@@ -257,7 +258,7 @@ class ScopeIQAgent:
 
 
 def generate_estimate_for_job(job_id: int) -> dict:
-    """Sync entry point for the Celery task — fetches its own data (Postgres
+    """Sync entry point for the Celery task - fetches its own data (Postgres
     + best-effort Neo4j), mirroring the self-contained style of
     `inefficiency_agent.detect_inefficiencies`."""
     from dsxlineage.db.database import SessionLocal
@@ -282,7 +283,7 @@ def generate_estimate_for_job(job_id: int) -> dict:
                 """,
                 "params": {"job_id": job_id},
             }])[0]
-        except Exception as exc:  # noqa: BLE001 — best-effort, same guard as /api/stats
+        except Exception as exc:  # noqa: BLE001 - best-effort, same guard as /api/stats
             print(f"Warning: could not fetch inefficiency patterns for ScopeIQ estimate (job {job_id}): {exc}")
 
         agent = ScopeIQAgent()

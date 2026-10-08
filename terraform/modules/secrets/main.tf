@@ -38,9 +38,9 @@ resource "azurerm_key_vault_access_policy" "apps" {
   secret_permissions = ["Get", "List"]
 }
 
-resource "azurerm_key_vault_secret" "openai_api_key" {
-  name         = "openai-api-key"
-  value        = var.openai_api_key
+resource "azurerm_key_vault_secret" "openrouter_api_key" {
+  name         = "openrouter-api-key"
+  value        = var.openrouter_api_key
   key_vault_id = azurerm_key_vault.main.id
   tags         = var.tags
 
@@ -83,14 +83,5 @@ resource "azurerm_key_vault_secret" "neo4j_password" {
   depends_on = [azurerm_key_vault_access_policy.deployer]
 }
 
-# Recorded for audit/rotation visibility only — no app reads this back via
-# KV (OpenMetadata's MySQL is internal to the OpenMetadata server component;
-# nothing else in DataWise talks to it), same reasoning as postgres_admin_password.
-resource "azurerm_key_vault_secret" "openmetadata_mysql_password" {
-  name         = "openmetadata-mysql-password"
-  value        = var.openmetadata_mysql_password
-  key_vault_id = azurerm_key_vault.main.id
-  tags         = var.tags
-
-  depends_on = [azurerm_key_vault_access_policy.deployer]
-}
+# Estate-only: openmetadata_mysql_password removed — ledger is the publish layer.
+# See archive/etl-v1 and tag v1-etl-final for the last ETL + OpenMetadata stack.

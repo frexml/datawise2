@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<cognosReport name="BRANCH_PERF_DASH" description="Branch revenue &amp; margin">
+<query><source table="VW_BRANCH_PERFORMANCE"/></query>
+</cognosReport>

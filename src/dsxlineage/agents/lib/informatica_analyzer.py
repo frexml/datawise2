@@ -1,11 +1,11 @@
 """Converts the raw Informatica parse tree (informatica_parser output) into
 the same {job_properties, components: {stages, links, annotations,
 containers, others}} shape DataStage's DSXAnalyzer and SSIS's analyze_ssis
-produce, plus the same {edges, ...} lineage shape — so every downstream
+produce, plus the same {edges, ...} lineage shape - so every downstream
 agent works unchanged regardless of source dialect.
 
 Informatica's CONNECTOR elements are field-level edges, richer than
-DataStage/SSIS's stage-to-stage links — grouped here by (from_instance,
+DataStage/SSIS's stage-to-stage links - grouped here by (from_instance,
 to_instance) pair into one link per stage-pair, with the individual field
 mappings preserved as link properties.
 """
@@ -107,7 +107,7 @@ def analyze_informatica(parsed_data: dict) -> dict:
 
 def extract_informatica_lineage(analysis_result: dict) -> dict:
     """Informatica equivalent of partner_extractor/ssis_analyzer's lineage
-    extraction — links already carry resolved stage ids, just need stage
+    extraction - links already carry resolved stage ids, just need stage
     names for the edges list worker.py expects."""
     components = analysis_result.get("components", {})
     stages = components.get("stages", {})

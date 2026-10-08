@@ -1,0 +1,5 @@
+        <?xml version="1.0"?>
+        <Schedule name="JOB_TELCO_BILLING" type="Control-M" schedule="01:00" frequency="daily">
+            <DependsOn>ETL_BSCS_SUB_TO_DW</DependsOn>
+<DependsOn>PROC_BILLING_ROLLUP</DependsOn>
+        </Schedule>

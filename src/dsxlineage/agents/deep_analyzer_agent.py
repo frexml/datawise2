@@ -5,7 +5,7 @@ Performance characteristics (compared to the original sequential implementation)
 - Link and annotation analyses use a smaller/cheaper model (gpt-4o-mini) and
   run concurrently in their own pool.
 - The growing context_summary string is replaced by a small, stable job overview
-  computed once. Each stage prompt is self-contained → no inter-stage dependency,
+  computed once. Each stage prompt is self-contained -> no inter-stage dependency,
   which is what made parallelism possible.
 - Every LLM call has a bounded max_tokens.
 
@@ -22,9 +22,9 @@ from langchain_openai import ChatOpenAI
 from dsxlineage.core.config import settings
 
 
-# Bound concurrent OpenAI calls. 24 saturates most OpenAI tiers without
-# triggering 429s; LangChain's ChatOpenAI client retries automatically on
-# the rare burst-induced rate limit.
+# Bound concurrent LLM calls through OpenRouter. 24 saturates most upstream
+# provider tiers without triggering 429s; LangChain's ChatOpenAI client
+# retries automatically on the rare burst-induced rate limit.
 _CONCURRENCY = 24
 
 # max_tokens per call kind. Stage analyses can be lengthy (multi-section markdown
@@ -34,7 +34,7 @@ _LINK_MAX_TOKENS = 500
 _ANNO_MAX_TOKENS = 400
 _SUMMARY_MAX_TOKENS = 800
 
-_MINI_MODEL = "gpt-4o-mini"
+_MINI_MODEL = "openai/gpt-4o-mini"
 
 _DIALECT_LABELS = {
     "datastage": "DataStage",
@@ -47,16 +47,18 @@ class DeepAnalyzerAgent:
     def __init__(self) -> None:
         # Main model: stage analyses (where C++ TrxGenCode may be present) + final summary.
         self.llm = ChatOpenAI(
-            model=settings.OPENAI_MODEL,
+            model=settings.OPENROUTER_MODEL,
             temperature=0,
-            api_key=settings.OPENAI_API_KEY,
+            api_key=settings.OPENROUTER_API_KEY,
+            base_url=settings.OPENROUTER_BASE_URL,
             max_tokens=_STAGE_MAX_TOKENS,
         )
         # Mini model: links + annotations (schema/text summaries, low-stakes).
         self.llm_mini = ChatOpenAI(
             model=_MINI_MODEL,
             temperature=0,
-            api_key=settings.OPENAI_API_KEY,
+            api_key=settings.OPENROUTER_API_KEY,
+            base_url=settings.OPENROUTER_BASE_URL,
             max_tokens=_LINK_MAX_TOKENS,
         )
         # Lazily initialized inside the event loop; required for asyncio.Semaphore.
@@ -262,7 +264,7 @@ Output Format:
                 "llm_explanation": analysis,
                 "_summary": summary,
             }
-        except Exception as exc:  # noqa: BLE001 — fail one stage, not the whole job
+        except Exception as exc:  # noqa: BLE001 - fail one stage, not the whole job
             return {
                 "stage_id": stage_id,
                 "name": stage_name,
@@ -356,7 +358,7 @@ Output Format:
         return sorted(stages.keys(), key=sort_key)
 
     # ------------------------------------------------------------------
-    # Job context builder — replaces the rolling context_summary string.
+    # Job context builder - replaces the rolling context_summary string.
     # ------------------------------------------------------------------
     @staticmethod
     def _build_job_context(
@@ -402,7 +404,7 @@ Output Format:
             f"(concurrency={_CONCURRENCY}, dialect={dialect_label})"
         )
 
-        # Fan out — all three groups concurrently. asyncio.gather inside gather
+        # Fan out - all three groups concurrently. asyncio.gather inside gather
         # is fine; outer gather just waits for the three inner gathers.
         stage_results, link_results, anno_results = await asyncio.gather(
             asyncio.gather(*(
@@ -423,11 +425,11 @@ Output Format:
         analyzed_links = list(link_results)
         analyzed_annotations = list(anno_results)
 
-        # Executive summaries — technical and business are two independent
+        # Executive summaries - technical and business are two independent
         # audiences/prompts (per DataWise's documented governance model: every
         # job gets a precise technical summary AND a plain-language business
         # summary, reviewed separately). Both are synthesis tasks over the
-        # per-stage one-liners already extracted above — mini model, run
+        # per-stage one-liners already extracted above - mini model, run
         # concurrently.
         bullets = []
         for s in stage_results:
@@ -446,7 +448,7 @@ Output Format:
         }
 
     # ------------------------------------------------------------------
-    # Executive summary prompts — shared by the first-pass pipeline run
+    # Executive summary prompts - shared by the first-pass pipeline run
     # (above) and the standalone re-run-on-rejection path (below). A
     # reviewer's rejection feedback, when present, is appended as a
     # correction directive rather than discarded.
@@ -458,7 +460,7 @@ Output Format:
             feedback_block = f"""
 
 A human reviewer rejected the previous version of this summary with the
-following feedback — address it directly in your rewrite:
+following feedback - address it directly in your rewrite:
 "{feedback}"
 """
         return f"""You are a senior data engineer reviewing an ETL job.
@@ -469,13 +471,13 @@ Here is a summary of the job's stages:
 Task:
 Write a technical executive summary of what this entire job does, using data
 engineering terminology. Do not infer business intent beyond what the stages
-show. Structure it exactly as the McKinsey pyramid-principle sections below —
+show. Structure it exactly as the McKinsey pyramid-principle sections below -
 lead with the answer, then support it. Use markdown; bold each bullet's
 lead-in phrase. Keep the whole thing under 250 words.
 
 Output:
-**Bottom Line:** <the single governing insight — what this job does and its
-technical criticality — in one sentence>
+**Bottom Line:** <the single governing insight - what this job does and its
+technical criticality - in one sentence>
 
 **Situation:** <1-2 sentences: job type, scale/volume signals, where it sits
 in the pipeline>
@@ -486,7 +488,7 @@ in the pipeline>
 - **<lead-in>:** <supporting technical detail>
 
 **Technical Risks:** <1-2 sentences on fragility, inefficiencies, or
-dependencies observed in the stages — omit if none are evident>
+dependencies observed in the stages - omit if none are evident>
 
 **Recommended Actions:** <1-2 concrete, prioritized next steps for a data
 engineer>
@@ -499,7 +501,7 @@ engineer>
             feedback_block = f"""
 
 A human reviewer rejected the previous version of this summary with the
-following feedback — address it directly in your rewrite:
+following feedback - address it directly in your rewrite:
 "{feedback}"
 """
         return f"""You are a business analyst translating an ETL job into plain language.
@@ -509,14 +511,14 @@ Here is a summary of the job's stages:
 {feedback_block}
 Task:
 Write a business summary explaining what business question or process this
-job serves. Avoid technical jargon — a finance director should be able to
+job serves. Avoid technical jargon - a finance director should be able to
 read it. Structure it exactly as the McKinsey pyramid-principle sections
-below — lead with the answer, then support it. Use markdown; bold each
+below - lead with the answer, then support it. Use markdown; bold each
 bullet's lead-in phrase. Keep the whole thing under 200 words.
 
 Output:
-**Bottom Line:** <the single governing insight — what business outcome this
-job delivers — in one sentence, in plain language>
+**Bottom Line:** <the single governing insight - what business outcome this
+job delivers - in one sentence, in plain language>
 
 **Situation:** <1-2 sentences of business context: what process or question
 this job supports>
@@ -527,7 +529,7 @@ this job supports>
 - **<lead-in>:** <supporting detail in plain language>
 
 **Business Impact:** <1-2 sentences on what depends on this job, or what
-happens if it fails or is delayed — omit if not evident>
+happens if it fails or is delayed - omit if not evident>
 
 **Recommended Next Steps:** <1-2 concrete, prioritized actions for a business
 stakeholder>
@@ -559,7 +561,7 @@ stakeholder>
         return asyncio.run(self._run_async(state))
 
     def regenerate_executive_summary(self, bullets_text: str, feedback: Optional[str] = None) -> Tuple[str, str]:
-        """Re-run just the executive summary (technical, business) — used when
+        """Re-run just the executive summary (technical, business) - used when
         a reviewer rejects a summary and chooses "Re-run" instead of editing
         it by hand. `bullets_text` is rebuilt from persisted Stage.llm_explanation
         rows since the original per-stage one-liners aren't stored (see worker.py).

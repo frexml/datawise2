@@ -3,16 +3,16 @@
 Per DataWise's documented design, inefficiency detection runs as Cypher
 pattern-matches against the property graph, not as a code-level static
 analyzer. Runs after db.graph.sync_job_to_graph has mirrored a job's
-stages/links into Neo4j — see worker.py.
+stages/links into Neo4j - see worker.py.
 
 DataStage transform logic lives in embedded C++ (TrxGenCode), not SQL, so the
 patterns here are structural (graph-topology) rather than the SQL-regex
-patterns (redundant JOIN/aggregation) used by SQL-dialect ETL tools — the
+patterns (redundant JOIN/aggregation) used by SQL-dialect ETL tools - the
 honest signal available from the current graph schema (Job/Stage/LINKS_TO).
 """
 from dsxlineage.db.graph import run_cypher
 
-# Demo-scale thresholds — tune per estate in config/dialects/inefficiency_thresholds.yaml
+# Demo-scale thresholds - tune per estate in config/dialects/inefficiency_thresholds.yaml
 # once this graduates beyond prototype scope.
 _HIGH_FANOUT_THRESHOLD = 4
 _LONG_CHAIN_THRESHOLD = 6
@@ -33,10 +33,10 @@ _QUERIES = [
         "params": {"threshold": _HIGH_FANOUT_THRESHOLD},
         "describe": lambda r: (
             f"Stage '{r['name']}' has unusually high connectivity "
-            f"({r['in_count']} inbound / {r['out_count']} outbound links) — "
+            f"({r['in_count']} inbound / {r['out_count']} outbound links) - "
             f"candidate bottleneck or over-consolidated stage."
         ),
-        # Static — this pattern type recurring across jobs is itself the
+        # Static - this pattern type recurring across jobs is itself the
         # cross-job signal, no finer sub-type available from this query.
         "signature": lambda r: "high_fan_in_out",
     },
@@ -55,7 +55,7 @@ _QUERIES = [
         """,
         "params": {"threshold": _LONG_CHAIN_THRESHOLD},
         "describe": lambda r: (
-            f"Derivation chain of {r['hops']} hops: {' → '.join(r['chain'])} — "
+            f"Derivation chain of {r['hops']} hops: {' -> '.join(r['chain'])} - "
             f"consider simplifying or breaking into intermediate outputs."
         ),
         "signature": lambda r: "long_derivation_chain",
@@ -70,7 +70,7 @@ _QUERIES = [
         """,
         "params": {},
         "describe": lambda r: (
-            f"Stage '{r['name']}' has no inbound or outbound links — "
+            f"Stage '{r['name']}' has no inbound or outbound links - "
             f"likely dead/unused, safe to remove after confirmation."
         ),
         "signature": lambda r: "orphan_stage",
@@ -87,10 +87,10 @@ _QUERIES = [
         "params": {"threshold": _REPEATED_STAGE_TYPE_THRESHOLD},
         "describe": lambda r: (
             f"{r['cnt']} stages of type '{r['type']}' in this job "
-            f"({', '.join(r['stages'][:5])}{'…' if len(r['stages']) > 5 else ''}) — "
+            f"({', '.join(r['stages'][:5])}{'…' if len(r['stages']) > 5 else ''}) - "
             f"review for consolidation opportunity."
         ),
-        # Sub-typed by the actual recurring stage type (e.g. "PxJoin") —
+        # Sub-typed by the actual recurring stage type (e.g. "PxJoin") -
         # this is the one pattern with a natural cross-job-comparable key,
         # matching the docs' "same join/aggregation appears in N+ jobs".
         "signature": lambda r: f"repeated_stage_type:{r['type']}",

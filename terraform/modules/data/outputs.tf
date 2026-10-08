@@ -59,19 +59,4 @@ output "neo4j_data_share_name" {
   value = azurerm_storage_share.neo4j_data.name
 }
 
-output "openmetadata_mysql_password" {
-  value     = random_password.openmetadata_mysql.result
-  sensitive = true
-}
-
-output "openmetadata_mysql_fqdn" {
-  value = azurerm_mysql_flexible_server.openmetadata.fqdn
-}
-
-output "openmetadata_mysql_login" {
-  value = azurerm_mysql_flexible_server.openmetadata.administrator_login
-}
-
-output "openmetadata_mysql_database" {
-  value = azurerm_mysql_flexible_database.openmetadata.name
-}
+# Estate-only: openmetadata outputs removed — see archive/etl-v1 and v1-etl-final.

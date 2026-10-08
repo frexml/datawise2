@@ -65,10 +65,10 @@ def process_file(file_path: str, on_stage: Optional[Callable[[str], None]] = Non
     """
     Entry point to run the graph.
 
-    Streams node-by-node (stream_mode="updates" — the default) instead of a
+    Streams node-by-node (stream_mode="updates" - the default) instead of a
     single blocking invoke() so callers can observe real pipeline progress.
     Each yielded step is {node_name: partial_state}; since no reducers are
-    defined on AgentState, merging is a plain shallow overwrite — the same
+    defined on AgentState, merging is a plain shallow overwrite - the same
     semantics invoke() used internally.
     """
     state: Dict[str, Any] = {

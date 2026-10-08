@@ -1,13 +1,13 @@
-"""Neo4j graph mirror of job/stage/link data — HTTP, not bolt.
+"""Neo4j graph mirror of job/stage/link data - HTTP, not bolt.
 
-Additive to the Postgres-backed API — Postgres remains the system of record.
+Additive to the Postgres-backed API - Postgres remains the system of record.
 This module is best-effort: callers should not let a Neo4j failure fail the
 job (see worker.py), since the graph is used for lineage/inefficiency
 queries, not for anything the frontend depends on directly.
 
 Uses Neo4j's transactional Cypher HTTP endpoint (same interface the Neo4j
 Browser itself talks to, enabled by default, no bolt driver needed) rather
-than the bolt protocol — bolt needs raw TCP, and internal TCP ingress is
+than the bolt protocol - bolt needs raw TCP, and internal TCP ingress is
 unreliable on this project's Azure Container Apps Environment (see
 terraform/modules/apps/main.tf's neo4j resource comment).
 """
@@ -18,11 +18,11 @@ from dsxlineage.core.config import settings
 def run_cypher(statements: list[dict]) -> list[list[dict]]:
     """Execute one or more Cypher statements in a single Neo4j transaction.
 
-    statements: [{"cypher": "...", "params": {...}}, ...] — all run and
+    statements: [{"cypher": "...", "params": {...}}, ...] - all run and
     committed atomically in one request.
     Returns one list-of-row-dicts (keyed by column name) per statement, in
     the same order. Raises requests.RequestException / RuntimeError on
-    failure — every caller already wraps Neo4j calls in a best-effort
+    failure - every caller already wraps Neo4j calls in a best-effort
     try/except, so this deliberately doesn't add its own.
     """
     url = f"{settings.NEO4J_HTTP_URL}/db/{settings.NEO4J_DATABASE}/tx/commit"
@@ -55,7 +55,7 @@ def sync_job_to_graph(job_id: int, filename: str, stages: list[dict], links: lis
     links: list of {"name", "source_stage", "target_stage", "source_pin", "target_pin"}
 
     All statements run in one Neo4j transaction (one HTTP round trip) rather
-    than one bolt session.run() per stage/link — atomic, and avoids paying a
+    than one bolt session.run() per stage/link - atomic, and avoids paying a
     per-statement HTTP round trip for what used to be a persistent bolt
     connection's per-call cost.
     """
@@ -81,7 +81,7 @@ def sync_job_to_graph(job_id: int, filename: str, stages: list[dict], links: lis
         })
     for link in links:
         # Link.source_stage/target_stage store the stage *name* (see
-        # PartnerExtractor._build_edges), not Stage.stage_id — match
+        # PartnerExtractor._build_edges), not Stage.stage_id - match
         # accordingly, same as the frontend's pin-based fallback logic.
         statements.append({
             "cypher": """

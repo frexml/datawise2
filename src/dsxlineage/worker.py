@@ -67,7 +67,7 @@ def generate_lineage_task(job_id: int):
 @celery_app.task
 def regenerate_summary_task(review_id: int):
     """Re-run just the executive summary after a reviewer rejects it and
-    chooses "Re-run" — the rejection feedback is fed back into the prompt.
+    chooses "Re-run" - the rejection feedback is fed back into the prompt.
 
     Rebuilds the per-stage bullet list from persisted Stage.llm_explanation
     (the original per-stage one-liners used on the first pass aren't stored),
@@ -108,7 +108,7 @@ def regenerate_summary_task(review_id: int):
         print(f"Error regenerating summary for review {review_id}: {e}")
         db.rollback()
         # Leave the review in "regenerating" rather than silently reverting to
-        # "rejected" — a stuck state is visible and re-triggerable, a silent
+        # "rejected" - a stuck state is visible and re-triggerable, a silent
         # revert would look like the rerun never happened.
     finally:
         db.close()
@@ -119,7 +119,7 @@ def generate_scopeiq_estimate_task(job_id: int):
 
     The triggering endpoint already created/reset the ScopeIQEstimate row to
     status="generating" before dispatching this task, so a missing row here
-    means the job was deleted mid-flight — nothing to do.
+    means the job was deleted mid-flight - nothing to do.
     """
     from dsxlineage.agents.scopeiq_agent import generate_estimate_for_job
 
@@ -163,7 +163,7 @@ def push_to_catalog_task(job_id: int):
     """Pushes a job's approved lineage/summary to the open-source data
     governance catalog (OpenMetadata). Fires on every approval (including
     re-approval after an edit/rerun) so the catalog stays in sync with the
-    latest governed content. Best-effort — a catalog outage must not affect
+    latest governed content. Best-effort - a catalog outage must not affect
     the review approval that triggered this, same guard as the Neo4j sync
     in process_dsx_task."""
     from dsxlineage.services.catalog_push import push_job_to_catalog
@@ -177,7 +177,7 @@ def push_to_catalog_task(job_id: int):
 
         try:
             catalog_url = push_job_to_catalog(job_id, db)
-        except Exception as exc:  # noqa: BLE001 — catalog is additive, must not break approval
+        except Exception as exc:  # noqa: BLE001 - catalog is additive, must not break approval
             print(f"Warning: catalog push failed for job {job_id}: {exc}")
             return
 
@@ -338,7 +338,7 @@ def process_dsx_task(self, job_id: int, file_path: str):
 
             # Mirror stages/links into Neo4j for graph-native queries
             # (inefficiency detection, future lineage traversal). Additive
-            # only — a Neo4j failure must not fail the job.
+            # only - a Neo4j failure must not fail the job.
             try:
                 sync_job_to_graph(job_id, job.filename, graph_stages, graph_links)
             except Exception as graph_err:
@@ -346,7 +346,7 @@ def process_dsx_task(self, job_id: int, file_path: str):
             else:
                 # Inefficiency detection needs the graph mirror above, so it
                 # only runs when that sync succeeded. Best-effort, same as
-                # the sync itself — must not fail the job.
+                # the sync itself - must not fail the job.
                 try:
                     findings = detect_inefficiencies(job_id)
                     print(f"Inefficiency detection for job {job_id}: {len(findings)} pattern(s) flagged.")

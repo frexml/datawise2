@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<workbook>
+<dashboard name="BILLING_DASH"><title>Billing summary</title>
+<datasource caption="VW_BILLING_SUMMARY"><relation table="VW_BILLING_SUMMARY" type="table"/></datasource>
+</dashboard>
+</workbook>

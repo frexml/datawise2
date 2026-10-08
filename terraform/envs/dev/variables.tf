@@ -31,9 +31,9 @@ variable "image_tag" {
   description = "Container image tag deployed to web/worker/openmetadata_server. Use 'bootstrap' for the very first apply before any images have been pushed."
 }
 
-variable "openai_api_key" {
+variable "openrouter_api_key" {
   type        = string
-  description = "OpenAI API key to seed in Key Vault. Source from env (TF_VAR_openai_api_key) — never commit."
+  description = "OpenRouter API key to seed in Key Vault. Source from env (TF_VAR_openrouter_api_key) — never commit."
   sensitive   = true
 }
 
@@ -43,8 +43,8 @@ variable "postgres_admin_password" {
   sensitive   = true
 }
 
-variable "openai_model" {
+variable "openrouter_model" {
   type        = string
-  description = "OpenAI model name used by backend + worker"
-  default     = "gpt-4o"
+  description = "OpenRouter model ID (provider-prefixed, e.g. openai/gpt-4o) used by backend + worker"
+  default     = "openai/gpt-4o"
 }

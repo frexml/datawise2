@@ -16,8 +16,8 @@ services:
       - POSTGRES_DB=dsx_db
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - OPENAI_API_KEY=${OPENAI_API_KEY:?OPENAI_API_KEY must be set in .env}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4-turbo-preview}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:?OPENROUTER_API_KEY must be set in .env}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-openai/gpt-4o}
       - NEO4J_HTTP_URL=http://neo4j:7474
       - NEO4J_USER=neo4j
       - NEO4J_PASSWORD=${NEO4J_PASSWORD:-devpassword123}
@@ -27,7 +27,6 @@ services:
       - neo4j
     volumes:
       - .:/app
-      - ./data/end_to_end_linage:/app/end_to_end_linage:ro
 
   frontend:
     build:
@@ -54,21 +53,17 @@ services:
       - POSTGRES_DB=dsx_db
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - OPENAI_API_KEY=${OPENAI_API_KEY:?OPENAI_API_KEY must be set in .env}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:?OPENROUTER_API_KEY must be set in .env}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-openai/gpt-4o}
       - NEO4J_HTTP_URL=http://neo4j:7474
       - NEO4J_USER=neo4j
       - NEO4J_PASSWORD=${NEO4J_PASSWORD:-devpassword123}
-      - OPENMETADATA_API_URL=http://openmetadata_server:8585/api/v1
-      - OPENMETADATA_UI_URL=${OPENMETADATA_UI_URL:-http://localhost:8585}
     depends_on:
       - db
       - redis
       - neo4j
-      - openmetadata_server
     volumes:
       - .:/app
-      - ./data/end_to_end_linage:/app/end_to_end_linage:ro
 
   db:
     image: postgres:13
@@ -98,110 +93,6 @@ services:
     volumes:
       - neo4j_data:/data
 
-  # --- Open-source Data Governance Catalog (OpenMetadata) ---
-  # Push-only usage: DataWise pushes tables/pipelines/lineage via the REST
-  # API on review approval. No scheduled connectors are configured, but the
-  # ingestion (Airflow) container ships as part of OpenMetadata's own
-  # supported compose topology, so it's kept even though nothing schedules
-  # jobs through it here.
-  # Despite the image name ("db"), openmetadata/db is a plain MySQL 8 image
-  # (confirmed by inspecting the running container) — standard MYSQL_* env
-  # vars apply, not POSTGRES_*.
-  openmetadata_mysql:
-    image: openmetadata/db:1.12.6
-    environment:
-      - MYSQL_ROOT_PASSWORD=openmetadata_root_password
-      - MYSQL_DATABASE=openmetadata_db
-      - MYSQL_USER=openmetadata_user
-      - MYSQL_PASSWORD=openmetadata_password
-    volumes:
-      - openmetadata_mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-popenmetadata_root_password"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
-  openmetadata_elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.16.3
-    environment:
-      - discovery.type=single-node
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
-    volumes:
-      - openmetadata_es_data:/usr/share/elasticsearch/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:9200 >/dev/null || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
-  # One-shot schema/index migration. openmetadata_server's own entrypoint
-  # does NOT run this — a fresh openmetadata_mysql_data volume crash-loops
-  # forever on "Table 'openmetadata_db.ACT_GE_PROPERTY' doesn't exist"
-  # without it. Runs on every `docker compose up`, not just first boot:
-  # openmetadata-ops.sh migrate checks the applied-migrations table and
-  # no-ops in a few seconds when the schema is already current, so this is
-  # safe and cheap to rerun on a volume that survived a teardown too.
-  openmetadata_migrate:
-    image: openmetadata/server:1.12.6
-    environment:
-      - DB_DRIVER_CLASS=com.mysql.cj.jdbc.Driver
-      - DB_SCHEME=mysql
-      - DB_USE_SSL=false
-      - DB_USER=openmetadata_user
-      - DB_USER_PASSWORD=openmetadata_password
-      - DB_HOST=openmetadata_mysql
-      - DB_PORT=3306
-      - OM_DATABASE=openmetadata_db
-      - ELASTICSEARCH_HOST=openmetadata_elasticsearch
-      - ELASTICSEARCH_PORT=9200
-    command: ["/opt/openmetadata/bootstrap/openmetadata-ops.sh", "migrate"]
-    restart: "no"
-    depends_on:
-      openmetadata_mysql:
-        condition: service_healthy
-
-  openmetadata_server:
-    image: openmetadata/server:1.12.6
-    environment:
-      - DB_DRIVER_CLASS=com.mysql.cj.jdbc.Driver
-      - DB_SCHEME=mysql
-      - DB_USE_SSL=false
-      - DB_USER=openmetadata_user
-      - DB_USER_PASSWORD=openmetadata_password
-      - DB_HOST=openmetadata_mysql
-      - DB_PORT=3306
-      - OM_DATABASE=openmetadata_db
-      - ELASTICSEARCH_HOST=openmetadata_elasticsearch
-      - ELASTICSEARCH_PORT=9200
-      - AIRFLOW_HOST=openmetadata_ingestion
-      - SERVER_HOST_API_URL=http://openmetadata_server:8585/api
-    ports:
-      - "8585:8585"
-      - "8586:8586"
-    depends_on:
-      openmetadata_mysql:
-        condition: service_healthy
-      openmetadata_elasticsearch:
-        condition: service_healthy
-      openmetadata_migrate:
-        condition: service_completed_successfully
-
-  openmetadata_ingestion:
-    image: openmetadata/ingestion:1.12.6
-    environment:
-      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
-      - DB_HOST=openmetadata_mysql
-      - DB_PORT=3306
-    ports:
-      - "8080:8080"
-    depends_on:
-      - openmetadata_server
-
 volumes:
   postgres_data:
   neo4j_data:
-  openmetadata_mysql_data:
-  openmetadata_es_data:

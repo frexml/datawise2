@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<Schedule name="JOB_WEEKLY_BRANCH" type="Control-M" schedule="Sunday 02:00" frequency="weekly">
+    <DependsOn>ETL_BRANCH_LOAD</DependsOn>
+</Schedule>

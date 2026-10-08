@@ -1,0 +1,167 @@
+[
+  {
+    "source": "DW_TELCO.SUBSCRIBER_DIM",
+    "target": "VW_SUBSCRIBER_CURRENT",
+    "type": "VIEW_DEPENDS",
+    "complexity": "simple"
+  },
+  {
+    "source": "DW_TELCO.SUBSCRIBER_DIM",
+    "target": "VW_CHURN_RISK",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW_TELCO.CHURN_SCORE",
+    "target": "VW_CHURN_RISK",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW_TELCO.CHURN_SCORE",
+    "target": "VW_CHURN_RISK",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW_TELCO.NETWORK_PERF",
+    "target": "VW_NETWORK_DASH",
+    "type": "VIEW_DEPENDS",
+    "complexity": "simple"
+  },
+  {
+    "source": "DW_TELCO.NETWORK_PERF",
+    "target": "VW_NETWORK_DASH",
+    "type": "VIEW_DEPENDS",
+    "complexity": "simple"
+  },
+  {
+    "source": "DW_TELCO.BILLING_FACT",
+    "target": "VW_BILLING_SUMMARY",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW_TELCO.SUBSCRIBER_DIM",
+    "target": "VW_BILLING_SUMMARY",
+    "type": "VIEW_DEPENDS",
+    "complexity": "join"
+  },
+  {
+    "source": "DW_TELCO.CDR_FACT",
+    "target": "VW_CDR_AGG",
+    "type": "VIEW_DEPENDS",
+    "complexity": "aggregate"
+  },
+  {
+    "source": "BSCS_BILLING",
+    "target": "PROC_BILLING_ROLLUP",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_BILLING_ROLLUP",
+    "target": "DW_TELCO.BILLING_FACT",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "DW_TELCO.CDR_FACT",
+    "target": "PROC_CHURN_SCORE",
+    "type": "SP_READS"
+  },
+  {
+    "source": "DW_TELCO.TICKET_FACT",
+    "target": "PROC_CHURN_SCORE",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_CHURN_SCORE",
+    "target": "DW_TELCO.CHURN_SCORE",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "NMS_ALARM",
+    "target": "PROC_NETWORK_AGG",
+    "type": "SP_READS"
+  },
+  {
+    "source": "STG_NETWORK",
+    "target": "PROC_NETWORK_AGG",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_NETWORK_AGG",
+    "target": "DW_TELCO.NETWORK_PERF",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "PROC_NETWORK_AGG",
+    "target": "UNRESOLVED_DYNAMIC",
+    "type": "UNRESOLVED",
+    "reason": "EXECUTE IMMEDIATE"
+  },
+  {
+    "source": "BSCS_SUBSCRIBER",
+    "target": "ETL_BSCS_SUB_TO_DW",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_BSCS_SUB_TO_DW",
+    "target": "DW_TELCO.SUBSCRIBER_DIM",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "CDR_RAW",
+    "target": "ETL_CDR_RAW_TO_FACT",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_CDR_RAW_TO_FACT",
+    "target": "DW_TELCO.CDR_FACT",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "NMS_ALARM",
+    "target": "ETL_NMS_ALARM_TO_PERF",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_NMS_ALARM_TO_PERF",
+    "target": "DW_TELCO.NETWORK_PERF",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "ETL_BSCS_SUB_TO_DW",
+    "target": "JOB_TELCO_BILLING",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "PROC_BILLING_ROLLUP",
+    "target": "JOB_TELCO_BILLING",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "ETL_CDR_RAW_TO_FACT",
+    "target": "JOB_TELCO_CHURN",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "PROC_CHURN_SCORE",
+    "target": "JOB_TELCO_CHURN",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "VW_CHURN_RISK",
+    "target": "CHURN_DASH",
+    "type": "DASHBOARD_RENDERS"
+  },
+  {
+    "source": "VW_NETWORK_DASH",
+    "target": "NETWORK_DASH_TELCO",
+    "type": "DASHBOARD_RENDERS"
+  },
+  {
+    "source": "VW_BILLING_SUMMARY",
+    "target": "BILLING_DASH",
+    "type": "DASHBOARD_RENDERS"
+  }
+]

@@ -1,7 +1,7 @@
 """Pushes an approved job's lineage and summary to the open-source data
 governance catalog (OpenMetadata).
 
-Fires on review approval (see worker.push_to_catalog_task) — an
+Fires on review approval (see worker.push_to_catalog_task) - an
 ungoverned (not-yet-approved) summary never reaches the catalog, matching
 the Platform Development Guide's "Catalog Integration" output, just backed
 by OpenMetadata instead of Collibra/Atlan/Alation.
@@ -122,7 +122,7 @@ def push_job_to_catalog(job_id: int, db: Session) -> str:
     client.ensure_database()
     client.ensure_schema()
 
-    # Merge columns across BOTH source and target roles before upserting —
+    # Merge columns across BOTH source and target roles before upserting -
     # a table acting as an intermediate staging point appears as a target
     # in one lineage row and a source in another, and must get one entity
     # carrying the union of columns, not two competing partial upserts.

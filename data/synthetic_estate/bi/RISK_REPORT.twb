@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<workbook>
+<dashboard name="RISK_REPORT"><title>Risk exposure by region, filtered HIGH/CRITICAL</title>
+<datasource caption="VW_RISK_DASHBOARD"><relation table="VW_RISK_DASHBOARD" type="table"/></datasource>
+</dashboard>
+</workbook>

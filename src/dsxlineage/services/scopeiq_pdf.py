@@ -2,7 +2,7 @@
 
 Renders the persisted output of `agents.scopeiq_agent`: four fixed research
 dimensions, each with a role-level day breakdown, complexity uplift
-signals, and risk adjustments, aggregated into a final estimate — the
+signals, and risk adjustments, aggregated into a final estimate - the
 "complete estimate document" handed to Delivery Lead / PMO for a single job.
 """
 import io
@@ -185,7 +185,7 @@ def _dimension_section(dim: dict, styles: dict) -> list:
     uplift_signals = dim.get("uplift_signals") or []
     if uplift_signals:
         items = [
-            f"<b>+{s['uplift_pct']:.0f}% — {s['signal']}</b>: {markdown_to_reportlab(s['rationale'], strip_leading_title=False)}"
+            f"<b>+{s['uplift_pct']:.0f}% - {s['signal']}</b>: {markdown_to_reportlab(s['rationale'], strip_leading_title=False)}"
             for s in uplift_signals
         ]
         story.append(_callout_list(items, _INDIGO, _INDIGO_BG, styles))
@@ -209,7 +209,7 @@ def _footer(canvas, doc):
     canvas.saveState()
     canvas.setFont("Helvetica", 7.5)
     canvas.setFillColor(_SLATE)
-    canvas.drawString(_MARGIN, 0.35 * inch, "DataWise · ScopeIQ Estimate · Internal — Delivery Lead / PMO")
+    canvas.drawString(_MARGIN, 0.35 * inch, "DataWise · ScopeIQ Estimate · Internal - Delivery Lead / PMO")
     canvas.drawRightString(_PAGE_WIDTH - _MARGIN, 0.35 * inch, f"Page {doc.page}")
     canvas.restoreState()
 
@@ -229,7 +229,7 @@ def generate_scopeiq_estimate_pdf(job: models.Job, estimate: models.ScopeIQEstim
             "patterns, delivery risk) so estimates are comparable across an engagement's full portfolio. "
             "Each dimension is researched independently against this job's actual lineage, transformation, "
             "and inefficiency data, producing a role-level day breakdown, complexity uplift signals, and risk "
-            "adjustments — aggregated below into a single delivery-effort estimate.",
+            "adjustments - aggregated below into a single delivery-effort estimate.",
             styles["body"],
         ),
         Spacer(1, 12),

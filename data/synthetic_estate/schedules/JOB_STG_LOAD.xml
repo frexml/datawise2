@@ -1,0 +1,5 @@
+        <?xml version="1.0"?>
+        <Schedule name="JOB_STG_LOAD" type="Control-M" schedule="01:10" frequency="daily">
+            <DependsOn>ETL_STG_CUSTOMER_MERGE</DependsOn>
+<DependsOn>ETL_KYC_LOAD</DependsOn>
+        </Schedule>

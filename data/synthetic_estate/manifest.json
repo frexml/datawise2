@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-10-07T21:54:06.556782+00:00",
+  "seed": 42,
+  "today": "2026-10-07",
+  "counts": {
+    "ddl_files": 74,
+    "procedures": 18,
+    "etl_jobs": 14,
+    "schedules": 12,
+    "dashboards": 8,
+    "csv_samples": 8,
+    "expected_lineage_edges": 147,
+    "chat_bench": 100,
+    "total_expected_edges": 147
+  }
+}

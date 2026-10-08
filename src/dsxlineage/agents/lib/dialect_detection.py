@@ -1,6 +1,6 @@
 """Determines which ETL dialect an uploaded export file belongs to.
 
-Extension alone is enough for DataStage (.dsx) and SSIS (.dtsx) — both are
+Extension alone is enough for DataStage (.dsx) and SSIS (.dtsx) - both are
 tool-specific extensions. Informatica PowerCenter exports use the generic
 .xml extension, so those need a peek at the root tag to avoid silently
 mis-parsing an unrelated XML upload as Informatica.
@@ -35,4 +35,4 @@ def detect_dialect(file_path: str) -> str:
             "supported dialect (expected <POWERMART> for Informatica)."
         )
 
-    raise UnsupportedDialectError(f"Unsupported file extension '{ext}' — expected .dsx, .dtsx, or .xml")
+    raise UnsupportedDialectError(f"Unsupported file extension '{ext}' - expected .dsx, .dtsx, or .xml")

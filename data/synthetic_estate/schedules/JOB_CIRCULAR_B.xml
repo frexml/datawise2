@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<Schedule name="JOB_CIRCULAR_B" type="Control-M" schedule="02:05" frequency="daily">
+    <DependsOn>JOB_CIRCULAR_A</DependsOn>
+</Schedule>
