@@ -25,6 +25,7 @@ export default function EstateDetails() {
   const [activeTab, setActiveTab] = useState('graph');
   const [graph, setGraph] = useState(null);
   const [analytics, setAnalytics] = useState(null);
+  const [recommendation, setRecommendation] = useState(null);
   const [ledger, setLedger] = useState([]);
   const [error, setError] = useState(null);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -59,6 +60,10 @@ export default function EstateDetails() {
     if (r.data.status === 'ACTIVE') {
       const a = await axios.get(`/api/estates/${estateId}/analytics`);
       setAnalytics(a.data);
+      try {
+        const rec = await axios.post(`/api/estates/${estateId}/bridge/recommend`);
+        setRecommendation(rec.data);
+      } catch { setRecommendation(null); }
     }
     const l = await axios.get(`/api/estates/${estateId}/ledger`);
     setLedger(l.data);
@@ -186,10 +191,10 @@ export default function EstateDetails() {
       </div>
 
       {activeTab === 'graph' && <GraphPanel nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onNodeClick={onNodeClick} selected={selected} blast={blast} unresolvedCount={graph?.estate?.unresolved} />}
-      {activeTab === 'analytics' && <AnalyticsPanel data={analytics} />}
+      {activeTab === 'analytics' && <AnalyticsPanel data={analytics} recommendation={recommendation} />}
       {activeTab === 'chat' && <ChatPanel estateId={estateId} />}
       {activeTab === 'bridge' && <BridgePanel estateId={estateId} />}
-      {activeTab === 'ledger' && <LedgerPanel ledger={ledger} />}
+      {activeTab === 'ledger' && <LedgerPanel ledger={ledger} estateId={estateId} />}
     </div>
   );
 }

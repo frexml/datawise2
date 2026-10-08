@@ -22,6 +22,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from dsxlineage.estate.analytics import compute_analytics
 from dsxlineage.estate.ir import EstateIR, Tolerances
 
 
@@ -40,20 +41,44 @@ class WedgeRecommendation(BaseModel):
 
 
 def recommend_wedge(ir: EstateIR, target: str = "snowflake") -> WedgeRecommendation:
-    """Recommend a narrow wedge: highest-value, lowest-risk mart."""
-    finance_candidates = [
-        "DW.FACT_ORDERS", "DW.CUSTOMER_DIM", "DW.PRODUCT_DIM", "DW.BRANCH_DIM",
-        "DW.FACT_INVOICE", "DW.FACT_PAYMENT", "DW.BRANCH_PERF",
-        "VW_ORDER_SUMMARY", "VW_REVENUE_DAILY", "VW_CUSTOMER_CURRENT",
-        "VW_INVOICE_SUMMARY", "VW_BRANCH_PERFORMANCE",
-        "PROC_LOAD_ORDERS", "PROC_LOAD_CUSTOMER_DIM", "PROC_BRANCH_ROLLUP",
-        "ETL_SAP_ORDERS_TO_DW", "ETL_SAP_CUSTOMER_TO_DW",
-        "JOB_SAP_EXTRACT",
-    ]
-    all_fqns = {t.fqn for t in ir.tables} | {v.fqn for v in ir.views} | {p.fqn for p in ir.procedures} | {j.fqn for j in ir.etl_jobs} | {s.fqn for s in ir.schedules}
-    scope = [f for f in finance_candidates if f in all_fqns]
-    if len(scope) < 5:
-        scope = sorted(all_fqns)[:18]
+    """Recommend a narrow wedge: highest-value, lowest-risk mart.
+
+    Data-driven, not estate-specific: picks scope from `compute_analytics`'s
+    risk/value quadrant (same data the Analytics tab's "Low Risk, High Value
+    -> wedge" quadrant already surfaces), so this generalizes across estate
+    types instead of only working for one hardcoded banking FQN list.
+    """
+    analytics = compute_analytics(ir)
+    quadrant = sorted(analytics["quadrant"], key=lambda q: q["value"], reverse=True)
+
+    scope: list[str] = []
+    for risk_ceiling in (1, 2, None):
+        candidates = [q["fqn"] for q in quadrant if risk_ceiling is None or q["risk"] <= risk_ceiling]
+        if len(candidates) >= 10:
+            scope = candidates[:18]
+            break
+        scope = candidates[:18]
+    if len(scope) < 10:
+        # Still short (very small estate) - fill from remaining quadrant entries by value, then any FQN.
+        all_fqns = {t.fqn for t in ir.tables} | {v.fqn for v in ir.views} | {p.fqn for p in ir.procedures} | {j.fqn for j in ir.etl_jobs} | {s.fqn for s in ir.schedules}
+        seen = set(scope)
+        for fqn in sorted(all_fqns):
+            if len(scope) >= 10:
+                break
+            if fqn not in seen:
+                scope.append(fqn)
+                seen.add(fqn)
+
+    # Pull in the ETL jobs/schedules that actually populate the selected tables/views -
+    # `compute_analytics`'s quadrant only scores tables/views, but a wedge of tables
+    # without the jobs that feed them is an incomplete migration scope.
+    scope_set = set(scope)
+    related_jobs = [j.fqn for j in ir.etl_jobs if j.target_fqn in scope_set or j.source_fqn in scope_set]
+    related_schedules = [s.fqn for s in ir.schedules if any(d in scope_set for d in s.depends_on)]
+    for fqn in related_jobs + related_schedules:
+        if fqn not in scope_set:
+            scope.append(fqn)
+            scope_set.add(fqn)
 
     unresolved_in_scope = sum(1 for e in ir.edges if e.unresolved and (e.source_fqn in scope or e.target_fqn in scope))
     high_in_scope = sum(1 for p in ir.procedures if p.fqn in scope and p.complexity == "high")
@@ -61,14 +86,19 @@ def recommend_wedge(ir: EstateIR, target: str = "snowflake") -> WedgeRecommendat
     risk = "high" if unresolved_in_scope >= 2 or high_in_scope >= 2 else "medium" if unresolved_in_scope >= 1 else "low"
     est_days = round(len(scope) * 1.2 + unresolved_in_scope * 3 + high_in_scope * 2, 1)
 
+    touched_dashboards = sorted({
+        dl["dashboard"] for dl in analytics["dashboard_lineage"] if any(t in scope for t in dl["upstream_tables"])
+    })
+    dash_note = f" and feeds {len(touched_dashboards)} dashboard(s) ({', '.join(touched_dashboards[:3])})" if touched_dashboards else ""
+
     rationale = textwrap.dedent(f"""\
-        **Recommended wedge: Finance Mart -> Snowflake**
-        - Scope: {len(scope)} objects (orders, customer, product, branch, revenue views)
+        **Recommended wedge -> {target.title()}**
+        - Scope: {len(scope)} objects, selected by highest usage (fan-in + dashboard reach) with the lowest complexity/risk
         - Unresolved in scope: {unresolved_in_scope} (dynamic SQL / cursor)
         - High-complexity SPs in scope: {high_in_scope}
-        - Rationale: finance mart has high downstream usage (hot tables) but limited dynamic logic,
-          making it the lowest-risk first cutover. Proposed target is Snowflake for SQL compatibility
-          with Oracle PL/SQL -> Snowflake Scripting.
+        - Rationale: this is the highest-value, lowest-risk slice of the estate{dash_note} - the
+          lowest-risk first cutover. Proposed target is {target.title()} for broad SQL compatibility
+          with Oracle PL/SQL -> {target.title()} equivalents.
         """)
     return WedgeRecommendation(
         target_platform=target,  # type: ignore

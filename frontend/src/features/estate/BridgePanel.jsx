@@ -13,6 +13,8 @@ export default function BridgePanel({ estateId }) {
   const [error, setError] = useState(null);
   const [approver, setApprover] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
+  const [artifacts, setArtifacts] = useState({});
+  const [artifactLoading, setArtifactLoading] = useState(null);
 
   const refreshPlans = useCallback(async () => { try { const r = await axios.get(`/api/estates/${estateId}/bridge/plans`); setPlans(r.data); } catch (e) {} }, [estateId]);
   useEffect(() => { refreshPlans(); }, [refreshPlans]);
@@ -34,6 +36,35 @@ export default function BridgePanel({ estateId }) {
 
   const approvedPlan = plans.find((p) => p.status === 'approved');
 
+  const viewArtifact = async (kind) => {
+    if (!approvedPlan) return;
+    setError(null);
+    if (artifacts[kind] != null) { setArtifacts((a) => ({ ...a, [kind]: null })); return; } // toggle closed
+    setArtifactLoading(kind);
+    try {
+      const r = await axios.get(`/api/estates/${estateId}/bridge/plan/${approvedPlan.id}/${kind}`, { responseType: 'text', transformResponse: (d) => d });
+      setArtifacts((a) => ({ ...a, [kind]: r.data }));
+    } catch (e) {
+      setError(e.response?.data?.detail || e.message);
+    } finally {
+      setArtifactLoading(null);
+    }
+  };
+
+  const downloadArtifact = (kind, filename) => {
+    const text = artifacts[kind];
+    if (!text) return;
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const ARTIFACT_LABELS = { ddl: 'DDL', terraform: 'Terraform', scaffold: 'Migration code' };
+  const ARTIFACT_EXT = { ddl: 'sql', terraform: 'tf', scaffold: 'py' };
+
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border">
@@ -54,6 +85,32 @@ export default function BridgePanel({ estateId }) {
           {p.status === 'pending_approval' && <button onClick={() => approve(p.id)} className="px-2 py-1 bg-emerald-600 text-white rounded">Approve</button>}
         </div>)}
       </div>
+      {approvedPlan && (
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border">
+          <h4 className="font-medium text-sm">Generated artifacts - {approvedPlan.name}</h4>
+          <div className="flex gap-2 mt-2 flex-wrap">
+            {['ddl', 'terraform', 'scaffold'].map((kind) => (
+              <button
+                key={kind}
+                onClick={() => viewArtifact(kind)}
+                disabled={artifactLoading === kind}
+                className="px-3 py-1.5 bg-white border rounded text-sm hover:bg-gray-50 disabled:opacity-50"
+              >
+                {artifactLoading === kind ? 'Loading…' : artifacts[kind] != null ? `Hide ${ARTIFACT_LABELS[kind]}` : `View ${ARTIFACT_LABELS[kind]}`}
+              </button>
+            ))}
+          </div>
+          {['ddl', 'terraform', 'scaffold'].map((kind) => artifacts[kind] != null && (
+            <div key={kind} className="mt-2">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{ARTIFACT_LABELS[kind]}</span>
+                <button onClick={() => downloadArtifact(kind, `${approvedPlan.name.replace(/\s+/g, '_')}.${ARTIFACT_EXT[kind]}`)} className="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700">Download</button>
+              </div>
+              <pre className="text-[11px] bg-gray-50 dark:bg-gray-900 border rounded p-3 overflow-auto max-h-72 whitespace-pre-wrap">{artifacts[kind]}</pre>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border">
         <h4 className="font-medium text-sm">3. Prove - Real DuckDB Diff + Continuity</h4>
         <p className="text-xs text-gray-500">Diff uses DuckDB EXCEPT + numeric epsilon + masked columns. Continuity uses ColumnIdentity + embedding similarity (difflib).</p>

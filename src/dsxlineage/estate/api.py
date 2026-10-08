@@ -876,6 +876,37 @@ def bridge_get_terraform(estate_id: int, plan_id: int, db: Session = Depends(get
     return tf
 
 
+@router.get("/{estate_id}/bridge/plan/{plan_id}/scaffold", response_class=PlainTextResponse)
+def bridge_get_scaffold(estate_id: int, plan_id: int, job_fqn: str | None = None, target: str = "pyspark", db: Session = Depends(get_db)):
+    estate = db.query(Estate).filter(Estate.id == estate_id).first()
+    if not estate:
+        raise HTTPException(status_code=404, detail="Estate not found")
+    plan = db.query(MigrationPlan).filter(MigrationPlan.id == plan_id, MigrationPlan.estate_id == estate_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    if plan.status != "approved":
+        raise HTTPException(status_code=409, detail="Plan must be approved before generating migration code")
+    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    scope = set(plan.scope_fqns or [])
+    eligible = [
+        j for j in ir.etl_jobs
+        if j.fqn in scope and j.dialect == "datastage" and j.raw_path and Path(j.raw_path).exists()
+    ]
+    if job_fqn:
+        job = next((j for j in eligible if j.fqn == job_fqn), None)
+        if not job:
+            raise HTTPException(status_code=404, detail=f"ETL job '{job_fqn}' not found in this plan's scope, or not eligible (DataStage only, raw file required)")
+    else:
+        if not eligible:
+            raise HTTPException(status_code=409, detail="No DataStage ETL job with a retained raw file in this plan's scope - scaffold generation is only supported for DataStage jobs today")
+        job = eligible[0]
+    from dsxlineage.estate.scaffold import generate_pyspark_scaffold
+    try:
+        return generate_pyspark_scaffold(job.raw_path, job.fqn, target=target)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Scaffold generation failed: {exc}")
+
+
 @router.post("/{estate_id}/bridge/diff")
 def bridge_run_diff(estate_id: int, payload: DiffRequest, db: Session = Depends(get_db)):
     estate = db.query(Estate).filter(Estate.id == estate_id).first()

@@ -4,7 +4,7 @@ const healthBg = { emerald: 'bg-emerald-500', amber: 'bg-amber-500', red: 'bg-re
 const healthText = { emerald: 'text-emerald-600', amber: 'text-amber-600', red: 'text-red-600' };
 const healthLight = { emerald: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800', amber: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800', red: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' };
 
-export default function AnalyticsPanel({ data }) {
+export default function AnalyticsPanel({ data, recommendation }) {
   if (!data) return <div className="text-sm text-gray-500 p-4">Loading analytics…</div>;
 
   const health = data.estate_health ?? 76;
@@ -20,7 +20,14 @@ export default function AnalyticsPanel({ data }) {
   // Quick Wins / Wedge / Watchlist derived
   const quickWins = data.orphan_tables?.slice(0, 3) ?? [];
   const watchUnresolved = data.unresolved?.slice(0, 3) ?? [];
-  const wedge = data.hot_tables?.[0];
+
+  // Wedge card - driven by the real /bridge/recommend call (recommend_wedge), not static text.
+  const wedgeScope = recommendation?.scope_fqns ?? [];
+  const wedgeScopeSet = new Set(wedgeScope);
+  const wedgeDashboards = (data.dashboard_lineage ?? []).filter((dl) =>
+    dl.upstream_tables?.some((t) => wedgeScopeSet.has(t))
+  );
+  const wedgeDashboardNames = wedgeDashboards.map((dl) => dl.dashboard);
 
   return (
     <div className="space-y-6">
@@ -111,14 +118,25 @@ export default function AnalyticsPanel({ data }) {
             <div className="mt-2 text-[11px] text-emerald-700 dark:text-emerald-300">-> Generate DROP script (saves {quickWins.length} edges)</div>
           </div>
           <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-4">
-            <div className="text-xs font-semibold text-indigo-800 dark:text-indigo-200">Wedge - Finance Mart (lowest risk)</div>
-            <div className="text-xs text-indigo-700 dark:text-indigo-300 mt-1">
-              {wedge ? `${wedge.fqn} hot (fan-in ${wedge.fan_in})` : 'Hot table'} + {data.hot_tables?.[1]?.fqn ?? '…'} - 18 objects, 0 unresolved, 2 dashboards (REVENUE_DASH, BRANCH_PERF_DASH).
-            </div>
-            <div className="mt-2 flex items-center gap-2 text-[11px]">
-              <span className="px-2 py-1 rounded bg-white dark:bg-gray-800 border">Est. 22 days</span>
-              <span className={`px-2 py-1 rounded text-white ${data.unresolved_count ? 'bg-amber-500' : 'bg-emerald-500'}`}>risk {data.unresolved_count ? 'low' : 'low'}</span>
-            </div>
+            <div className="text-xs font-semibold text-indigo-800 dark:text-indigo-200">Wedge - recommended first cutover</div>
+            {recommendation ? (
+              <>
+                <div className="text-xs text-indigo-700 dark:text-indigo-300 mt-1">
+                  {wedgeScope.length} objects, {recommendation.unresolved_count} unresolved
+                  {wedgeDashboardNames.length > 0 && (
+                    <> · {wedgeDashboardNames.length} dashboard{wedgeDashboardNames.length !== 1 ? 's' : ''} ({wedgeDashboardNames.slice(0, 2).join(', ')}{wedgeDashboardNames.length > 2 ? `, +${wedgeDashboardNames.length - 2} more` : ''})</>
+                  )}
+                  .
+                </div>
+                <div className="mt-2 flex items-center gap-2 text-[11px]">
+                  <span className="px-2 py-1 rounded bg-white dark:bg-gray-800 border">Est. {recommendation.estimated_days} days</span>
+                  <span className={`px-2 py-1 rounded text-white ${recommendation.risk_level === 'high' ? 'bg-red-500' : recommendation.risk_level === 'medium' ? 'bg-amber-500' : 'bg-emerald-500'}`}>risk {recommendation.risk_level}</span>
+                  <span className="px-2 py-1 rounded bg-white dark:bg-gray-800 border capitalize">{recommendation.target_platform}</span>
+                </div>
+              </>
+            ) : (
+              <div className="text-xs text-indigo-700 dark:text-indigo-300 mt-1">Computing recommendation…</div>
+            )}
           </div>
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4">
             <div className="text-xs font-semibold text-red-800 dark:text-red-200">Watchlist - Fix first or block cutover</div>
