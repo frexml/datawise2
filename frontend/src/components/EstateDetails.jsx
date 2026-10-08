@@ -7,6 +7,7 @@ import AnalyticsPanel from '../features/estate/AnalyticsPanel';
 import ChatPanel from '../features/estate/ChatPanel';
 import BridgePanel from '../features/estate/BridgePanel';
 import LedgerPanel from '../features/estate/LedgerPanel';
+import { useAuth } from '../context/AuthContext';
 
 const TAB_LABELS = [
   { key: 'graph', label: 'Lineage Graph' },
@@ -19,6 +20,7 @@ const TAB_LABELS = [
 // Thin orchestrator - was 650-line God component, now delegates to features/estate/* (P1 fix)
 export default function EstateDetails() {
   const { estateId } = useParams();
+  const { user } = useAuth();
   const [estate, setEstate] = useState(null);
   const [activeTab, setActiveTab] = useState('graph');
   const [graph, setGraph] = useState(null);
@@ -32,7 +34,10 @@ export default function EstateDetails() {
   const [surveyTodo, setSurveyTodo] = useState([]);
   const [surveyStage, setSurveyStage] = useState('');
   const [displayTodo, setDisplayTodo] = useState([]);
-  const [hasAnimated, setHasAnimated] = useState(false);
+  const [approver, setApprover] = useState(user?.name || '');
+  const [approveError, setApproveError] = useState(null);
+
+  useEffect(() => { if (user?.name) setApprover(user.name); }, [user]);
 
   const loadAll = async (showGraph = true) => {
     const r = await axios.get(`/api/estates/${estateId}`);
@@ -119,40 +124,52 @@ export default function EstateDetails() {
       {isSurveying && todoToShow && todoToShow.length > 0 && (
         <div className="bg-white dark:bg-gray-800 border rounded-xl p-4">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-gray-900 dark:text-white">{isPendingApproval ? 'Todo ready for approval' : 'Discovering your estate - live progress'}</span>
-            <span className="text-xs text-gray-500">{isPendingApproval ? `${todoToShow.length} steps` : `${doneCount}/${todoToShow.length} done · ${surveyStage}`}</span>
+            <span className="text-sm font-medium text-gray-900 dark:text-white">{isPendingApproval ? "Based on initial findings, here's the discovery plan awaiting your approval" : 'Discovering your estate - live progress'}</span>
+            <span className="text-xs text-gray-500">{isPendingApproval ? `${todoToShow.length} steps proposed` : `${doneCount}/${todoToShow.length} done · ${surveyStage}`}</span>
           </div>
           {isPendingApproval && (
-            <div className="mb-3 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded flex justify-between items-center">
-              <span className="text-xs text-amber-800 dark:text-amber-200">Review the 8 steps, then approve to start discovery.</span>
-              <button
-                onClick={async () => {
-                  await axios.post(`/api/estates/${estateId}/survey/approve`, {});
-                  // Trigger poll
-                  const poll = async () => {
-                    const r = await axios.get(`/api/estates/${estateId}/survey/todo`);
-                    setSurveyTodo(r.data.todo || []);
-                    setDisplayTodo(r.data.todo || []);
-                    setSurveyStage(r.data.current_stage || '');
-                    if (r.data.status === 'ACTIVE' && r.data.current_stage === 'done') {
-                      const g = await axios.get(`/api/estates/${estateId}/graph`);
-                      setGraph(g.data);
-                    } else {
-                      setTimeout(poll, 500);
-                    }
-                  };
-                  poll();
-                }}
-                className="px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700"
-              >
-                Approve & Run →
-              </button>
+            <div className="mb-3 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded flex flex-wrap gap-2 justify-between items-center">
+              <span className="text-xs text-amber-800 dark:text-amber-200">Approve to begin discovery.</span>
+              <div className="flex gap-2 items-center">
+                {approveError && <span className="text-xs text-red-600">{approveError}</span>}
+                <input
+                  value={approver}
+                  onChange={(e) => setApprover(e.target.value)}
+                  placeholder="Approver name (≥2)"
+                  className="px-2 py-1 border rounded text-xs dark:bg-gray-900 dark:border-gray-700 w-36"
+                />
+                <button
+                  onClick={async () => {
+                    const name = approver.trim();
+                    if (name.length < 2) { setApproveError('Approver name required (≥2 chars)'); return; }
+                    setApproveError(null);
+                    await axios.post(`/api/estates/${estateId}/survey/approve`, { approver: name, actor_email: user?.email || undefined });
+                    // Trigger poll
+                    const poll = async () => {
+                      const r = await axios.get(`/api/estates/${estateId}/survey/todo`);
+                      setSurveyTodo(r.data.todo || []);
+                      setDisplayTodo(r.data.todo || []);
+                      setSurveyStage(r.data.current_stage || '');
+                      if (r.data.status === 'ACTIVE' && r.data.current_stage === 'done') {
+                        const g = await axios.get(`/api/estates/${estateId}/graph`);
+                        setGraph(g.data);
+                      } else {
+                        setTimeout(poll, 500);
+                      }
+                    };
+                    poll();
+                  }}
+                  className="px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700"
+                >
+                  Approve & Run →
+                </button>
+              </div>
             </div>
           )}
           <div className="grid sm:grid-cols-2 gap-2">
             {todoToShow.map((item) => (
               <div key={item.key} className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg border bg-gray-50 dark:bg-gray-900 dark:border-gray-700">
-                <span className={`h-5 w-5 rounded-full flex items-center justify-center text-xs ${item.status === 'done' ? 'bg-emerald-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 animate-pulse'}`}>{item.status === 'done' ? '✓' : '◐'}</span>
+                <span className={`h-5 w-5 rounded-full flex items-center justify-center text-xs ${item.status === 'done' ? 'bg-emerald-500 text-white' : item.status === 'running' ? 'bg-indigo-500 text-white animate-pulse' : 'bg-gray-200 dark:bg-gray-700 text-gray-500'}`}>{item.status === 'done' ? '✓' : item.status === 'running' ? '◐' : '○'}</span>
                 <span className="flex-1 font-medium text-gray-700 dark:text-gray-300">{item.label}</span>
                 <span className="text-gray-500">{item.count != null ? item.count : ''}</span>
               </div>
@@ -161,7 +178,6 @@ export default function EstateDetails() {
           <div className="mt-3 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
             <div className="h-full bg-indigo-500 transition-all" style={{ width: `${(doneCount / Math.max(todoToShow.length, 1)) * 100}%` }} />
           </div>
-          {!hasAnimated && <div className="mt-2 text-[11px] text-gray-400">Showing live discovery - ticks every ~0.8s after initial 5s view</div>}
         </div>
       )}
 

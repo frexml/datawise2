@@ -81,6 +81,7 @@ class EstateCreate(BaseModel):
     estate_type: str = "banking"  # banking | telecom
     synthetic_path: str | None = None  # override path if needed
     connection: dict | None = None  # {host, port, user, db_type} - mock for demo
+    defer_discovery: bool = False  # True: skip auto-extract, leave PENDING for a real survey/approve flow
 
 
 class ConnectionTestRequest(BaseModel):
@@ -92,6 +93,11 @@ class ConnectionTestRequest(BaseModel):
 
 class SurveyRequest(BaseModel):
     synthetic_path: str | None = None
+
+
+class SurveyApprove(BaseModel):
+    approver: str  # named approver, not free-text; validated non-empty - same rule as PlanApprove
+    actor_email: str | None = None  # for ledger actor_email_hash + IdP mock
 
 
 class ChatRequest(BaseModel):
@@ -182,35 +188,37 @@ def create_estate(payload: EstateCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(estate)
 
-    # Auto-extract for backward compat (tests create with synthetic and expect immediate IR)
-    # Keep for existing tests - new UI will explicitly call POST /{id}/survey
-    synth_path = Path(payload.synthetic_path) if payload.synthetic_path else (Path("data/synthetic_estate_telco") if payload.estate_type == "telecom" else SYNTHETIC_ROOT)
-    # Try to pick correct synthetic dir per estate_type
-    if payload.estate_type == "telecom" and not synth_path.exists():
-        synth_path = Path("data/synthetic_estate_telco")
-    if payload.source_type == "synthetic" and synth_path.exists():
-        try:
-            ir = extract_estate_ir(synth_path, estate_name=estate.name)
-            estate.ir_version = "1.0.0"
-            estate.ir_generated_at = datetime.now(timezone.utc)
-            estate.node_count = ir.total_nodes
-            estate.edge_count = ir.total_edges
-            estate.unresolved_count = ir.unresolved_count
-            estate.survey_todo = _build_survey_todo(ir)
-            estate.current_stage = "done"
-            estate.last_survey_at = datetime.now(timezone.utc)
-            estate.status = "ACTIVE"
-            db.commit()
-            append_ledger_event(db, estate.id, "ir_generated", {"version": ir.version, "nodes": ir.total_nodes, "edges": ir.total_edges, "unresolved": ir.unresolved_count, "estate_type": payload.estate_type})
+    # Auto-extract for backward compat (tests create with synthetic and expect immediate IR).
+    # Skipped when defer_discovery=True so the interactive demo flow goes through a real
+    # pending_approval -> approve -> staged survey instead of landing on ACTIVE/done instantly.
+    if not payload.defer_discovery:
+        synth_path = Path(payload.synthetic_path) if payload.synthetic_path else (Path("data/synthetic_estate_telco") if payload.estate_type == "telecom" else SYNTHETIC_ROOT)
+        # Try to pick correct synthetic dir per estate_type
+        if payload.estate_type == "telecom" and not synth_path.exists():
+            synth_path = Path("data/synthetic_estate_telco")
+        if payload.source_type == "synthetic" and synth_path.exists():
             try:
-                from dsxlineage.estate.graph import sync_estate_to_graph
-                sync_estate_to_graph(estate.id, estate.name, ir)
-                append_ledger_event(db, estate.id, "graph_synced", {"estate_id": estate.id})
+                ir = extract_estate_ir(synth_path, estate_name=estate.name)
+                estate.ir_version = "1.0.0"
+                estate.ir_generated_at = datetime.now(timezone.utc)
+                estate.node_count = ir.total_nodes
+                estate.edge_count = ir.total_edges
+                estate.unresolved_count = ir.unresolved_count
+                estate.survey_todo = _build_survey_todo(ir)
+                estate.current_stage = "done"
+                estate.last_survey_at = datetime.now(timezone.utc)
+                estate.status = "ACTIVE"
+                db.commit()
+                append_ledger_event(db, estate.id, "ir_generated", {"version": ir.version, "nodes": ir.total_nodes, "edges": ir.total_edges, "unresolved": ir.unresolved_count, "estate_type": payload.estate_type})
+                try:
+                    from dsxlineage.estate.graph import sync_estate_to_graph
+                    sync_estate_to_graph(estate.id, estate.name, ir)
+                    append_ledger_event(db, estate.id, "graph_synced", {"estate_id": estate.id})
+                except Exception as e:
+                    print(f"Warning: graph sync failed for estate {estate.id}: {e}")
+                db.commit()
             except Exception as e:
-                print(f"Warning: graph sync failed for estate {estate.id}: {e}")
-            db.commit()
-        except Exception as e:
-            print(f"Warning: auto-extract failed for estate {estate.id}: {e}")
+                print(f"Warning: auto-extract failed for estate {estate.id}: {e}")
 
     append_ledger_event(db, estate.id, "estate_created", {"name": estate.name, "source_type": estate.source_type, "estate_type": payload.estate_type})
     db.commit()
@@ -277,28 +285,15 @@ def start_survey(estate_id: int, payload: SurveyRequest = SurveyRequest(), db: S
     estate.current_stage = "pending_approval"
     estate.status = "PENDING_APPROVAL"
     db.commit()
-    # Populate counts for the preview (from IR, but keep status pending_approval)
-    synth = payload.synthetic_path or (str(Path("data/synthetic_estate_telco")) if estate.estate_type == "telecom" else str(SYNTHETIC_ROOT))
-    sp = Path(synth) if Path(synth).exists() else SYNTHETIC_ROOT
-    try:
-        ir = extract_estate_ir(sp, estate_name=estate.name)
-        preview_todo = _build_survey_todo(ir)
-        # Keep as pending_approval, but fill counts for preview
-        for i, item in enumerate(preview_todo):
-            if i < len(todo_pending):
-                todo_pending[i]["count"] = item["count"]
-                todo_pending[i]["detail"] = item["detail"]
-        estate.survey_todo = todo_pending
-        db.commit()
-    except Exception:
-        pass
+    # No counts yet — step labels only. Counts/details are revealed per-stage as each
+    # one completes during approve_survey's staged run, not spoiled upfront here.
     append_ledger_event(db, estate_id, "survey_todo_created", {"todo_count": len(todo_pending), "estate_type": estate.estate_type})
     db.commit()
     return {"estate_id": estate_id, "status": "pending_approval", "todo": todo_pending}
 
 
 @router.post("/{estate_id}/survey/approve")
-def approve_survey(estate_id: int, db: Session = Depends(get_db)):
+def approve_survey(estate_id: int, payload: SurveyApprove, db: Session = Depends(get_db)):
     estate = db.query(Estate).filter(Estate.id == estate_id).first()
     if not estate:
         raise HTTPException(status_code=404, detail="Estate not found")
@@ -308,11 +303,19 @@ def approve_survey(estate_id: int, db: Session = Depends(get_db)):
             return {"estate_id": estate_id, "status": "done", "todo": estate.survey_todo}
     if not estate.survey_todo:
         raise HTTPException(status_code=409, detail="No survey Todo to approve — POST /survey first")
+    if not payload.approver or not payload.approver.strip():
+        raise HTTPException(status_code=400, detail="Approver name is required (not free-text reviewer, named approver)")
+    if len(payload.approver.strip()) < 2:
+        raise HTTPException(status_code=400, detail="Approver name must be at least 2 characters")
+    approver = payload.approver.strip()
 
     estate.current_stage = "surveying"
     estate.status = "PENDING"
     db.commit()
-    append_ledger_event(db, estate_id, "survey_approved", {"todo_count": len(estate.survey_todo)})
+    append_ledger_event(
+        db, estate_id, "survey_approved", {"todo_count": len(estate.survey_todo), "approver": approver},
+        actor=approver, actor_email=payload.actor_email,
+    )
     db.commit()
 
     estate_name = estate.name
@@ -323,7 +326,7 @@ def approve_survey(estate_id: int, db: Session = Depends(get_db)):
 
     import threading
 
-    def _run_bg(eid: int, ename: str, etype: str, synth_path: str, engine):
+    def _run_bg(eid: int, ename: str, etype: str, synth_path: str, engine, actor: str, actor_email: str | None):
         import time
         from sqlalchemy.orm import sessionmaker
         # 5s initial view - user sees the full Todo list before ticking (as requested)
@@ -331,35 +334,64 @@ def approve_survey(estate_id: int, db: Session = Depends(get_db)):
         Session2 = sessionmaker(bind=engine)
         db2 = Session2()
         try:
-            delays = [0.9, 1.1, 0.85, 0.75, 0.8, 0.7, 1.0, 0.9]
+            # Per-stage durations weighted by how "heavy" the stage should feel — not
+            # uniform ticks. Procedure/ETL analysis reads as the hard part; discovery
+            # and the final rollup are quick.
+            stage_seconds = {
+                "discover_systems": 5,
+                "extract_tables": 6,
+                "parse_views": 8,
+                "analyze_procedures": 10,
+                "map_etl": 9,
+                "map_bi": 6,
+                "build_graph": 7,
+                "compute_analytics": 5,
+            }
             order = ["discover_systems", "extract_tables", "parse_views", "analyze_procedures", "map_etl", "map_bi", "build_graph", "compute_analytics"]
             sp_path = Path(synth_path) if Path(synth_path).exists() else SYNTHETIC_ROOT
             try:
                 ir = extract_estate_ir(sp_path, estate_name=ename)
-                base = _build_survey_todo(ir)
-                todo_template = [dict(item, status="pending") for item in base]
+                base = _build_survey_todo(ir)  # real counts/details, pulled in only as each stage completes
             except Exception:
-                # Fallback pending template
-                todo_template = [
-                    {"key": k, "label": k.replace("_", " ").title(), "status": "pending", "count": None, "detail": ""}
-                    for k, _ in zip(order, delays)
+                base = [
+                    {"key": k, "label": k.replace("_", " ").title(), "status": "done", "count": None, "detail": ""}
+                    for k in order
                 ]
-            for idx, (key, delay) in enumerate(zip(order, delays)):
-                time.sleep(delay)
+            blank_template = [dict(item, status="pending", count=None, detail="") for item in base]
+
+            from sqlalchemy.orm.attributes import flag_modified
+
+            def _snapshot(done_idx: int, running_idx: int | None) -> list[dict]:
+                snap = []
+                for j, item in enumerate(blank_template):
+                    new_item = dict(item)
+                    if j <= done_idx:
+                        new_item["status"] = "done"
+                        new_item["count"] = base[j]["count"]
+                        new_item["detail"] = base[j]["detail"]
+                    elif j == running_idx:
+                        new_item["status"] = "running"
+                    snap.append(new_item)
+                return snap
+
+            for idx, key in enumerate(order):
                 est = db2.query(Estate).filter(Estate.id == eid).first()
                 if not est:
                     break
-                new_todo = []
-                for j, item in enumerate(todo_template):
-                    new_item = dict(item)
-                    if j <= idx:
-                        new_item["status"] = "done"
-                    new_todo.append(new_item)
-                # Force SQLAlchemy to detect JSONB change (mutable)
-                from sqlalchemy.orm.attributes import flag_modified
-                est.survey_todo = new_todo
+                # Mark this stage running first (no count/detail yet - nothing to reveal mid-flight)
+                est.survey_todo = _snapshot(done_idx=idx - 1, running_idx=idx)
                 flag_modified(est, "survey_todo")
                 est.current_stage = key
+                db2.commit()
+
+                time.sleep(stage_seconds[key])
+
+                est = db2.query(Estate).filter(Estate.id == eid).first()
+                if not est:
+                    break
+                # Flip to done and reveal this stage's real count/detail
+                est.survey_todo = _snapshot(done_idx=idx, running_idx=None)
+                flag_modified(est, "survey_todo")
                 db2.commit()
             est = db2.query(Estate).filter(Estate.id == eid).first()
             if est:
@@ -368,7 +400,6 @@ def approve_survey(estate_id: int, db: Session = Depends(get_db)):
                 est.survey_todo = _build_survey_todo(ir)
                 for it in est.survey_todo:
                     it["status"] = "done"
-                from sqlalchemy.orm.attributes import flag_modified
                 flag_modified(est, "survey_todo")
                 est.current_stage = "done"
                 est.last_survey_at = datetime.now(timezone.utc)
@@ -379,20 +410,23 @@ def approve_survey(estate_id: int, db: Session = Depends(get_db)):
                 est.unresolved_count = ir.unresolved_count
                 est.status = "ACTIVE"
                 db2.commit()
-                append_ledger_event(db2, eid, "survey_completed", {"nodes": ir.total_nodes, "edges": ir.total_edges, "estate_type": etype})
+                append_ledger_event(
+                    db2, eid, "survey_completed", {"nodes": ir.total_nodes, "edges": ir.total_edges, "estate_type": etype, "approver": actor},
+                    actor=actor, actor_email=actor_email,
+                )
                 try:
                     from dsxlineage.estate.graph import sync_estate_to_graph
                     sync_estate_to_graph(eid, ename, ir)
-                    append_ledger_event(db2, eid, "graph_synced", {"estate_id": eid})
+                    append_ledger_event(db2, eid, "graph_synced", {"estate_id": eid}, actor=actor, actor_email=actor_email)
                 except Exception as e:
                     print(f"Survey graph sync failed: {e}")
                 db2.commit()
         finally:
             db2.close()
 
-    t = threading.Thread(target=_run_bg, args=(estate_id, estate_name, estate_type, synth, bind_engine), daemon=True)
+    t = threading.Thread(target=_run_bg, args=(estate_id, estate_name, estate_type, synth, bind_engine, approver, payload.actor_email), daemon=True)
     t.start()
-    return {"estate_id": estate_id, "status": "surveying", "todo": todo_pending}
+    return {"estate_id": estate_id, "status": "surveying", "todo": estate.survey_todo}
 
 
 @router.get("/{estate_id}/survey/todo")

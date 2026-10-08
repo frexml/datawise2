@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 const TEMPLATES = {
   banking: {
@@ -28,19 +29,37 @@ const TEMPLATES = {
 };
 
 function TodoList({ todo, currentStage, onApprove, isPendingApproval }) {
+  const { user } = useAuth();
+  const [approver, setApprover] = useState(user?.name || '');
+  const [approveError, setApproveError] = useState(null);
+
+  useEffect(() => { if (user?.name) setApprover(user.name); }, [user]);
+
   if (!todo || todo.length === 0) return null;
   const done = todo.filter((t) => t.status === 'done').length;
   const isPending = isPendingApproval || currentStage === 'pending_approval';
+
+  const handleApprove = () => {
+    const name = approver.trim();
+    if (name.length < 2) { setApproveError('Approver name required (≥2 chars)'); return; }
+    setApproveError(null);
+    onApprove(name, user?.email);
+  };
+
   return (
     <div className="mt-4 border rounded-xl overflow-hidden">
       <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800 flex justify-between items-center">
-        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{isPending ? 'Ready for approval' : `${done}/${todo.length} steps done`}</span>
-        <span className="text-xs text-gray-500">{currentStage}</span>
+        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{isPending ? `${todo.length} steps proposed` : `${done}/${todo.length} steps done`}</span>
+        <span className="text-xs text-gray-500">{isPending ? '' : currentStage}</span>
       </div>
       {isPending && (
-        <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 flex justify-between items-center">
-          <span className="text-xs text-amber-800 dark:text-amber-200">Review the 8 steps below, then approve to start discovery.</span>
-          <button onClick={onApprove} className="px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">Approve & Run →</button>
+        <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 flex flex-wrap gap-2 justify-between items-center">
+          <span className="text-xs text-amber-800 dark:text-amber-200">Approve to begin discovery.</span>
+          <div className="flex gap-2 items-center">
+            {approveError && <span className="text-xs text-red-600">{approveError}</span>}
+            <input value={approver} onChange={(e) => setApprover(e.target.value)} placeholder="Approver name (≥2)" className="px-2 py-1 border rounded text-xs dark:bg-gray-900 dark:border-gray-700 w-36" />
+            <button onClick={handleApprove} className="px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">Approve & Run →</button>
+          </div>
         </div>
       )}
       <div className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -107,6 +126,7 @@ export default function Estates() {
         source_type: 'synthetic',
         estate_type: tpl.estate_type,
         connection: { host: conn.host, port: conn.port, user: conn.user, db_type: conn.db_type, status: 'pending' },
+        defer_discovery: true,
       });
       const estateId = createRes.data.id;
       // 2) Test connection (mock)
@@ -166,15 +186,15 @@ export default function Estates() {
         {surveying && todo.length > 0 && (
           <div className="mt-4">
             <div className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
-              {currentStage === 'pending_approval' ? 'Todo ready for approval' : `Discovering estate ${surveying}… live progress`}
+              {currentStage === 'pending_approval' ? "Based on initial findings, here's the discovery plan awaiting your approval" : `Discovering estate ${surveying}… live progress`}
             </div>
             <TodoList
               todo={todo}
               currentStage={currentStage}
               isPendingApproval={currentStage === 'pending_approval'}
-              onApprove={async () => {
+              onApprove={async (approver, actorEmail) => {
                 try {
-                  await axios.post(`/api/estates/${surveying}/survey/approve`, {});
+                  await axios.post(`/api/estates/${surveying}/survey/approve`, { approver, actor_email: actorEmail || undefined });
                   setCurrentStage('surveying');
                   const poll = async () => {
                     try {
