@@ -42,6 +42,9 @@ class Estate(Base):
     connection = Column(JsonCol, default=dict)
     # Survey Todo - list of {key, label, status, count, detail} for live progress
     survey_todo = Column(JsonCol, default=list)
+    # Coarse approval-gate preview - {systems: [...], estimated_objects: "125+"} -
+    # deliberately rounded, set once at pending_approval; never the per-stage exact counts
+    survey_preview = Column(JsonCol, default=dict)
     current_stage = Column(String, default="pending")  # pending | discovering | extracting_tables | parsing_views | analyzing_procedures | mapping_etl | mapping_bi | building_graph | computing_analytics | done | failed
     last_survey_at = Column(DateTime(timezone=True))
     # IR versioning: which semver was last computed

@@ -142,6 +142,7 @@ def _estate_to_dict(e: Estate) -> dict:
         "status": e.status,
         "connection": getattr(e, "connection", None),
         "survey_todo": getattr(e, "survey_todo", None),
+        "survey_preview": getattr(e, "survey_preview", None),
         "current_stage": getattr(e, "current_stage", None),
         "last_survey_at": e.last_survey_at.isoformat() if getattr(e, "last_survey_at", None) else None,
         "ir_version": e.ir_version,
@@ -152,6 +153,12 @@ def _estate_to_dict(e: Estate) -> dict:
         "created_at": e.created_at.isoformat() if e.created_at else None,
         "updated_at": e.updated_at.isoformat() if e.updated_at else None,
     }
+
+
+def _bucket_estimate(n: int) -> str:
+    """Round down to the nearest 25 - a ballpark for the approval-gate
+    preview, deliberately never the exact final count."""
+    return f"{(n // 25) * 25}+" if n >= 25 else f"~{n}"
 
 
 def _build_survey_todo(ir: EstateIR) -> list[dict]:
@@ -284,12 +291,22 @@ def start_survey(estate_id: int, payload: SurveyRequest = SurveyRequest(), db: S
     estate.survey_todo = todo_pending
     estate.current_stage = "pending_approval"
     estate.status = "PENDING_APPROVAL"
+    # Coarse preview for the gate - systems + a rounded estimate, never the exact
+    # count. Best-effort: a parse hiccup here must never block reaching the gate.
+    try:
+        synth = payload.synthetic_path or str(_synthetic_root_for_estate(estate))
+        sp = Path(synth) if Path(synth).exists() else _synthetic_root_for_estate(estate)
+        preview_ir = extract_estate_ir(sp, estate_name=estate.name)
+        estate.survey_preview = {"systems": preview_ir.systems, "estimated_objects": _bucket_estimate(preview_ir.total_nodes)}
+    except Exception:
+        estate.survey_preview = {"systems": [], "estimated_objects": None}
     db.commit()
-    # No counts yet — step labels only. Counts/details are revealed per-stage as each
-    # one completes during approve_survey's staged run, not spoiled upfront here.
+    # No per-stage counts yet — step labels + the coarse preview above only.
+    # Per-stage counts/details are revealed as each one completes during
+    # approve_survey's staged run, not spoiled upfront here.
     append_ledger_event(db, estate_id, "survey_todo_created", {"todo_count": len(todo_pending), "estate_type": estate.estate_type})
     db.commit()
-    return {"estate_id": estate_id, "status": "pending_approval", "todo": todo_pending}
+    return {"estate_id": estate_id, "status": "pending_approval", "todo": todo_pending, "survey_preview": estate.survey_preview}
 
 
 @router.post("/{estate_id}/survey/approve")
@@ -434,7 +451,7 @@ def get_survey_todo(estate_id: int, db: Session = Depends(get_db)):
     estate = db.query(Estate).filter(Estate.id == estate_id).first()
     if not estate:
         raise HTTPException(status_code=404, detail="Estate not found")
-    return {"estate_id": estate_id, "current_stage": estate.current_stage, "status": estate.status, "todo": estate.survey_todo or [], "counts": {"nodes": estate.node_count, "edges": estate.edge_count, "unresolved": estate.unresolved_count}}
+    return {"estate_id": estate_id, "current_stage": estate.current_stage, "status": estate.status, "todo": estate.survey_todo or [], "survey_preview": estate.survey_preview, "counts": {"nodes": estate.node_count, "edges": estate.edge_count, "unresolved": estate.unresolved_count}}
 
 
 @router.get("")

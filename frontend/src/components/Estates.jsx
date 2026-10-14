@@ -28,7 +28,7 @@ const TEMPLATES = {
   },
 };
 
-function TodoList({ todo, currentStage, onApprove, isPendingApproval }) {
+function TodoList({ todo, currentStage, onApprove, isPendingApproval, preview }) {
   const { user } = useAuth();
   const [approver, setApprover] = useState(user?.name || '');
   const [approveError, setApproveError] = useState(null);
@@ -52,6 +52,11 @@ function TodoList({ todo, currentStage, onApprove, isPendingApproval }) {
         <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{isPending ? `${todo.length} steps proposed` : `${done}/${todo.length} steps done`}</span>
         <span className="text-xs text-gray-500">{isPending ? '' : currentStage}</span>
       </div>
+      {isPending && preview?.systems?.length > 0 && (
+        <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 border-b dark:border-gray-700">
+          Detected: {preview.systems.join(', ')}{preview.estimated_objects ? ` · ~${preview.estimated_objects.replace(/^~/, '')} objects estimated` : ''}
+        </div>
+      )}
       {isPending && (
         <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 flex flex-wrap gap-2 justify-between items-center">
           <span className="text-xs text-amber-800 dark:text-amber-200">Approve to begin discovery.</span>
@@ -93,6 +98,7 @@ export default function Estates() {
   const [surveying, setSurveying] = useState(null); // estate id being surveyed
   const [todo, setTodo] = useState([]);
   const [currentStage, setCurrentStage] = useState('');
+  const [preview, setPreview] = useState(null);
 
   const fetch = async () => {
     try {
@@ -140,6 +146,7 @@ export default function Estates() {
       // 3) Start survey - creates Todo as pending_approval; user must approve before execution
       const surveyRes = await axios.post(`/api/estates/${estateId}/survey`, {});
       setTodo(surveyRes.data.todo || []);
+      setPreview(surveyRes.data.survey_preview || null);
       setCurrentStage('pending_approval');
       setSurveying(estateId);
       setShowModal(false);
@@ -159,6 +166,7 @@ export default function Estates() {
       try {
         const r = await axios.get(`/api/estates/${surveying}/survey/todo`);
         setTodo(r.data.todo || []);
+        setPreview(r.data.survey_preview || null);
         setCurrentStage(r.data.current_stage || '');
         if (r.data.status === 'ACTIVE') {
           setSurveying(null);
@@ -191,6 +199,7 @@ export default function Estates() {
             <TodoList
               todo={todo}
               currentStage={currentStage}
+              preview={preview}
               isPendingApproval={currentStage === 'pending_approval'}
               onApprove={async (approver, actorEmail) => {
                 try {
@@ -296,6 +305,11 @@ export default function Estates() {
                 {e.unresolved_count > 0 && <span className="text-amber-600">⚠️ {e.unresolved_count} unresolved</span>}
                 {e.current_stage && <span className="text-indigo-600">· {e.current_stage}</span>}
               </div>
+              {e.status === 'PENDING_APPROVAL' && e.survey_preview?.systems?.length > 0 && (
+                <div className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
+                  Detected: {e.survey_preview.systems.join(', ')}{e.survey_preview.estimated_objects ? ` · ~${e.survey_preview.estimated_objects.replace(/^~/, '')} objects estimated` : ''} - open to approve
+                </div>
+              )}
               {e.survey_todo && e.survey_todo.length > 0 && (
                 <div className="mt-3">
                   <div className="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">

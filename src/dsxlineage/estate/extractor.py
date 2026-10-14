@@ -194,7 +194,7 @@ def extract_estate_ir(
             stem = sql_path.stem  # e.g. DW_CUSTOMER_DIM
             # Need to split correctly: systems contain underscores? Use known systems
             # Try longest prefix match among known systems
-            known_systems = ["SAP_ECC", "SALESFORCE", "FLAT_FILES", "DW"]
+            known_systems = ["SAP_ECC", "SALESFORCE", "FLAT_FILES", "DW_TELCO", "FLAT_TELCO", "CRM_TELCO", "BSCS", "CDR", "NMS", "DW"]
             system = "DW"
             table = stem
             for ks in sorted(known_systems, key=len, reverse=True):
@@ -468,7 +468,13 @@ def extract_estate_ir(
             pass
 
     # ---- Systems list ----
-    systems_set.update(["SAP_ECC", "SALESFORCE", "FLAT_FILES", "DW"])
+    # Whatever was actually detected while walking tables/views/procs above
+    # (per estate_type - banking's SAP_ECC/SALESFORCE/FLAT_FILES/DW, telecom's
+    # BSCS/CDR/NMS/DW_TELCO/etc.). No estate-specific fallback here - a blind
+    # hardcoded default previously forced the banking system list onto every
+    # estate type, including Telecom.
+    if not systems_set:
+        systems_set.add("DW")
     ir.systems = sorted(systems_set)
 
     # ---- Summaries + dedup edges ----

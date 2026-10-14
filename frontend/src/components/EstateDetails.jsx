@@ -35,6 +35,7 @@ export default function EstateDetails() {
   const [surveyTodo, setSurveyTodo] = useState([]);
   const [surveyStage, setSurveyStage] = useState('');
   const [displayTodo, setDisplayTodo] = useState([]);
+  const [preview, setPreview] = useState(null);
   const [approver, setApprover] = useState(user?.name || '');
   const [approveError, setApproveError] = useState(null);
 
@@ -46,6 +47,7 @@ export default function EstateDetails() {
     setSurveyTodo(r.data.survey_todo || []);
     setDisplayTodo(r.data.survey_todo || []);
     setSurveyStage(r.data.current_stage || '');
+    setPreview(r.data.survey_preview || null);
     if (showGraph && r.data.status === 'ACTIVE') {
       const g = await axios.get(`/api/estates/${estateId}/graph`);
       setGraph(g.data);
@@ -79,6 +81,7 @@ export default function EstateDetails() {
           setSurveyTodo(r.data.todo || []);
           setDisplayTodo(r.data.todo || []);
           setSurveyStage(r.data.current_stage || '');
+          setPreview(r.data.survey_preview || null);
           setEstate((prev) => prev ? { ...prev, status: r.data.status, current_stage: r.data.current_stage, survey_todo: r.data.todo, node_count: r.data.counts?.nodes ?? prev.node_count, edge_count: r.data.counts?.edges ?? prev.edge_count } : prev);
           if (r.data.status === 'ACTIVE' && r.data.current_stage === 'done') {
             await loadAll(true);
@@ -132,6 +135,11 @@ export default function EstateDetails() {
             <span className="text-sm font-medium text-gray-900 dark:text-white">{isPendingApproval ? "Based on initial findings, here's the discovery plan awaiting your approval" : 'Discovering your estate - live progress'}</span>
             <span className="text-xs text-gray-500">{isPendingApproval ? `${todoToShow.length} steps proposed` : `${doneCount}/${todoToShow.length} done · ${surveyStage}`}</span>
           </div>
+          {isPendingApproval && preview?.systems?.length > 0 && (
+            <div className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+              Detected: {preview.systems.join(', ')}{preview.estimated_objects ? ` · ~${preview.estimated_objects.replace(/^~/, '')} objects estimated` : ''}
+            </div>
+          )}
           {isPendingApproval && (
             <div className="mb-3 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded flex flex-wrap gap-2 justify-between items-center">
               <span className="text-xs text-amber-800 dark:text-amber-200">Approve to begin discovery.</span>
