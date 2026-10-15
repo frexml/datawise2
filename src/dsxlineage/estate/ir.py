@@ -134,6 +134,8 @@ class ColumnLineage(BaseModel):
     transform_expr: str | None = None
     confidence: float = 1.0
     via_edge: str | None = None
+    unresolved: bool = False
+    unresolved_reason: str | None = None
 
 
 class ColumnIdentity(BaseModel):

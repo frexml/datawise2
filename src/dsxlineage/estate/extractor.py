@@ -26,9 +26,12 @@ from typing import List
 
 import sqlglot
 from sqlglot import exp
+from sqlglot.lineage import lineage
 
 from dsxlineage.estate.ir import (
     ColumnDef,
+    ColumnIdentity,
+    ColumnLineage,
     DashboardDef,
     EdgeType,
     ETLJobDef,
@@ -394,29 +397,84 @@ def extract_estate_ir(
                 if dd.source_fqn:
                     ir.edges.append(LineageEdge(source_fqn=dd.source_fqn.upper(), target_fqn=dd.fqn, edge_type=EdgeType.DASHBOARD_RENDERS, confidence=1.0))
 
-    # ---- Column lineage (derived from view SQL where possible) ----
-    # For POC, generate simple column lineage for a few key views
-    # Real implementation would use sqlglot column-level lineage
-    # Here we synthesize plausible edges for demo determinism
+    # ---- Column lineage (real, via sqlglot's own lineage resolver) ----
+    # Uses sqlglot.lineage.lineage() - its own scope-aware column resolver -
+    # instead of hand-rolled alias matching. The hand-rolled version silently
+    # misattributed every column from a JOIN's 2nd+ table back to the 1st
+    # whenever the SQL used a short alias (e.g. "p.PERF_DATE" with
+    # "FROM DW.BRANCH_DIM b JOIN DW.BRANCH_PERF p") - which is most JOINs.
+    # sqlglot's own scope resolution gets this right because it actually
+    # tracks the FROM/JOIN alias map rather than fuzzy-matching strings.
+
+    def _reconcile_fqn(raw: str, source_fqns: list[str]) -> tuple[str, bool]:
+        """Match sqlglot's resolved db.table string against this view's known
+        source FQNs - canonicalizes casing/format, doesn't drive resolution."""
+        raw_u = raw.upper()
+        for src in source_fqns:
+            src_u = src.upper()
+            if src_u == raw_u or src_u.endswith("." + raw_u) or raw_u.endswith("." + src_u):
+                return src, True
+        return raw_u, False
+
+    def _leaves(node) -> list:
+        out, stack = [], [node]
+        while stack:
+            n = stack.pop()
+            (stack.extend(n.downstream) if n.downstream else out.append(n))
+        return out
+
+    def _extract_cols_for_view(vd) -> list[ColumnLineage]:
+        try:
+            tree = sqlglot.parse_one(vd.sql, read="oracle")
+            if not tree or not isinstance(tree, exp.Select):
+                tree = next(tree.find_all(exp.Select), None) if tree else None
+            if not tree:
+                return [ColumnLineage(
+                    target_table=vd.fqn, target_column="*", source_table="", source_column="",
+                    confidence=0.0, unresolved=True, unresolved_reason="could not find a SELECT to analyze",
+                )]
+            result = lineage(None, tree, dialect="oracle")
+        except Exception as exc:
+            return [ColumnLineage(
+                target_table=vd.fqn, target_column="*", source_table="", source_column="",
+                confidence=0.0, unresolved=True, unresolved_reason=f"lineage resolution failed: {exc}",
+            )]
+
+        rows: list[ColumnLineage] = []
+        for target_col, node in result.items():
+            leaves = [l for l in _leaves(node) if isinstance(l.source, exp.Table)]
+            if not leaves:
+                rows.append(ColumnLineage(
+                    target_table=vd.fqn, target_column=target_col.upper(), source_table="", source_column="",
+                    confidence=0.0, unresolved=True,
+                    unresolved_reason="no traceable source column (literal/constant or unsupported expression)",
+                ))
+                continue
+
+            # Transform = top-level expression isn't a bare column reference
+            inner = node.expression.this if isinstance(node.expression, exp.Alias) else node.expression
+            is_transform = not isinstance(inner, exp.Column)
+            transform_expr = inner.sql(dialect="oracle") if is_transform else None
+
+            for leaf in leaves:
+                src_col = leaf.name.split(".")[-1].upper()
+                raw_fqn = f"{leaf.source.db}.{leaf.source.name}".upper() if leaf.source.db else leaf.source.name.upper()
+                src_fqn, matched = _reconcile_fqn(raw_fqn, vd.source_fqns)
+                confidence = 0.6 if not matched else (0.9 if is_transform else 0.95)
+                rows.append(ColumnLineage(
+                    target_table=vd.fqn,
+                    target_column=target_col.upper(),
+                    source_table=src_fqn,
+                    source_column=src_col,
+                    transform_expr=transform_expr,
+                    confidence=confidence,
+                ))
+        return rows
+
     for vd in ir.views:
         if vd.unresolved or not vd.source_fqns:
             continue
-        # For each source, map columns 1:1 for demo (first 3 cols)
-        # Find source table def
-        for src_fqn in vd.source_fqns[:2]:
-            src_table = next((t for t in ir.tables if t.fqn == src_fqn), None)
-            if src_table and src_table.columns:
-                for col in src_table.columns[:2]:
-                    ir.column_lineage.append(
-                        __import__("dsxlineage.estate.ir", fromlist=["ColumnLineage"]).ColumnLineage(
-                            target_table=vd.fqn,
-                            target_column=col.name,
-                            source_table=src_fqn,
-                            source_column=col.name,
-                            transform_expr=None,
-                            confidence=0.9,
-                        )
-                    )
+        ir.column_lineage.extend(_extract_cols_for_view(vd))
 
     # ---- Column identities (entity resolution stub) ----
     # Group columns by canonical lowercased name sans suffix
@@ -439,7 +497,7 @@ def extract_estate_ir(
             primary = fqns_sorted[0]
             for fqn in fqns_sorted:
                 ir.column_identities.append(
-                    __import__("dsxlineage.estate.ir", fromlist=["ColumnIdentity"]).ColumnIdentity(
+                    ColumnIdentity(
                         canonical_id=canonical,
                         fqn=fqn,
                         aliases=[x for x in fqns_sorted if x != fqn],

@@ -2,10 +2,9 @@ import React, { useState } from 'react';
 import ReactFlow, { Background, Controls, MiniMap } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-export default function GraphPanel({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, selected, blast, unresolvedCount }) {
+export default function GraphPanel({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, onNodeMouseEnter, onNodeMouseLeave, selected, blast, unresolvedCount, hoverPreview, highlightCol, onClearHighlight }) {
   const [expanded, setExpanded] = useState(false);
 
-  // Reset expanded when selection changes
   React.useEffect(() => { setExpanded(false); }, [selected]);
 
   const blastList = blast?.blast_radius || [];
@@ -16,12 +15,24 @@ export default function GraphPanel({ nodes, edges, onNodesChange, onEdgesChange,
 
   return (
     <div className="bg-white dark:bg-gray-800 border rounded-lg">
-      <div style={{ height: 650 }}>
-        <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onNodeClick={onNodeClick} fitView>
+      <div style={{ height: 650 }} className="relative">
+        <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onNodeClick={onNodeClick} onNodeMouseEnter={onNodeMouseEnter} onNodeMouseLeave={onNodeMouseLeave} fitView>
           <Background />
           <Controls />
           <MiniMap />
         </ReactFlow>
+        {hoverPreview && (
+          <div className="absolute top-2 left-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 shadow-lg text-xs pointer-events-none">
+            <div className="font-mono font-medium text-gray-900 dark:text-white">{hoverPreview.fqn}</div>
+            <div className="text-gray-500">{hoverPreview.count} columns, {hoverPreview.withTransform} with transforms - click to see what changed</div>
+          </div>
+        )}
+        {highlightCol && (
+          <div className="absolute top-2 right-2 bg-indigo-600 text-white text-xs px-2 py-1 rounded-full shadow">
+            highlighting: {highlightCol.source_column} → {highlightCol.target_column}
+            <button onClick={(e) => { e.stopPropagation(); onClearHighlight && onClearHighlight(); }} className="ml-2 underline">clear</button>
+          </div>
+        )}
       </div>
       {selected && (
         <div className="p-3 border-t text-xs leading-relaxed">

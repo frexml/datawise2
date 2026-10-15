@@ -70,6 +70,25 @@ def _synthetic_root_for_estate(estate: Estate) -> Path:
     return SYNTHETIC_ROOT
 
 
+# In-process cache for the (expensive - sqlglot column lineage + full DDL/view/
+# procedure parse) extracted IR. Keyed by (estate.id, estate.ir_version) - that
+# pair already captures "valid until the next re-survey" exactly, since
+# ir_version only changes when a fresh extraction is intentionally computed
+# (create_estate's auto-extract, approve_survey's staged run). Read-only
+# endpoints should use _get_ir(); endpoints that are themselves computing a
+# fresh IR (those write paths) call extract_estate_ir() directly as before.
+_IR_CACHE: dict[tuple[int, str], EstateIR] = {}
+
+
+def _get_ir(estate: Estate) -> EstateIR:
+    key = (estate.id, estate.ir_version or "")
+    cached = _IR_CACHE.get(key)
+    if cached is None:
+        cached = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+        _IR_CACHE[key] = cached
+    return cached
+
+
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
@@ -476,7 +495,7 @@ def extract_estate(estate_id: int, db: Session = Depends(get_db)):
     if not _synthetic_root_for_estate(estate).exists():
         raise HTTPException(status_code=404, detail="Synthetic estate not found on disk")
 
-    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    ir = _get_ir(estate)
     estate.ir_version = ir.version
     estate.ir_generated_at = datetime.now(timezone.utc)
     estate.node_count = ir.total_nodes
@@ -505,7 +524,7 @@ def get_estate_ir(estate_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Estate not found")
     if not _synthetic_root_for_estate(estate).exists():
         raise HTTPException(status_code=404, detail="Synthetic estate not found")
-    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    ir = _get_ir(estate)
     return ir.model_dump()
 
 
@@ -514,7 +533,7 @@ def get_estate_graph(estate_id: int, db: Session = Depends(get_db)):
     estate = db.query(Estate).filter(Estate.id == estate_id).first()
     if not estate:
         raise HTTPException(status_code=404, detail="Estate not found")
-    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    ir = _get_ir(estate)
     # Build nodes for ReactFlow: each table/view/procedure/etc is a node
     nodes = []
     edges = []
@@ -589,7 +608,7 @@ def get_lineage(estate_id: int, fqn: str, direction: str = "both", hops: int = 6
     estate = db.query(Estate).filter(Estate.id == estate_id).first()
     if not estate:
         raise HTTPException(status_code=404, detail="Estate not found")
-    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    ir = _get_ir(estate)
     # BFS in IR (Postgres-native, no Neo4j needed)
     outgoing: dict[str, list[str]] = {}
     incoming: dict[str, list[str]] = {}
@@ -625,7 +644,7 @@ def get_blast_radius(estate_id: int, fqn: str, db: Session = Depends(get_db)):
     estate = db.query(Estate).filter(Estate.id == estate_id).first()
     if not estate:
         raise HTTPException(status_code=404, detail="Estate not found")
-    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    ir = _get_ir(estate)
     outgoing: dict[str, list[str]] = {}
     for e in ir.edges:
         if e.edge_type.value == "UNRESOLVED":
@@ -653,7 +672,7 @@ def get_analytics(estate_id: int, db: Session = Depends(get_db)):
     estate = db.query(Estate).filter(Estate.id == estate_id).first()
     if not estate:
         raise HTTPException(status_code=404, detail="Estate not found")
-    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    ir = _get_ir(estate)
     ana = compute_analytics(ir)
     return ana
 
@@ -669,7 +688,7 @@ def post_chat(estate_id: int, payload: ChatRequest, db: Session = Depends(get_db
         raise HTTPException(status_code=404, detail="Estate not found")
     if not payload.question or not payload.question.strip():
         raise HTTPException(status_code=400, detail="Question is required")
-    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    ir = _get_ir(estate)
 
     # Session handling
     session_id = payload.session_id
@@ -777,7 +796,7 @@ def bridge_recommend(estate_id: int, db: Session = Depends(get_db)):
     estate = db.query(Estate).filter(Estate.id == estate_id).first()
     if not estate:
         raise HTTPException(status_code=404, detail="Estate not found")
-    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    ir = _get_ir(estate)
     rec = recommend_wedge(ir)
     append_ledger_event(db, estate_id, "wedge_recommended", rec.model_dump())
     db.commit()
@@ -789,7 +808,7 @@ def bridge_create_plan(estate_id: int, payload: PlanCreate, db: Session = Depend
     estate = db.query(Estate).filter(Estate.id == estate_id).first()
     if not estate:
         raise HTTPException(status_code=404, detail="Estate not found")
-    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    ir = _get_ir(estate)
     if payload.scope_fqns is None:
         rec = recommend_wedge(ir, target=payload.target_platform)
         scope = rec.scope_fqns
@@ -846,7 +865,7 @@ def bridge_approve_plan(estate_id: int, plan_id: int, payload: PlanApprove, db: 
     plan.approved_at = datetime.now(timezone.utc)
 
     # Generate artifacts upon approval
-    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    ir = _get_ir(estate)
     ddl = generate_snowflake_ddl(ir, plan.scope_fqns or [])
     tf = generate_terraform(ir, plan.scope_fqns or [], target=plan.target_platform)
     # Store as ledger artifacts (for POC, store inline in payload; prod would write to Files)
@@ -873,7 +892,7 @@ def bridge_get_ddl(estate_id: int, plan_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Plan not found")
     if plan.status != "approved":
         raise HTTPException(status_code=409, detail="Plan must be approved before generating DDL")
-    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    ir = _get_ir(estate)
     ddl = generate_snowflake_ddl(ir, plan.scope_fqns or [])
     return ddl
 
@@ -888,7 +907,7 @@ def bridge_get_terraform(estate_id: int, plan_id: int, db: Session = Depends(get
         raise HTTPException(status_code=404, detail="Plan not found")
     if plan.status != "approved":
         raise HTTPException(status_code=409, detail="Plan must be approved before generating Terraform")
-    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    ir = _get_ir(estate)
     tf = generate_terraform(ir, plan.scope_fqns or [], target=plan.target_platform)
     return tf
 
@@ -903,7 +922,7 @@ def bridge_get_scaffold(estate_id: int, plan_id: int, job_fqn: str | None = None
         raise HTTPException(status_code=404, detail="Plan not found")
     if plan.status != "approved":
         raise HTTPException(status_code=409, detail="Plan must be approved before generating migration code")
-    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    ir = _get_ir(estate)
     scope = set(plan.scope_fqns or [])
     eligible = [
         j for j in ir.etl_jobs
@@ -933,7 +952,7 @@ def bridge_run_diff(estate_id: int, payload: DiffRequest, db: Session = Depends(
     approved = db.query(MigrationPlan).filter(MigrationPlan.estate_id == estate_id, MigrationPlan.status == "approved").first()
     if not approved:
         raise HTTPException(status_code=409, detail="At least one plan must be approved before running diff (ledger gate)")
-    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    ir = _get_ir(estate)
     scope = payload.scope_fqns or approved.scope_fqns or [t.fqn for t in ir.tables[:8]]
     result = run_diff_harness(ir, scope_fqns=scope, synthetic_data_dir=_synthetic_root_for_estate(estate) / "data", sampling=payload.sampling, n=payload.n)
     # Persist DiffRun
@@ -971,7 +990,7 @@ def bridge_check_continuity(estate_id: int, payload: ContinuityRequest, db: Sess
     last_diff = db.query(DiffRun).filter(DiffRun.estate_id == estate_id, DiffRun.status == "passed").order_by(DiffRun.id.desc()).first()
     if not last_diff:
         raise HTTPException(status_code=409, detail="A passed diff run is required before continuity check (ledger gate)")
-    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    ir = _get_ir(estate)
     result = check_continuity(ir, target_ir=None, scope_fqns=payload.scope_fqns)
     # Update diff run with continuity
     last_diff.continuity_passed = result.passed

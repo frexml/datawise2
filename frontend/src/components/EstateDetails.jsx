@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useNodesState, useEdgesState, MarkerType } from 'reactflow';
@@ -7,11 +7,42 @@ import AnalyticsPanel from '../features/estate/AnalyticsPanel';
 import ChatPanel from '../features/estate/ChatPanel';
 import BridgePanel from '../features/estate/BridgePanel';
 import LedgerPanel from '../features/estate/LedgerPanel';
+import ColumnDrawer from '../features/estate/ColumnDrawer';
+import ColumnLineageTable from '../features/estate/ColumnLineageTable';
 import { useAuth } from '../context/AuthContext';
+
+// BFS shortest path between two graph nodes - used to highlight a column's
+// full lineage path, which may span 2+ view hops, not just a direct edge.
+function findPath(edges, fromId, toId) {
+  const empty = { nodes: new Set(), edgeIds: new Set() };
+  if (!fromId || !toId) return empty;
+  if (fromId === toId) return { nodes: new Set([fromId]), edgeIds: new Set() };
+
+  const adjacency = new Map();
+  for (const e of edges) {
+    if (!adjacency.has(e.source)) adjacency.set(e.source, []);
+    adjacency.get(e.source).push({ to: e.target, edgeId: e.id });
+  }
+
+  const visited = new Set([fromId]);
+  const queue = [[fromId, [fromId], []]];
+  while (queue.length > 0) {
+    const [cur, nodePath, edgePath] = queue.shift();
+    if (cur === toId) return { nodes: new Set(nodePath), edgeIds: new Set(edgePath) };
+    for (const { to, edgeId } of adjacency.get(cur) || []) {
+      if (!visited.has(to)) {
+        visited.add(to);
+        queue.push([to, [...nodePath, to], [...edgePath, edgeId]]);
+      }
+    }
+  }
+  return empty; // no path - e.g. source/target aren't connected in the loaded graph
+}
 
 const TAB_LABELS = [
   { key: 'graph', label: 'Lineage Graph' },
   { key: 'analytics', label: 'Analytics' },
+  { key: 'columns', label: 'Column Lineage' },
   { key: 'chat', label: 'Chat' },
   { key: 'bridge', label: 'Bridge' },
   { key: 'ledger', label: 'Ledger' },
@@ -38,6 +69,11 @@ export default function EstateDetails() {
   const [preview, setPreview] = useState(null);
   const [approver, setApprover] = useState(user?.name || '');
   const [approveError, setApproveError] = useState(null);
+  const [ir, setIr] = useState(null);
+  const [drawerFqn, setDrawerFqn] = useState(null);
+  const [drawerKind, setDrawerKind] = useState(null);
+  const [highlightCol, setHighlightCol] = useState(null);
+  const [hoverPreview, setHoverPreview] = useState(null);
 
   useEffect(() => { if (user?.name) setApprover(user.name); }, [user]);
 
@@ -54,8 +90,14 @@ export default function EstateDetails() {
       const rfNodes = g.data.nodes.map((n, i) => ({
         id: n.id, position: n.position || { x: (i % 6) * 220, y: Math.floor(i / 6) * 80 },
         data: { label: n.label }, type: 'default',
-        style: { background: n.type === 'table' ? '#EEF2FF' : n.type === 'view' ? (n.unresolved ? '#FEF3C7' : '#ECFDF5') : n.type === 'procedure' ? (n.has_dynamic ? '#FEE2E2' : '#F3E8FF') : n.type === 'dashboard' ? '#FFF7ED' : '#F1F5F9', border: '1px solid #CBD5E1', fontSize: '10px', padding: '6px', borderRadius: '6px', width: 170 }
+        style: {
+          background: n.type === 'table' ? '#EEF2FF' : n.type === 'view' ? (n.unresolved ? '#FEF3C7' : '#ECFDF5') : n.type === 'procedure' ? (n.has_dynamic ? '#FEE2E2' : '#F3E8FF') : n.type === 'dashboard' ? '#FFF7ED' : '#F1F5F9',
+          border: '1px solid #CBD5E1', fontSize: '10px', padding: '6px', borderRadius: '6px', width: 170,
+        }
       }));
+      // Highlight styling for a selected column's path is applied reactively by
+      // the effect below (keyed on highlightCol) - this initial load just does
+      // the normal unresolved-vs-resolved coloring.
       const rfEdges = g.data.edges.map((e) => ({ id: e.id, source: e.source, target: e.target, animated: true, style: { stroke: e.unresolved ? '#F59E0B' : '#6366F1' }, markerEnd: { type: MarkerType.ArrowClosed, color: e.unresolved ? '#F59E0B' : '#6366F1' }, label: e.type }));
       setNodes(rfNodes); setEdges(rfEdges);
     }
@@ -66,6 +108,10 @@ export default function EstateDetails() {
         const rec = await axios.post(`/api/estates/${estateId}/bridge/recommend`);
         setRecommendation(rec.data);
       } catch { setRecommendation(null); }
+      try {
+        const irRes = await axios.get(`/api/estates/${estateId}/ir`);
+        setIr(irRes.data);
+      } catch { setIr(null); }
     }
     const l = await axios.get(`/api/estates/${estateId}/ledger`);
     setLedger(l.data);
@@ -103,8 +149,51 @@ export default function EstateDetails() {
 
   const onNodeClick = async (_, node) => {
     setSelected(node.id);
+    const kind = node.data?.kind || node.type || 'table';
+    setDrawerFqn(node.id);
+    setDrawerKind(kind);
+    setHighlightCol(null);
     try { const r = await axios.get(`/api/estates/${estateId}/blast-radius`, { params: { fqn: node.id } }); setBlast(r.data); } catch (e) { setBlast({ count: 0, blast_radius: [] }); }
   };
+
+  const onNodeMouseEnter = (_, node) => {
+    if (!ir || !ir.column_lineage) return;
+    const cols = ir.column_lineage.filter((c) => c.target_table === node.id || c.source_table === node.id);
+    if (cols.length > 0) {
+      setHoverPreview({ fqn: node.id, count: cols.length, withTransform: cols.filter((c) => c.transform_expr).length });
+    }
+  };
+  const onNodeMouseLeave = () => setHoverPreview(null);
+
+  // Snapshot of the current edges, read (not reactive) by the highlight effect
+  // below so it can run BFS without depending on `edges` itself - depending on
+  // it directly would re-trigger every time this same effect calls setEdges.
+  const edgesRef = useRef([]);
+  useEffect(() => { edgesRef.current = edges; }, [edges]);
+
+  // Highlight a column's full lineage path on the graph - BFS over the real
+  // edge list, not just a single direct edge, since column lineage commonly
+  // spans 2+ view hops (e.g. table -> view -> view -> dashboard).
+  useEffect(() => {
+    if (!highlightCol) {
+      setNodes((nds) => nds.map((n) => ({ ...n, style: { ...n.style, opacity: 1, border: '1px solid #CBD5E1' } })));
+      setEdges((eds) => eds.map((e) => ({ ...e, style: { ...e.style, opacity: 1, stroke: e.unresolved ? '#F59E0B' : '#6366F1' } })));
+      return;
+    }
+    const { nodes: pathNodes, edgeIds: pathEdgeIds } = findPath(edgesRef.current, highlightCol.source_table, highlightCol.target_table);
+    setNodes((nds) =>
+      nds.map((n) => {
+        const isOnPath = pathNodes.has(n.id);
+        return { ...n, style: { ...n.style, opacity: isOnPath ? 1 : 0.25, border: isOnPath ? '2px solid #6366F1' : '1px solid #CBD5E1' } };
+      })
+    );
+    setEdges((eds) =>
+      eds.map((e) => {
+        const onPath = pathEdgeIds.has(e.id);
+        return { ...e, style: { ...e.style, opacity: onPath ? 1 : 0.15, stroke: onPath ? '#6366F1' : '#CBD5E1' } };
+      })
+    );
+  }, [highlightCol, setNodes, setEdges]);
 
   if (error) return <div className="p-8 text-red-600 text-sm">{error}</div>;
   if (!estate) return <div className="p-8 text-gray-500">Loading estate…</div>;
@@ -198,8 +287,43 @@ export default function EstateDetails() {
         {TAB_LABELS.map((t) => <button key={t.key} onClick={() => setActiveTab(t.key)} className={`px-4 py-2 text-sm border-b-2 ${activeTab === t.key ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>{t.label}</button>)}
       </div>
 
-      {activeTab === 'graph' && <GraphPanel nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onNodeClick={onNodeClick} selected={selected} blast={blast} unresolvedCount={graph?.estate?.unresolved} />}
+      {activeTab === 'graph' && (
+        <div className="flex gap-4">
+          <div className="flex-1 min-w-0">
+            <GraphPanel
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onNodeClick={onNodeClick}
+              onNodeMouseEnter={onNodeMouseEnter}
+              onNodeMouseLeave={onNodeMouseLeave}
+              selected={selected}
+              blast={blast}
+              unresolvedCount={graph?.estate?.unresolved}
+              hoverPreview={hoverPreview}
+              highlightCol={highlightCol}
+              onClearHighlight={() => setHighlightCol(null)}
+            />
+            {hoverPreview && (
+              <div className="mt-2 text-xs text-gray-500 bg-gray-50 dark:bg-gray-900 border rounded-lg px-3 py-2">
+                <span className="font-mono font-medium">{hoverPreview.fqn}</span> — {hoverPreview.count} columns, {hoverPreview.withTransform} with transforms. Click to see what changed.
+              </div>
+            )}
+          </div>
+          {drawerFqn && (
+            <ColumnDrawer
+              fqn={drawerFqn}
+              kind={drawerKind}
+              columns={(ir?.column_lineage || []).filter((c) => c.target_table === drawerFqn || c.source_table === drawerFqn)}
+              onClose={() => { setDrawerFqn(null); setHighlightCol(null); }}
+              onSelectColumn={(col) => setHighlightCol(col)}
+            />
+          )}
+        </div>
+      )}
       {activeTab === 'analytics' && <AnalyticsPanel data={analytics} recommendation={recommendation} />}
+      {activeTab === 'columns' && <ColumnLineageTable columnLineage={ir?.column_lineage || []} />}
       {activeTab === 'chat' && <ChatPanel estateId={estateId} />}
       {activeTab === 'bridge' && <BridgePanel estateId={estateId} />}
       {activeTab === 'ledger' && <LedgerPanel ledger={ledger} estateId={estateId} />}
