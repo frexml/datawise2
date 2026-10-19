@@ -62,26 +62,30 @@ router = APIRouter()
 
 SYNTHETIC_ROOT = Path("data/synthetic_estate")
 TELCO_ROOT = Path("data/synthetic_estate_telco")
+LOAN_ROOT = Path("data/synthetic_estate_loan")
 
 def _synthetic_root_for_estate(estate: Estate) -> Path:
-    """Pick synthetic dir per estate_type - banking vs telecom."""
-    if getattr(estate, "estate_type", "banking") == "telecom":
+    """Pick synthetic dir per estate_type — banking vs telecom vs loan_onboarding."""
+    et = getattr(estate, "estate_type", "banking")
+    if et == "telecom":
         return TELCO_ROOT if TELCO_ROOT.exists() else SYNTHETIC_ROOT
+    if et == "loan_onboarding":
+        return LOAN_ROOT if LOAN_ROOT.exists() else SYNTHETIC_ROOT
     return SYNTHETIC_ROOT
 
 
 # In-process cache for the (expensive - sqlglot column lineage + full DDL/view/
-# procedure parse) extracted IR. Keyed by (estate.id, estate.ir_version) - that
-# pair already captures "valid until the next re-survey" exactly, since
-# ir_version only changes when a fresh extraction is intentionally computed
-# (create_estate's auto-extract, approve_survey's staged run). Read-only
-# endpoints should use _get_ir(); endpoints that are themselves computing a
-# fresh IR (those write paths) call extract_estate_ir() directly as before.
-_IR_CACHE: dict[tuple[int, str], EstateIR] = {}
+# procedure parse) extracted IR. Keyed by (estate.id, name, estate_type,
+# ir_version) - id+version captures "valid until the next re-survey" in prod,
+# while name+type disambiguate isolated test DBs that reuse id=1 across
+# separate in-memory engines in the same process. Read-only endpoints should
+# use _get_ir(); endpoints that are themselves computing a fresh IR (those
+# write paths) call extract_estate_ir() directly as before.
+_IR_CACHE: dict[tuple, EstateIR] = {}
 
 
 def _get_ir(estate: Estate) -> EstateIR:
-    key = (estate.id, estate.ir_version or "")
+    key = (estate.id, getattr(estate, "name", ""), getattr(estate, "estate_type", ""), estate.ir_version or "")
     cached = _IR_CACHE.get(key)
     if cached is None:
         cached = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
@@ -97,7 +101,7 @@ class EstateCreate(BaseModel):
     name: str = "NORTHSTAR"
     display_name: str = "NorthStar Synthetic Estate"
     source_type: str = "synthetic"  # synthetic | catalog_dump
-    estate_type: str = "banking"  # banking | telecom
+    estate_type: str = "banking"  # banking | telecom | loan_onboarding
     synthetic_path: str | None = None  # override path if needed
     connection: dict | None = None  # {host, port, user, db_type} - mock for demo
     defer_discovery: bool = False  # True: skip auto-extract, leave PENDING for a real survey/approve flow
@@ -123,12 +127,26 @@ class ChatRequest(BaseModel):
     question: str
     session_id: int | None = None
     use_llm: bool | None = None
+    human_loop: bool = False
+    generate_sql: bool = False
+    explain: bool = False
 
 
 class PlanCreate(BaseModel):
     name: str = "Snowflake Wedge - Finance Mart"
-    target_platform: Literal["snowflake", "bigquery", "synapse"] = "snowflake"
+    target_platform: Literal["snowflake", "databricks", "aws", "microsoft", "other"] = "snowflake"
     scope_fqns: list[str] | None = None
+
+
+class BridgeRecommendRequest(BaseModel):
+    target: Literal["snowflake", "databricks", "aws", "microsoft", "other"] = "snowflake"
+
+
+class ChatFeedbackRequest(BaseModel):
+    message_id: int
+    decision: Literal["approve", "reject", "edit"] = "approve"
+    comment: str | None = None
+    reviewer: str | None = None
 
 
 class PlanApprove(BaseModel):
@@ -218,10 +236,11 @@ def create_estate(payload: EstateCreate, db: Session = Depends(get_db)):
     # Skipped when defer_discovery=True so the interactive demo flow goes through a real
     # pending_approval -> approve -> staged survey instead of landing on ACTIVE/done instantly.
     if not payload.defer_discovery:
-        synth_path = Path(payload.synthetic_path) if payload.synthetic_path else (Path("data/synthetic_estate_telco") if payload.estate_type == "telecom" else SYNTHETIC_ROOT)
-        # Try to pick correct synthetic dir per estate_type
+        synth_path = Path(payload.synthetic_path) if payload.synthetic_path else (Path("data/synthetic_estate_telco") if payload.estate_type == "telecom" else (Path("data/synthetic_estate_loan") if payload.estate_type == "loan_onboarding" else SYNTHETIC_ROOT))
         if payload.estate_type == "telecom" and not synth_path.exists():
             synth_path = Path("data/synthetic_estate_telco")
+        if payload.estate_type == "loan_onboarding" and not synth_path.exists():
+            synth_path = Path("data/synthetic_estate_loan")
         if payload.source_type == "synthetic" and synth_path.exists():
             try:
                 ir = extract_estate_ir(synth_path, estate_name=estate.name)
@@ -358,7 +377,7 @@ def approve_survey(estate_id: int, payload: SurveyApprove, db: Session = Depends
     estate_type = estate.estate_type
     bind_engine = db.get_bind()
     # Use file-based path for synthetic per estate_type
-    synth = str(Path("data/synthetic_estate_telco") if estate_type == "telecom" else SYNTHETIC_ROOT)
+    synth = str(Path("data/synthetic_estate_telco") if estate_type == "telecom" else (Path("data/synthetic_estate_loan") if estate_type == "loan_onboarding" else SYNTHETIC_ROOT))
 
     import threading
 
@@ -541,9 +560,10 @@ def get_estate_graph(estate_id: int, db: Session = Depends(get_db)):
     # Previously every node in a layer shared x=0, so 126 nodes collapsed to 5 visible stacks.
     layer_order = {"source": 0, "warehouse": 1, "etl": 2, "orchestration": 3, "bi": 4}
     # Sort tables so warehouse tables are together, source tables together, etc., then grid
+    _SOURCE_SYSTEMS = ("SAP_ECC", "SALESFORCE", "FLAT_FILES", "RETAIL_CUSTOMER", "BSCS", "CDR", "NMS", "FLAT_TELCO", "CRM_TELCO")
     def _layer_of(node_type: str, system: str = "") -> str:
         if node_type == "table":
-            return "source" if system in ("SAP_ECC", "SALESFORCE", "FLAT_FILES") else "warehouse"
+            return "source" if system in _SOURCE_SYSTEMS else "warehouse"
         if node_type == "view": return "warehouse"
         if node_type == "procedure": return "warehouse"
         if node_type == "etl": return "etl"
@@ -554,7 +574,7 @@ def get_estate_graph(estate_id: int, db: Session = Depends(get_db)):
     # but guarantees every node gets a unique (x,y)
     all_items = []
     for t in ir.tables:
-        layer = "source" if t.system in ("SAP_ECC", "SALESFORCE", "FLAT_FILES") else "warehouse"
+        layer = "source" if t.system in _SOURCE_SYSTEMS else "warehouse"
         all_items.append((layer_order[layer], t.fqn, "table", t))
     for v in ir.views:
         all_items.append((layer_order["warehouse"], v.fqn, "view", v))
@@ -574,7 +594,7 @@ def get_estate_graph(estate_id: int, db: Session = Depends(get_db)):
         y = (idx // 6) * 85
         if kind == "table":
             t = obj
-            nodes.append({"id": t.fqn, "label": t.fqn, "type": "table", "system": t.system, "layer": "source" if t.system in ("SAP_ECC", "SALESFORCE", "FLAT_FILES") else "warehouse", "data": {"label": t.fqn, "fqn": t.fqn, "kind": "table", "system": t.system}, "position": {"x": x, "y": y}})
+            nodes.append({"id": t.fqn, "label": t.fqn, "type": "table", "system": t.system, "layer": "source" if t.system in _SOURCE_SYSTEMS else "warehouse", "data": {"label": t.fqn, "fqn": t.fqn, "kind": "table", "system": t.system}, "position": {"x": x, "y": y}})
         elif kind == "view":
             v = obj
             nodes.append({"id": v.fqn, "label": v.fqn, "type": "view", "complexity": v.complexity, "unresolved": v.unresolved, "data": {"label": v.fqn, "fqn": v.fqn, "kind": "view", "complexity": v.complexity, "unresolved": v.unresolved}, "position": {"x": x, "y": y}})
@@ -706,10 +726,39 @@ def post_chat(estate_id: int, payload: ChatRequest, db: Session = Depends(get_db
     db.add(user_msg)
     db.flush()
 
-    # Answer
+    # Handle generate_sql / explain tools
     import time as _time
     t0 = _time.time()
-    ans = answer_question(payload.question.strip(), ir, use_llm=payload.use_llm)
+    if payload.generate_sql:
+        # Use reasoning endpoint logic inline
+        from dsxlineage.estate.semantic import analyze_semantic
+        # Simple: generate SQL for the FQN mentioned in question
+        fqn = payload.question.strip().split()[-1] if payload.question.strip() else ""
+        # Try to find a view/table in question
+        import re
+        m = re.search(r"(VW_\w+|DW[_\w]*\.\w+)", payload.question)
+        if m:
+            fqn = m.group(1)
+        ans = answer_question(f"Generate SQL for {fqn}", ir, use_llm=payload.use_llm)
+        # Append SQL generation
+        try:
+            from dsxlineage.estate.api import _synthetic_root_for_estate  # noqa
+            # Call generate_sql logic
+            cols = [c for c in ir.column_lineage if c.target_table == fqn or c.source_table == fqn]
+            if cols:
+                ans.answer += f"\n\n**Generated SQL for {fqn}:**\n```sql\nSELECT {', '.join(c.target_column for c in cols[:5])} FROM {fqn} -- {len(cols)} columns, hops {max(c.hops for c in cols)}\n```"
+        except Exception:
+            pass
+    elif payload.explain:
+        ans = answer_question(f"Explain {payload.question}", ir, use_llm=payload.use_llm)
+        ans.answer = f"**Explanation for {payload.question}:**\n" + ans.answer
+    else:
+        ans = answer_question(payload.question.strip(), ir, use_llm=payload.use_llm)
+    # Human-in-the-loop: low confidence -> mark for review + persist review queue row
+    needs_review = bool(payload.human_loop and ans.confidence is not None and ans.confidence < 0.6 and not ans.was_refused)
+    if needs_review:
+        ans.answer += "\n\n*Low confidence — routed to human review (Pending Review).*"
+        ans.tool_calls = (ans.tool_calls or []) + ["human_review"]
     latency = int((_time.time() - t0) * 1000)
 
     assistant_msg = ChatMessage(
@@ -722,6 +771,7 @@ def post_chat(estate_id: int, payload: ChatRequest, db: Session = Depends(get_db
         latency_ms=latency,
     )
     db.add(assistant_msg)
+    db.flush()
 
     # Ledger: chat_query
     append_ledger_event(db, estate_id, "chat_query", {
@@ -729,7 +779,19 @@ def post_chat(estate_id: int, payload: ChatRequest, db: Session = Depends(get_db
         "citations": ans.citations,
         "was_refused": ans.was_refused,
         "latency_ms": latency,
+        "confidence": ans.confidence,
+        "message_id": assistant_msg.id,
     }, actor="user")
+    if needs_review:
+        append_ledger_event(db, estate_id, "human_review_pending", {
+            "message_id": assistant_msg.id,
+            "session_id": sess.id,
+            "question": payload.question.strip()[:500],
+            "answer": ans.answer[:1000],
+            "confidence": ans.confidence,
+            "citations": ans.citations,
+            "status": "pending",
+        }, actor="user")
     db.commit()
     db.refresh(assistant_msg)
 
@@ -743,6 +805,7 @@ def post_chat(estate_id: int, payload: ChatRequest, db: Session = Depends(get_db
         "tool_calls": ans.tool_calls,
         "latency_ms": latency,
         "message_id": assistant_msg.id,
+        "needs_review": needs_review,
     }
 
 
@@ -762,6 +825,60 @@ def get_chat_session(estate_id: int, session_id: int, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="Chat session not found")
     msgs = db.query(ChatMessage).filter(ChatMessage.session_id == session_id).order_by(ChatMessage.created_at.asc()).all()
     return {"session": sess, "messages": msgs}
+
+
+@router.post("/{estate_id}/chat/feedback")
+def post_chat_feedback(estate_id: int, payload: ChatFeedbackRequest, db: Session = Depends(get_db)):
+    estate = db.query(Estate).filter(Estate.id == estate_id).first()
+    if not estate:
+        raise HTTPException(status_code=404, detail="Estate not found")
+    msg = db.query(ChatMessage).filter(ChatMessage.id == payload.message_id).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Chat message not found")
+    sess = db.query(ChatSession).filter(ChatSession.id == msg.session_id, ChatSession.estate_id == estate_id).first()
+    if not sess:
+        raise HTTPException(status_code=404, detail="Chat session not found for estate")
+    ev = append_ledger_event(db, estate_id, "human_review_decision", {
+        "message_id": payload.message_id,
+        "session_id": msg.session_id,
+        "decision": payload.decision,
+        "comment": payload.comment,
+        "reviewer": payload.reviewer or "reviewer",
+        "answer": (msg.content or "")[:1000],
+    }, actor=payload.reviewer or "reviewer")
+    msg.tool_calls = (msg.tool_calls or []) + [f"human_{payload.decision}"]
+    db.commit()
+    return {"message_id": payload.message_id, "decision": payload.decision, "ledger_event_id": ev.id}
+
+
+@router.get("/{estate_id}/chat/reviews")
+def list_chat_reviews(estate_id: int, status: str | None = None, db: Session = Depends(get_db)):
+    estate = db.query(Estate).filter(Estate.id == estate_id).first()
+    if not estate:
+        raise HTTPException(status_code=404, detail="Estate not found")
+    from dsxlineage.estate.models import LedgerEvent
+    events = db.query(LedgerEvent).filter(
+        LedgerEvent.estate_id == estate_id,
+        LedgerEvent.event_type.in_(["human_review_pending", "human_review_decision"]),
+    ).order_by(LedgerEvent.id.desc()).limit(100).all()
+    out = []
+    for e in events:
+        p = e.payload or {}
+        out.append({
+            "id": e.id,
+            "event_type": e.event_type,
+            "message_id": p.get("message_id"),
+            "session_id": p.get("session_id"),
+            "question": p.get("question"),
+            "decision": p.get("decision"),
+            "status": p.get("status", "decided" if e.event_type == "human_review_decision" else "pending"),
+            "confidence": p.get("confidence"),
+            "reviewer": p.get("reviewer"),
+            "created_at": e.created_at.isoformat() if e.created_at else None,
+        })
+    if status:
+        out = [o for o in out if o["status"] == status]
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -787,17 +904,287 @@ def verify_ledger(estate_id: int, db: Session = Depends(get_db)):
     return {"estate_id": estate_id, "verified": ok, "reason": reason}
 
 
+@router.get("/{estate_id}/audit")
+def get_audit(estate_id: int, raw: bool = False, limit: int = 100, db: Session = Depends(get_db)):
+    estate = db.query(Estate).filter(Estate.id == estate_id).first()
+    if not estate:
+        raise HTTPException(status_code=404, detail="Estate not found")
+    from dsxlineage.estate.models import LedgerEvent
+    from dsxlineage.estate.audit import humanize_ledger
+    events = db.query(LedgerEvent).filter(LedgerEvent.estate_id == estate_id).order_by(LedgerEvent.id.asc()).limit(limit).all()
+    if raw:
+        return events
+    # Try to load IR for relationship enrichment
+    try:
+        ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    except Exception:
+        ir = None
+    human = humanize_ledger(events, ir)
+    return human
+
+
+def _fqn_matches(query: str | None, evidence_fqn: str | None) -> bool:
+    """Case-insensitive per-node match for drawer tabs (?fqn=).
+
+    Matches when either side is a substring of the other (handles
+    TABLE vs SCHEMA.TABLE vs SCHEMA.TABLE.COLUMN), plus edge strings
+    like 'SRC -> TGT' and comma-separated FQN lists.
+    """
+    if not query:
+        return True
+    q = query.strip().upper()
+    e = (evidence_fqn or "").upper()
+    if not e:
+        return False
+    if q in e or e in q:
+        return True
+    norm = e.replace("→", "->")
+    if "->" in norm:
+        for part in norm.split("->"):
+            part = part.strip()
+            if q in part or part in q:
+                return True
+    if "," in e:
+        for part in e.split(","):
+            part = part.strip()
+            if q in part or part in q:
+                return True
+    return False
+
+
+def _filter_items(items: list[dict], query: str | None) -> list[dict]:
+    if not query:
+        return items
+    return [it for it in items if _fqn_matches(query, (it.get("evidence") or {}).get("fqn"))]
+
+
+@router.get("/{estate_id}/structure/facts")
+def get_structure_facts(estate_id: int, fqn: str | None = None, db: Session = Depends(get_db)):
+    estate = db.query(Estate).filter(Estate.id == estate_id).first()
+    if not estate:
+        raise HTTPException(status_code=404, detail="Estate not found")
+    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    from dsxlineage.estate.structure import analyze_structure
+    res = analyze_structure(ir)
+    if fqn:
+        res = {
+            **res,
+            "facts": _filter_items(res.get("facts", []), fqn),
+            "unknowns": _filter_items(res.get("unknowns", []), fqn),
+            "fqn": fqn,
+        }
+    return res
+
+
+@router.get("/{estate_id}/semantic/rules")
+def get_semantic_rules(estate_id: int, fqn: str | None = None, db: Session = Depends(get_db)):
+    estate = db.query(Estate).filter(Estate.id == estate_id).first()
+    if not estate:
+        raise HTTPException(status_code=404, detail="Estate not found")
+    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    from dsxlineage.estate.semantic import analyze_semantic
+    res = analyze_semantic(ir)
+    if fqn:
+        res = {
+            **res,
+            "rules": _filter_items(res.get("rules", []), fqn),
+            "implicit_contracts": _filter_items(res.get("implicit_contracts", []), fqn),
+            "similar": _filter_items(res.get("similar", []), fqn),
+            "conflicting": _filter_items(res.get("conflicting", []), fqn),
+            "fqn": fqn,
+        }
+    return res
+
+
+@router.get("/{estate_id}/behavior/flows")
+def get_behavior_flows(estate_id: int, fqn: str | None = None, db: Session = Depends(get_db)):
+    estate = db.query(Estate).filter(Estate.id == estate_id).first()
+    if not estate:
+        raise HTTPException(status_code=404, detail="Estate not found")
+    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    from dsxlineage.estate.behavior import analyze_behavior
+    res = analyze_behavior(ir, estate_root=_synthetic_root_for_estate(estate))
+    if fqn:
+        res = {
+            **res,
+            "failures": _filter_items(res.get("failures", []), fqn),
+            "dependencies": _filter_items(res.get("dependencies", []), fqn),
+            "rejects": _filter_items(res.get("rejects", []), fqn),
+            "data_quality": _filter_items(res.get("data_quality", []), fqn),
+            "operational": _filter_items(res.get("operational", []), fqn),
+            "fqn": fqn,
+        }
+    return res
+
+
+@router.get("/{estate_id}/columns/{fqn:path}/lineage")
+def get_column_lineage(estate_id: int, fqn: str, db: Session = Depends(get_db)):
+    """Estate-wide column lineage for a single column FQN (e.g., VW_RISK_EXPOSURE.CUSTOMER_ID)."""
+    estate = db.query(Estate).filter(Estate.id == estate_id).first()
+    if not estate:
+        raise HTTPException(status_code=404, detail="Estate not found")
+    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    from dsxlineage.estate.column_graph import get_column_journey
+    # fqn is like "VW_RISK_EXPOSURE.CUSTOMER_ID" or "DW.FACT_ORDERS.ORDER_ID"
+    # Normalize: if it doesn't contain '.', try to find it
+    if "." not in fqn:
+        raise HTTPException(status_code=400, detail="fqn must be table.column")
+    # Ensure it exists in column lineage
+    journey = get_column_journey(ir, fqn)
+    # Enrich with hops already in ir
+    # Find the specific column lineage entry for this fqn
+    target_table, target_col = fqn.rsplit(".", 1)
+    cl = next((c for c in ir.column_lineage if c.target_table == target_table and c.target_column == target_col.upper()), None)
+    if not cl:
+        cl = next((c for c in ir.column_lineage if f"{c.target_table}.{c.target_column}" == fqn.upper()), None)
+    return {
+        "fqn": fqn,
+        "column": cl.model_dump() if cl else None,
+        "journey": journey,
+    }
+
+
+MIGRATION_TARGETS = ["snowflake", "databricks", "aws", "microsoft", "other"]
+MIGRATION_PATTERNS = {
+    "snowflake": "SnowConvert / Snowflake",
+    "databricks": "Lakebridge",
+    "aws": "AWS Transform / Glue",
+    "microsoft": "Microsoft Fabric / Azure",
+    "other": "Custom",
+}
+
+
+@router.get("/{estate_id}/knowledge-graph")
+def get_knowledge_graph(estate_id: int, fqn: str | None = None, db: Session = Depends(get_db)):
+    estate = db.query(Estate).filter(Estate.id == estate_id).first()
+    if not estate:
+        raise HTTPException(status_code=404, detail="Estate not found")
+    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    from dsxlineage.estate.structure import analyze_structure
+    from dsxlineage.estate.semantic import analyze_semantic
+    from dsxlineage.estate.behavior import analyze_behavior
+    struct = analyze_structure(ir)
+    sem = analyze_semantic(ir)
+    beh = analyze_behavior(ir, estate_root=_synthetic_root_for_estate(estate))
+    if fqn:
+        struct_facts = _filter_items(struct.get("facts", []), fqn)
+        sem_rules = _filter_items(sem.get("rules", []), fqn) + _filter_items(sem.get("implicit_contracts", []), fqn)
+        beh_deps = _filter_items(beh.get("dependencies", []), fqn)
+        beh_failures = _filter_items(beh.get("failures", []), fqn)
+        beh_oper = _filter_items(beh.get("operational", []), fqn)
+        cols = [c for c in ir.column_lineage if _fqn_matches(fqn, f"{c.target_table}.{c.target_column}") or _fqn_matches(fqn, f"{c.source_table}.{c.source_column}")]
+        tables = [t for t in ir.tables if _fqn_matches(fqn, t.fqn)]
+        views = [v for v in ir.views if _fqn_matches(fqn, v.fqn)]
+    else:
+        struct_facts = struct.get("facts", [])
+        sem_rules = sem.get("rules", []) + sem.get("implicit_contracts", [])
+        beh_deps = beh.get("dependencies", [])
+        beh_failures = beh.get("failures", [])
+        beh_oper = beh.get("operational", [])
+        cols = ir.column_lineage
+        tables = ir.tables
+        views = ir.views
+    # Knowledge Graph overview: exactly 6 subgraphs as in PNG.
+    # Jobs/orchestration counts fold into Dependencies (ETL + schedules are edges).
+    jobs_count = len(ir.etl_jobs) + len(ir.schedules)
+    result = {
+        "central": "Knowledge Graph",
+        "subgraphs": [
+            {"name": "Rules", "count": len(sem_rules), "color": "purple"},
+            {"name": "Dependencies", "count": len(beh_deps) + (0 if fqn else jobs_count), "color": "orange"},
+            {"name": "Metadata", "count": len(tables) + len(views), "color": "teal"},
+            {"name": "Datasets", "count": len(tables), "color": "green"},
+            {"name": "Behavior", "count": len(beh_failures) + len(beh_oper), "color": "red"},
+            {"name": "Lineage", "count": len(cols), "color": "cyan"},
+        ],
+        "facts": len(struct_facts) + len(sem_rules) + len(beh_deps) + len(beh_failures) + len(beh_oper),
+        "unknowns": len(_filter_items(struct.get("unknowns", []), fqn)) if fqn else struct["unknown_count"],
+    }
+    if fqn:
+        result["fqn"] = fqn
+    return result
+
+
+@router.post("/{estate_id}/reasoning/explain")
+def post_reasoning_explain(estate_id: int, payload: dict, db: Session = Depends(get_db)):
+    estate = db.query(Estate).filter(Estate.id == estate_id).first()
+    if not estate:
+        raise HTTPException(status_code=404, detail="Estate not found")
+    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    fqn = payload.get("fqn", "")
+    # Use semantic engine to explain
+    from dsxlineage.estate.semantic import analyze_semantic
+    sem = analyze_semantic(ir)
+    # Find rule for fqn
+    rule = next((r for r in sem.get("rules", []) if fqn in r["evidence"]["fqn"]), None)
+    if rule:
+        return {"fqn": fqn, "explanation": rule["meaning"], "confidence": rule["confidence"], "source_ref": rule["source_ref"]}
+    return {"fqn": fqn, "explanation": f"No specific business rule found for {fqn}, but it is part of {ir.total_nodes} nodes with {ir.unresolved_count} unresolved.", "confidence": 0.5, "source_ref": "ir"}
+
+
+@router.post("/{estate_id}/reasoning/generate-sql")
+def post_generate_sql(estate_id: int, payload: dict, db: Session = Depends(get_db)):
+    estate = db.query(Estate).filter(Estate.id == estate_id).first()
+    if not estate:
+        raise HTTPException(status_code=404, detail="Estate not found")
+    fqn = payload.get("fqn", "")
+    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    cols = [c for c in ir.column_lineage if c.target_table == fqn or c.source_table == fqn]
+    if not cols:
+        # Try to find view
+        view = next((v for v in ir.views if v.fqn == fqn), None)
+        if view:
+            return {"fqn": fqn, "sql": view.sql, "hops": 1}
+        return {"fqn": fqn, "sql": f"SELECT * FROM {fqn} -- no lineage found", "hops": 0}
+    # Build SQL from column lineage
+    target_cols = {}
+    for c in cols:
+        if c.target_table == fqn:
+            target_cols[c.target_column] = c
+    if target_cols:
+        # Generate SELECT for target
+        cols_sql = ", ".join([f"{c.source_table}.{c.source_column}" + (f" AS {c.target_column}" if c.transform_expr else "") for c in target_cols.values()])
+        # Find source tables
+        sources = ", ".join(set(c.source_table for c in target_cols.values()))
+        sql = f"SELECT {cols_sql} FROM {sources} -- {len(target_cols)} columns, hops {max(c.hops for c in target_cols.values())}"
+        return {"fqn": fqn, "sql": sql, "hops": max(c.hops for c in target_cols.values()), "columns": list(target_cols.keys())}
+    return {"fqn": fqn, "sql": f"SELECT * FROM {fqn}", "hops": 1}
+
+
+@router.post("/{estate_id}/migration/recommend")
+def post_migration_recommend(estate_id: int, payload: dict = {}, db: Session = Depends(get_db)):
+    estate = db.query(Estate).filter(Estate.id == estate_id).first()
+    if not estate:
+        raise HTTPException(status_code=404, detail="Estate not found")
+    target = payload.get("target", "databricks") if isinstance(payload, dict) else "databricks"
+    if target not in MIGRATION_TARGETS:
+        target = "snowflake"
+    ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    from dsxlineage.estate.bridge import recommend_wedge
+    rec = recommend_wedge(ir, target=target)
+    # Map to new migration recommendation format (recommend-only, not execute)
+    return {
+        "target": target,
+        "pattern": MIGRATION_PATTERNS.get(target, "Custom"),
+        "evidence": {"nodes": ir.total_nodes, "edges": ir.total_edges, "unresolved": ir.unresolved_count, "hops": max((c.hops for c in ir.column_lineage), default=1)},
+        "recommendation": rec.model_dump(),
+        "alternatives": [t for t in MIGRATION_TARGETS if t != target],
+        "note": "Recommendation only — not execution. Export pack for evidence.",
+    }
+
+
 # ---------------------------------------------------------------------------
 # Bridge
 # ---------------------------------------------------------------------------
 
 @router.post("/{estate_id}/bridge/recommend")
-def bridge_recommend(estate_id: int, db: Session = Depends(get_db)):
+def bridge_recommend(estate_id: int, payload: BridgeRecommendRequest | None = None, db: Session = Depends(get_db)):
     estate = db.query(Estate).filter(Estate.id == estate_id).first()
     if not estate:
         raise HTTPException(status_code=404, detail="Estate not found")
+    target = payload.target if payload else "snowflake"
     ir = _get_ir(estate)
-    rec = recommend_wedge(ir)
+    rec = recommend_wedge(ir, target=target)
     append_ledger_event(db, estate_id, "wedge_recommended", rec.model_dump())
     db.commit()
     return rec.model_dump()

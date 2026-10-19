@@ -219,6 +219,18 @@ def deterministic_answer(question: str, ir: EstateIR) -> ChatAnswer:
 
     candidates = _find_nodes_for_question(question, ir)
 
+    # Ambiguous / vague questions → low confidence so human-in-the-loop demo is
+    # reachable without an LLM key (deterministic engine otherwise never <0.6).
+    # Checked BEFORE lineage/impact branches so "uncertain ... lineage" still routes.
+    vague_markers = ("uncertain", "unsure", "maybe", "guess", "not sure", "review this", "please review")
+    if any(m in ql for m in vague_markers) and candidates:
+        return ChatAnswer(
+            answer="My best guess from the estate graph (low confidence — needs review):\n\n" + "\n".join(f"- `{c}`" for c in candidates[:5]),
+            citations=candidates[:2],
+            confidence=0.55,
+            tool_calls=["find_nodes", "low_confidence_heuristic"],
+        )
+
     if is_wedge:
         from dsxlineage.estate.bridge import recommend_wedge
         rec = recommend_wedge(ir)

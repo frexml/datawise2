@@ -60,11 +60,16 @@ def test_transform_detection_and_telecom_estate():
 
 def test_unresolved_columns_are_flagged_not_dropped():
     ir = extract_estate_ir(Path("data/synthetic_estate"))
-    cols = _lineage_for(ir, "VW_REVENUE_DAILY")
-    # COUNT(*) has no traceable single source column.
-    assert cols["ORDER_COUNT"].unresolved is True
-    assert cols["ORDER_COUNT"].unresolved_reason
-    assert cols["ORDER_COUNT"].confidence == 0.0
+    # Non-core CELL_ID is the intentional unresolved demo, not Order Amount/Count
+    cols = _lineage_for(ir, "VW_TELCO_CDR_AGG_ADJ")
+    assert cols["CELL_ID"].unresolved is True
+    assert cols["CELL_ID"].unresolved_reason
+    assert "CELL_ID" in cols["CELL_ID"].unresolved_reason or "No clear" in cols["CELL_ID"].unresolved_reason
+    assert cols["CELL_ID"].confidence == 0.0
+    # COUNT(*) now correctly traces to source (was previously unresolved, now fixed to be Complete)
+    cols2 = _lineage_for(ir, "VW_REVENUE_DAILY")
+    assert cols2["ORDER_COUNT"].unresolved is False
+    assert cols2["ORDER_COUNT"].source_table == "DW.FACT_ORDERS"
     # DAILY_REVENUE (SUM(AMOUNT)) resolves fine.
-    assert cols["DAILY_REVENUE"].unresolved is False
-    assert cols["DAILY_REVENUE"].source_table == "DW.FACT_ORDERS"
+    assert cols2["DAILY_REVENUE"].unresolved is False
+    assert cols2["DAILY_REVENUE"].source_table == "DW.FACT_ORDERS"

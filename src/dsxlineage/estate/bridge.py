@@ -30,8 +30,11 @@ from dsxlineage.estate.ir import EstateIR, Tolerances
 # Recommendation
 # ---------------------------------------------------------------------------
 
+TargetPlatform = Literal["snowflake", "databricks", "aws", "microsoft", "other"]
+
+
 class WedgeRecommendation(BaseModel):
-    target_platform: Literal["snowflake", "bigquery", "synapse"] = "snowflake"
+    target_platform: TargetPlatform = "snowflake"  # type: ignore[assignment]
     scope_fqns: list[str]
     estimated_days: float
     risk_level: Literal["low", "medium", "high"] = "medium"
@@ -48,6 +51,8 @@ def recommend_wedge(ir: EstateIR, target: str = "snowflake") -> WedgeRecommendat
     -> wedge" quadrant already surfaces), so this generalizes across estate
     types instead of only working for one hardcoded banking FQN list.
     """
+    if target not in ("snowflake", "databricks", "aws", "microsoft", "other"):
+        target = "snowflake"
     analytics = compute_analytics(ir)
     quadrant = sorted(analytics["quadrant"], key=lambda q: q["value"], reverse=True)
 

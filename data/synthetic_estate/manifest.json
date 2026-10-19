@@ -1,16 +1,17 @@
 {
-  "generated_at": "2026-10-07T21:54:06.556782+00:00",
+  "generated_at": "2026-10-15T21:05:49.184157+00:00",
   "seed": 42,
-  "today": "2026-10-07",
+  "today": "2026-10-15",
+  "estate_type": "banking",
   "counts": {
-    "ddl_files": 74,
+    "ddl_files": 75,
     "procedures": 18,
     "etl_jobs": 14,
     "schedules": 12,
     "dashboards": 8,
     "csv_samples": 8,
-    "expected_lineage_edges": 147,
+    "expected_lineage_edges": 148,
     "chat_bench": 100,
-    "total_expected_edges": 147
+    "total_expected_edges": 148
   }
 }

@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<workbook>
+<dashboard name="DTI_DASH"><title>Borrower debt-to-income</title>
+<datasource caption="VW_BORROWER_DTI"><relation table="VW_BORROWER_DTI" type="table"/></datasource>
+</dashboard>
+</workbook>

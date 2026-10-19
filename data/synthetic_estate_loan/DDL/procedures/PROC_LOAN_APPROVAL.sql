@@ -1,0 +1,14 @@
+-- PROCEDURE: PROC_LOAN_APPROVAL
+-- LANGUAGE: PL/SQL
+-- TYPE: transform
+-- READS: DW_LOAN.loanapplication, DW_LOAN.kyc, DW_LOAN.creditcheck
+-- WRITES: DW_LOAN.loanapplication
+-- CALLS: NONE
+-- HAS_DYNAMIC: False
+-- HAS_CURSOR: False
+-- COMPLEXITY: high
+CREATE OR REPLACE PROCEDURE PROC_LOAN_APPROVAL AS
+BEGIN
+    INSERT INTO DW_LOAN.loanapplication SELECT * FROM DW_LOAN.loanapplication;
+END PROC_LOAN_APPROVAL;
+/

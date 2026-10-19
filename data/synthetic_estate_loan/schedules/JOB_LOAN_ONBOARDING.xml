@@ -1,0 +1,10 @@
+        <?xml version="1.0"?>
+        <Schedule name="JOB_LOAN_ONBOARDING" type="Control-M" schedule="01:00" frequency="daily">
+            <DependsOn>ETL_RETAIL_CUSTOMER_TO_DW</DependsOn>
+<DependsOn>ETL_RETAIL_ACCOUNT_TO_DW</DependsOn>
+<DependsOn>ETL_LOAN_APP_TO_DW</DependsOn>
+<DependsOn>PROC_CONTACT_LINK</DependsOn>
+<DependsOn>PROC_CREDIT_SCORE_INGEST</DependsOn>
+<DependsOn>PROC_KYC_CHECK</DependsOn>
+<DependsOn>PROC_RISK_ASSESSMENT</DependsOn>
+        </Schedule>

@@ -64,41 +64,62 @@ Synthetic POC estate under `data/synthetic_estate/` (`seed=42`, `Faker`+`sqlglot
 
 ---
 
-## Architecture
+## Architecture — Legacy Intelligence Platform (Composable with Your Existing Tools)
 
-### Estate (new — system of record)
+> **Not a replacement. An intelligence layer for all your modernization and data platforms.**
+> *Understand · Explain · De-risk · Migrate · Govern — Technology Neutral · Evidence Driven · Built for Enterprise*
+
+**Source:** `docs/Datawise Platform.png` — this is the **only** architecture diagram for the application. It replaces the previous `Estate v2` (`M1→M5`) flow. For the full implementation reference, see `docs/plan.md`.
+
+![Legacy Intelligence Platform](docs/Datawise%20Platform.png)
 
 ```mermaid
 flowchart TB
-    Ingest["M1 Discover<br/>synthetic/generator.py → DDL / ETL / SP / Schedule / BI"] --> IR["M2 EstateIR v1.0.0<br/>Pydantic, sqlglot views + Tolerances + ColumnIdentity"]
-    IR --> KG[("Knowledge Graph<br/>Neo4j HTTP — 126 nodes, 144 edges")]
-    IR --> Ledger[("Evidence Ledger<br/>Postgres, hash-chained")]
-    KG --> Analytics["Analytics<br/>orphan / hot / circular / complexity"]
-    KG --> Chat["Chat<br/>RAG + deterministic fallback"]
-    KG --> Bridge["Bridge: Recommend → Plan → Approve → Generate"]
-    Bridge --> Ledger
-    Bridge --> Diff["M4 Diff Harness<br/>tolerances + masking + sampling"]
-    Diff --> Ledger
-    Diff --> Cont["M5 Continuity<br/>canonical col resolution"]
-    Cont --> Ledger
-    Ledger --> Gate{"Promote?<br/>ledger gate in code"}
-    Gate -->|"409 unless diff+continuity+approval"| Catalog["Publish"]
+    classDef l1 fill:#E3F2FD,stroke:#1565C0,stroke-width:2px,color:#0D47A1
+    classDef l2 fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20
+    classDef l2s fill:#E1F5FE,stroke:#0277BD,color:#01579B
+    classDef l2m fill:#F3E5F5,stroke:#6A1B9A,color:#4A148C
+    classDef l2b fill:#FFF3E0,stroke:#EF6C00,color:#E65100
+    classDef l3 fill:#E1F5FE,stroke:#0288D1,stroke-width:2px,color:#01579B
+    classDef l4 fill:#FCE4EC,stroke:#AD1457,stroke-width:2px,color:#880E4F
+    classDef l5 fill:#FFF9C4,stroke:#F9A825,stroke-width:2px,color:#F57F17
+    classDef l6 fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20
+
+    L1["1 — Legacy Ecosystem (Heterogeneous Sources)<br/>Ingest entire estate in any structure/format<br/>DataStage (DSX/ISX) · Databases (SQL/DDL) · Routines (BASIC/Python) · Job Metadata & Scheduler · Scripts · Documentation · Runtime Logs · Other (Informatica/SAP/SSIS/Ab Initio/custom)"]:::l1
+    L2["2 — Legacy Intelligence Platform (Our Solution)<br/>Turn legacy complexity into structured, explainable, actionable intelligence"]:::l2
+    SE["Structure Engine<br/>(Deterministic + Adaptive)<br/>Generic parsing · AST/IR · Jobs/Stages/Links · Schema/Metadata · Unknowns<br/>Structure → Facts"]:::l2s
+    SEM["Semantic AI Engine<br/>(Meaning & Intent)<br/>Business rules · Implicit contracts · Similar/Conflicting logic · Classify & Explain<br/>LLM with graph context<br/>Facts + Context → Meaning"]:::l2m
+    BE["Behavior Engine<br/>(Runtime & Operational)<br/>Failure/retry · Dependencies & orchestration · Reject/exception · Data quality<br/>Meaning + Context → Behavior"]:::l2b
+    L2 --- SE & SEM & BE
+    KG["3 — Knowledge Graph (Central Data Layer)<br/>Unified model: Jobs, Stages, Datasets, Columns, Rules, Dependencies<br/>+ Runtime behavior, Metadata, Versions, Ownership, Unknowns<br/>Enables impact, semantic search, reasoning"]:::l3
+    DL["Data Layer<br/>Stores metadata, artifacts, logs<br/>Powers analytics/ML · Keeps versions & lineage<br/>Scalable for large estates"]:::l3
+    AI["4 — AI Reasoning & Intelligence Layer<br/>Use Data + Knowledge Graph + AI to Generate Trusted Insights<br/>Semantic comparison · Landmine detection · Root-cause · Explanations<br/>Augmented by Human Expertise"]:::l4
+    INT["5 — Integration with Existing Migration Tools (Your Choice)<br/>AWS Transform/Glue · Databricks Lakebridge · SnowConvert/Snowflake · Microsoft Fabric/Azure · Other"]:::l5
+    OUT["6 — Outcomes & Use Cases<br/>Migration Readiness & Planning · Accelerated Migration · Validation & Reconciliation · Governance & Compliance · Ongoing Operations"]:::l6
+    L1 --> L2 --> KG --> AI --> INT --> OUT
+    KG --- DL
 ```
 
-*   **EstateIR** (`src/dsxlineage/estate/ir.py`) is versioned Pydantic and the *only* place semantic mismatches (null/decimal/collation/timezone), dynamic SQL, and `ColumnIdentity` are modeled — per Brief §4.2.
-*   **Ledger** (`LedgerEvent` now `actor_id = uuid5(email)`, `actor_email_hash`, `canonical_payload_hash` via `orjson` sorted, `prev_hash` chain, genesis `GENESIS`, `SELECT … FOR UPDATE` on Postgres) — `verify_ledger_chain` checks canonical; `can_promote` is the `409` gate on `POST /api/estates/{id}/bridge/promote`.
-*   **Chat** is TF-IDF retrieval (`src/dsxlineage/estate/retrieval.py`, `sklearn`, 126 docs, `max_features=5000`, cosine ≥0.08) + deterministic fallback; LLM path (`openai/gpt-4o` via OpenRouter, `temperature=0`, `max_tokens=800`, `with_structured_output`, `date.today()` in prompt, PII never sent) is grounded and refused when ungrounded. `httpx==0.25.2` pinned for `TestClient` compat. UI is `features/estate/ChatPanel.jsx` — header `✦`, bubbles, `…` typing, no pill citations.
-*   **Analytics** (`src/dsxlineage/estate/analytics.py`) now emits `estate_health` (76 Moderate Risk), `migration_readiness`, `orphan_cost_label`, `blast_stats{p50,p90,max}`, `lineage_depth{histogram}`, `quadrant[{fqn,value,risk}]` — hero + Risk vs Value scatter + 3 prioritized cards.
-*   **Diff** is real DuckDB (`_duckdb_diff_table`: `read_csv` → `EXCEPT` / anti-join `ABS(CAST… )<=epsilon` + `LOWER` + masked columns) with fast-path for `source==target` synthetic.
-*   **Neo4j** stays HTTP (Browser-compatible, no bolt) and is best-effort — estate creation never fails on graph outage.
+**How the 6 layers map to Praveen’s 10 enhancements (see `docs/transcripts.md` + `docs/plan.md`):**
 
-### Legacy ETL — archived at `archive/etl-v1` / tag `v1-etl-final` (estate-only since 2026-10-08)
+| Layer (PNG) | Praveen # | What It Does — Facts → Meaning → Behavior |
+|---|---|---|
+| **1 Legacy Ecosystem** | **#10 Loan Onboarding** | New primary synthetic: **Microsoft CDM Loan Onboarding** (16 entities: `LoanApplication`, `LoanApplicationContact` (hub, 45+ cols), `Contact`, `Bank`, `Collateral`, `CreditCheck`, `KYC`, `Employment`, `LoanApplicationAsset/Liability/Collateral/Valuation`, `ApplicationDocument`, etc., with deliberately complex ETL `RISK_SCORE = CASE WHEN credit_check.score > 700…`) + `BSS/OSS` Telco + `Routines/Scripts/Documentation/Runtime Logs` as `Other Sources`. |
+| **2 Structure → Facts** | **#6 Structure Engine**, **#1 Schema→Table→Column + hops** | Generic parsing (handles varied structures), `AST/IR` (`EstateIR` is the IR), `jobs/stages/links/parameters`, schema/metadata, `unknown pattern` registry (extensible). Emits `Structure → Facts`. |
+| **2 Facts+Context→Meaning** | **#6 Semantic Engine** | Extract business rules, implicit contracts (`KYC Approved` before disbursement), similar/conflicting logic (`difflib >0.9` on `transform_expr`), classify & explain data meaning, LLM with graph context + confidence/source-ref. |
+| **2 Meaning+Context→Behavior** | **#6 Behaviour Engine** | Failure/retry/restart (`PROC_RISK_ASSESSMENT` retry 3 on `score IS NULL` from `runtime_logs/`), dependencies & orchestration flow (`Schedule`), reject/exception (`kyc Rejected`, `liability isPayOffPending`), data quality (`KYC score`), parameter/env behavior. |
+| **3 Knowledge Graph + Data Layer** | **#7 Central graphical output**, **#2 Attention Required**, **#4 hop/path** | Unified model: `Jobs, Stages, Datasets, Columns, Rules, Dependencies` + `Runtime behavior, Metadata, Versions, Ownership, Unknowns, Evidence, Confidence`. Enables `impact, semantic search, reasoning`. `Data Layer` stores `metadata, artifacts, logs` and powers analytics/ML. **UI:** `Graph` 5 perspectives (end-to-end, table, job, schema→BI, column 3 cases) + `ColumnDrawer` with `Schema` chip + `Hops` badge + `Attention Required` on `CELL_ID` (non-core) drill → `No upstream`. |
+| **4 AI Reasoning** | **#8 Reasoning layer**, **#3 Human-readable audit** | Semantic comparison/conflict detection, landmine/migration risk, root-cause (`data mismatches`), explanations/summaries/documentation, test scenarios/validation rules, continuous learning, **Augmented by Human Expertise** (human-in-the-loop for low-confidence `Review`). Chat now has `Generate SQL` + `Explain meaning` tools over the KG. Audit is `What (VW_RISK_EXPOSURE.REGION CASE WHEN…) / Who (Sarah Chen) / When (2 min ago) / Relationship (→ RISK_REPORT, 2 hops)` from `GET /api/estates/{id}/audit`. |
+| **5 Integration** | **#9 Migration recommendations (not execution)** | Use insights with *your* tools: **AWS Transform/Glue, Databricks Lakebridge, SnowConvert/Snowflake, Microsoft Fabric/Azure, Other** — `POST /api/estates/{id}/migration/recommend` returns `{target: "databricks", pattern: "Lakebridge", evidence: [hops, landmines]}` instead of generating/migrating. Technology neutral. |
+| **6 Outcomes** | **#5 Five perspectives**, **#9** | `Migration Readiness & Planning | Accelerated Migration | Validation & Reconciliation | Governance & Compliance | Ongoing Operations & Impact Analysis` — each is a filtered view of the same KG (e.g., `Governance` → `Human audit`). |
 
-Estate is now the product (`/api/estates`, `/estates`). The three parsers (`dsx` `BEGIN/END`, `dtsx`, `POWERMART`) live as a **pure library** at `src/dsxlineage/parsers/` (`from dsxlineage.parsers import parse_dsx`) and are reused by `estate/extractor.py`. The old DataWise ETL app (`POST /api/upload`, `/api/jobs`, `/history`, `/jobs/:id`, `ScopeIQ`, `OpenMetadata` push) is frozen at `v1-etl-final` — see `archive/etl-v1/`.
+**Previous `Estate v2` (`M1→M5`, 126 nodes) is deprecated — see `archive/etl-v1` and tag `v1-etl-final`. The three parsers (`dsx`/`dtsx`/`POWERMART`) remain as a pure library at `src/dsxlineage/parsers/` and are reused by `Structure Engine`.
 
-### Gates (evidence, not dates)
+**Gates (evidence, not dates):** `P0` (Schema→Column + hops, `Attention Required`, human audit, 5 perspectives, richer outputs) → `P1` (3 engines + KG) → `P2` (Reasoning + Migration + Loan Onboarding). See `docs/plan.md` for the 6-week plan.
 
-`1a` Views (sqlglot recall ≥0.95) · `1b` SPs (12 clean + 6 `UNRESOLVED` flagged) · `1c` Scheduler+BI · `B` Parity (`3/n` bound) · `C` Continuity (`ColumnIdentity` precision/recall). The promote endpoint enforces `B+C`.
+**Key Differentiators & Business Value (from PNG, demoable):**
+*   Works with existing tools, handles structurally different artifacts, explains what logic *actually means*, finds unknowns/conflicts/hidden dependencies, builds a persistent KG you own, generates evidence/test scenarios, technology neutral.
+*   Business Value: Reduce migration risk, Save engineering effort, Preserve business logic, Improve auditability & compliance, Faster onboarding, Rationalize/retire jobs, Enable data-driven decisions.
 
 ---
 

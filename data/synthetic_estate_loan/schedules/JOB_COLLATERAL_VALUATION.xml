@@ -1,0 +1,5 @@
+        <?xml version="1.0"?>
+        <Schedule name="JOB_COLLATERAL_VALUATION" type="Control-M" schedule="02:00" frequency="daily">
+            <DependsOn>ETL_COLLATERAL_TO_DW</DependsOn>
+<DependsOn>PROC_COLLATERAL_VALUATION</DependsOn>
+        </Schedule>

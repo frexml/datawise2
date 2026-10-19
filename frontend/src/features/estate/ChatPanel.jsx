@@ -7,22 +7,51 @@ export default function ChatPanel({ estateId }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState(null);
+  const [humanLoop, setHumanLoop] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [reviewer, setReviewer] = useState('');
   const listRef = useRef(null);
+
+  const loadReviews = async () => {
+    try {
+      const r = await axios.get(`/api/estates/${estateId}/chat/reviews`);
+      setReviews(r.data || []);
+    } catch {}
+  };
+  useEffect(() => { loadReviews(); }, [estateId]);
+
+  const sendFeedback = async (messageId, decision) => {
+    try {
+      await axios.post(`/api/estates/${estateId}/chat/feedback`, { message_id: messageId, decision, reviewer: reviewer || undefined });
+      await loadReviews();
+    } catch (e) {
+      setMessages((m) => [...m, { role: 'assistant', content: 'Feedback error: ' + (e.response?.data?.detail || e.message), isError: true }]);
+    }
+  };
 
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages, loading]);
 
-  const ask = async (text) => {
+  const ask = async (text, action) => {
     const q = (text ?? question).trim();
     if (!q) return;
     setLoading(true);
+    const userContent = action ? `${action}: ${q}` : q;
     setQuestion('');
-    setMessages((m) => [...m, { role: 'user', content: q }]);
+    setMessages((m) => [...m, { role: 'user', content: userContent }]);
     try {
-      const res = await axios.post(`/api/estates/${estateId}/chat`, { question: q, session_id: sessionId });
+      const payload = { question: q, session_id: sessionId, human_loop: humanLoop };
+      if (action === 'Generate SQL') payload.generate_sql = true;
+      if (action === 'Explain') payload.explain = true;
+      const res = await axios.post(`/api/estates/${estateId}/chat`, payload);
       setSessionId(res.data.session_id);
-      setMessages((m) => [...m, { role: 'assistant', content: res.data.answer, citations: res.data.citations, was_refused: res.data.was_refused }]);
+      let content = res.data.answer;
+      if (res.data.needs_review || (res.data.confidence !== undefined && res.data.confidence < 0.6 && humanLoop)) {
+        if (!content.includes('Pending Review')) content += '\n\n*Low confidence — routed to human review (Pending Review).*';
+      }
+      setMessages((m) => [...m, { role: 'assistant', content, citations: res.data.citations, was_refused: res.data.was_refused, message_id: res.data.message_id, needs_review: res.data.needs_review }]);
+      if (res.data.needs_review) await loadReviews();
     } catch (e) {
       setMessages((m) => [...m, { role: 'assistant', content: 'Error: ' + (e.response?.data?.detail || e.message), isError: true }]);
     } finally {
@@ -71,6 +100,13 @@ export default function ChatPanel({ estateId }) {
                   <ReactMarkdown>{m.content}</ReactMarkdown>
                 </div>
                 {m.was_refused && !m.isError && <div className="mt-1 text-xs opacity-80">Refused - no grounding in the graph</div>}
+                {!isUser && !m.isError && m.message_id && (
+                  <div className="mt-2 flex gap-1 items-center">
+                    <button onClick={() => sendFeedback(m.message_id, 'approve')} className="px-2 py-0.5 text-[11px] rounded bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200">👍 Approve</button>
+                    <button onClick={() => sendFeedback(m.message_id, 'reject')} className="px-2 py-0.5 text-[11px] rounded bg-red-100 text-red-700 border border-red-200 hover:bg-red-200">👎 Reject</button>
+                    {m.needs_review && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">Pending Review</span>}
+                  </div>
+                )}
               </div>
               {isUser && <div className="h-8 w-8 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center text-xs font-medium shrink-0">You</div>}
             </div>
@@ -91,8 +127,36 @@ export default function ChatPanel({ estateId }) {
         )}
       </div>
 
+      {reviews.length > 0 && (
+        <div className="px-4 sm:px-6 py-2 border-t border-gray-100 dark:border-gray-800 bg-amber-50/50 dark:bg-amber-900/10">
+          <div className="text-[11px] font-medium text-amber-800 dark:text-amber-200">Human review queue ({reviews.filter((r) => r.status === 'pending').length} pending)</div>
+          <div className="mt-1 space-y-1 max-h-24 overflow-y-auto">
+            {reviews.slice(0, 5).map((r) => (
+              <div key={r.id} className="text-[11px] text-gray-600 dark:text-gray-300 flex gap-2 items-center">
+                <span className={`px-1.5 py-0.5 rounded ${r.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{r.status}</span>
+                <span className="truncate">msg {r.message_id}: {(r.question || '').slice(0, 60)}{r.decision ? ` → ${r.decision}` : ''}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Composer */}
       <div className="px-4 sm:px-6 py-4 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 space-y-3">
+        <div className="flex items-center gap-2">
+          <input value={reviewer} onChange={(e) => setReviewer(e.target.value)} placeholder="Reviewer name (for feedback)" className="px-2 py-1 border rounded text-xs dark:bg-gray-800 dark:border-gray-700 w-48" />
+          <span className="text-[11px] text-gray-400">Tip: ask something “uncertain …” with HITL on to trigger review</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+            <input type="checkbox" checked={humanLoop} onChange={(e) => setHumanLoop(e.target.checked)} className="rounded border-gray-300" />
+            Augmented by Human Expertise (human-in-the-loop)
+          </label>
+          <div className="flex gap-1">
+            <button onClick={() => ask(question, 'Explain')} disabled={loading || !question.trim()} className="px-2 py-1 text-xs rounded bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800 hover:bg-violet-200 disabled:opacity-40">Explain</button>
+            <button onClick={() => ask(question, 'Generate SQL')} disabled={loading || !question.trim()} className="px-2 py-1 text-xs rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-200 disabled:opacity-40">Generate SQL</button>
+          </div>
+        </div>
         <div className="flex items-end gap-2 sm:gap-3">
           <div className="flex-1 relative">
             <input
@@ -114,7 +178,7 @@ export default function ChatPanel({ estateId }) {
             <span className="sm:hidden">↑</span>
           </button>
         </div>
-        <div className="text-[11px] text-center text-gray-400 dark:text-gray-500">Grounded answers only · cites FQNs · refuses when not in graph</div>
+        <div className="text-[11px] text-center text-gray-400 dark:text-gray-500">Grounded answers only · cites FQNs · refuses when not in graph · {humanLoop ? 'low confidence → human review' : 'human-in-the-loop off'}</div>
       </div>
     </div>
   );

@@ -54,6 +54,12 @@
     "complexity": "aggregate"
   },
   {
+    "source": "DW_TELCO.CDR_FACT",
+    "target": "VW_TELCO_CDR_AGG_ADJ_TELCO",
+    "type": "VIEW_DEPENDS",
+    "complexity": "dynamic"
+  },
+  {
     "source": "BSCS_BILLING",
     "target": "PROC_BILLING_ROLLUP",
     "type": "SP_READS"

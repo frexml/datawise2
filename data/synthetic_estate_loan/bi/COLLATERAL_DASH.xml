@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<cognosReport name="COLLATERAL_DASH" description="Net collateral value">
+<query><source table="VW_LOAN_COLLATERAL_NET"/></query>
+</cognosReport>

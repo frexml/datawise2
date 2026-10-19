@@ -1,0 +1,5 @@
+        <?xml version="1.0"?>
+        <Schedule name="JOB_ADW_MART_LOAD" type="Control-M" schedule="05:00" frequency="daily">
+            <DependsOn>ETL_DW_LOAN_TO_ADW_RISK</DependsOn>
+<DependsOn>ETL_DW_LOAN_TO_ADW_BORROWER</DependsOn>
+        </Schedule>

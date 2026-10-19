@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<cognosReport name="ADW_RISK_MART_DASH" description="ADW loan risk mart">
+<query><source table="ADW.loan_risk_mart"/></query>
+</cognosReport>

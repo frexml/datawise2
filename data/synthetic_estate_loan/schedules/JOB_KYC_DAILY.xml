@@ -1,0 +1,5 @@
+        <?xml version="1.0"?>
+        <Schedule name="JOB_KYC_DAILY" type="Control-M" schedule="03:00" frequency="daily">
+            <DependsOn>ETL_KYC_TO_DW</DependsOn>
+<DependsOn>PROC_KYC_CHECK</DependsOn>
+        </Schedule>

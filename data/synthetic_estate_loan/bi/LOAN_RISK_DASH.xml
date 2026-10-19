@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<cognosReport name="LOAN_RISK_DASH" description="Loan risk band by application">
+<query><source table="VW_LOAN_RISK_SUMMARY"/></query>
+</cognosReport>

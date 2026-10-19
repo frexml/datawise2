@@ -1,0 +1,2 @@
+CREATE OR REPLACE VIEW VW_BORROWER_DTI AS
+SELECT lac.loanApplicationContactId, SUM(lal.monthlyPaymentAmount) AS TOTAL_MONTHLY_DEBT, emp.employmentWorkMonths FROM DW_LOAN.loanapplicationcontact lac JOIN DW_LOAN.loanapplicationcontactliability lcal ON lac.loanApplicationContactId = lcal.loanApplicationContactId JOIN DW_LOAN.loanapplicationliability lal ON lcal.loanApplicationLiabilityId = lal.loanApplicationLiabilityId JOIN DW_LOAN.employment emp ON lac.loanApplicationContactId = emp.loanApplicationContactId GROUP BY lac.loanApplicationContactId, emp.employmentWorkMonths;

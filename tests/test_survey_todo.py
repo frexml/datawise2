@@ -42,7 +42,7 @@ def test_survey_todo_telecom():
     r = client.post('/api/estates', json={'name':'TELCO_SURVEY','display_name':'Telco Survey','source_type':'synthetic','estate_type':'telecom'})
     assert r.status_code == 200
     assert r.json()['estate_type'] == 'telecom'
-    assert r.json()['node_count'] == 35  # telco is smaller
+    assert r.json()['node_count'] == 36  # telco is smaller (35 + VW_TELCO_CDR_AGG_ADJ_TELCO)
     tid = r.json()['id']
     r = client.get(f'/api/estates/{tid}/survey/todo')
     todo = r.json()['todo']
@@ -89,8 +89,8 @@ def test_multi_estate_allowance():
     r2 = client.post('/api/estates', json={'name':'TELCO_M1','display_name':'Telco M1','source_type':'synthetic','estate_type':'telecom'})
     assert r1.json()['estate_type'] == 'banking'
     assert r2.json()['estate_type'] == 'telecom'
-    assert r1.json()['node_count'] == 126
-    assert r2.json()['node_count'] == 35
+    assert r1.json()['node_count'] == 127
+    assert r2.json()['node_count'] == 36
     # List should contain both with correct types
     r = client.get('/api/estates')
     names = {e['name']: e['estate_type'] for e in r.json()}
@@ -102,8 +102,8 @@ def test_multi_estate_allowance():
     r_bank = client.get(f"/api/estates/{id_bank}/analytics")
     r_telco = client.get(f"/api/estates/{id_telco}/analytics")
     counts = {r_bank.json()['total_nodes'], r_telco.json()['total_nodes']}
-    assert 126 in counts
-    assert 35 in counts
+    assert 127 in counts
+    assert 36 in counts
 
 def test_connection_failure_mock():
     client, _ = _client()

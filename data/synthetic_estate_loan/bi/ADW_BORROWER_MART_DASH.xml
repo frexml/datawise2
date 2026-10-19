@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<cognosReport name="ADW_BORROWER_MART_DASH" description="ADW borrower mart">
+<query><source table="ADW.borrower_mart"/></query>
+</cognosReport>

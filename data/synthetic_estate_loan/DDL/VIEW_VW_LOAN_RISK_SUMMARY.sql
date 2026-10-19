@@ -1,0 +1,2 @@
+CREATE OR REPLACE VIEW VW_LOAN_RISK_SUMMARY AS
+SELECT la.loanApplicationId, la.principalAmount, la.interestRate, CASE WHEN cc.score > 700 THEN 'LOW' WHEN cc.score > 600 THEN 'MEDIUM' ELSE 'HIGH' END AS RISK_BAND, lc.isPrimaryBorrower FROM DW_LOAN.loanapplication la JOIN DW_LOAN.loanapplicationcontact lc ON la.loanApplicationId = lc.loanApplicationId JOIN DW_LOAN.creditcheck cc ON lc.creditCheckId = cc.creditCheckId;

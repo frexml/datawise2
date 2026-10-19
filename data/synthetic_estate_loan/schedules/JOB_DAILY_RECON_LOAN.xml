@@ -1,0 +1,5 @@
+        <?xml version="1.0"?>
+        <Schedule name="JOB_DAILY_RECON_LOAN" type="Control-M" schedule="04:00" frequency="daily">
+            <DependsOn>PROC_BORROWER_DTI_CALC</DependsOn>
+<DependsOn>PROC_LOAN_APPROVAL</DependsOn>
+        </Schedule>

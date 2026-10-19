@@ -16,12 +16,23 @@ export default function BridgePanel({ estateId }) {
   const [artifacts, setArtifacts] = useState({});
   const [artifactLoading, setArtifactLoading] = useState(null);
 
+  const TARGETS = [
+    { key: 'snowflake', label: 'Snowflake (SnowConvert)' },
+    { key: 'databricks', label: 'Databricks (Lakebridge)' },
+    { key: 'aws', label: 'AWS (Transform / Glue)' },
+    { key: 'microsoft', label: 'Microsoft (Fabric / Azure)' },
+    { key: 'other', label: 'Other (Custom)' },
+  ];
+  const [target, setTarget] = useState('snowflake');
+  const [migrationRec, setMigrationRec] = useState(null);
+
   const refreshPlans = useCallback(async () => { try { const r = await axios.get(`/api/estates/${estateId}/bridge/plans`); setPlans(r.data); } catch (e) {} }, [estateId]);
   useEffect(() => { refreshPlans(); }, [refreshPlans]);
   useEffect(() => { if (user) { setApprover(user.name); setEmail(user.email); } }, [user]);
 
-  const recommend = async () => { setError(null); try { const r = await axios.post(`/api/estates/${estateId}/bridge/recommend`); setRec(r.data); } catch (e) { setError(e.response?.data?.detail || e.message); } };
-  const createPlan = async () => { setError(null); try { await axios.post(`/api/estates/${estateId}/bridge/plan`, { name: 'Snowflake Wedge - Finance Mart', target_platform: 'snowflake' }); await refreshPlans(); } catch (e) { setError(e.response?.data?.detail || e.message); } };
+  const recommend = async () => { setError(null); try { const r = await axios.post(`/api/estates/${estateId}/bridge/recommend`, { target }); setRec(r.data); } catch (e) { setError(e.response?.data?.detail || e.message); } };
+  const recommendMigration = async () => { setError(null); try { const r = await axios.post(`/api/estates/${estateId}/migration/recommend`, { target }); setMigrationRec(r.data); } catch (e) { setError(e.response?.data?.detail || e.message); } };
+  const createPlan = async () => { setError(null); try { await axios.post(`/api/estates/${estateId}/bridge/plan`, { name: `${target} Wedge - Finance Mart`, target_platform: target }); await refreshPlans(); } catch (e) { setError(e.response?.data?.detail || e.message); } };
   const approve = async (planId) => {
     setError(null);
     if (!approver.trim() || approver.trim().length < 2) { setError('Approver name required (≥2 chars)'); return; }
@@ -68,10 +79,17 @@ export default function BridgePanel({ estateId }) {
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border">
-        <h4 className="font-medium text-sm">1. Recommend Wedge -> Snowflake</h4>
-        <p className="text-xs text-gray-500">Per-attribute Oracle->Snowflake mapping + Terraform per-FQN. Finance mart is lowest-risk.</p>
-        <button onClick={recommend} className="mt-2 px-3 py-1.5 bg-indigo-600 text-white rounded text-sm">Recommend</button>
+        <h4 className="font-medium text-sm">1. Recommend Wedge (5 targets, recommend-only)</h4>
+        <p className="text-xs text-gray-500">Per-attribute mapping + Terraform per-FQN. Finance mart is lowest-risk. Recommendation only — not execution.</p>
+        <div className="flex gap-2 mt-2 flex-wrap items-center">
+          <select value={target} onChange={(e) => setTarget(e.target.value)} className="px-2 py-1.5 border rounded text-sm dark:bg-gray-900 dark:border-gray-700">
+            {TARGETS.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+          </select>
+          <button onClick={recommend} className="px-3 py-1.5 bg-indigo-600 text-white rounded text-sm">Recommend</button>
+          <button onClick={recommendMigration} className="px-3 py-1.5 bg-white border rounded text-sm hover:bg-gray-50">Migration pattern</button>
+        </div>
         {rec && <div className="mt-2 text-xs bg-gray-50 dark:bg-gray-900 p-3 rounded"><div>Target: {rec.target_platform} · {rec.scope_fqns?.length} objects · {rec.estimated_days} days · risk {rec.risk_level}</div><div className="mt-1 prose dark:prose-invert prose-xs max-w-none"><ReactMarkdown>{rec.rationale}</ReactMarkdown></div></div>}
+        {migrationRec && <div className="mt-2 text-xs bg-gray-50 dark:bg-gray-900 p-3 rounded"><div>Pattern: {migrationRec.pattern} · target {migrationRec.target} · alternatives: {(migrationRec.alternatives || []).join(', ')}</div><div className="mt-1 text-gray-500">{migrationRec.note} · evidence: {migrationRec.evidence?.nodes} nodes, {migrationRec.evidence?.unresolved} unresolved, hops {migrationRec.evidence?.hops}</div></div>}
       </div>
       <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border">
         <h4 className="font-medium text-sm">2. Create & Approve Plan (IdP-verified)</h4>

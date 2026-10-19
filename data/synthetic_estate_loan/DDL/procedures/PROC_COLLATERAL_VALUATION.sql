@@ -1,0 +1,14 @@
+-- PROCEDURE: PROC_COLLATERAL_VALUATION
+-- LANGUAGE: PL/SQL
+-- TYPE: transform
+-- READS: DW_LOAN.collateral
+-- WRITES: DW_LOAN.loanapplicationcollateralvaluation
+-- CALLS: NONE
+-- HAS_DYNAMIC: False
+-- HAS_CURSOR: False
+-- COMPLEXITY: medium
+CREATE OR REPLACE PROCEDURE PROC_COLLATERAL_VALUATION AS
+BEGIN
+    INSERT INTO DW_LOAN.loanapplicationcollateralvaluation SELECT * FROM DW_LOAN.collateral;
+END PROC_COLLATERAL_VALUATION;
+/

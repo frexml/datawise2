@@ -1,0 +1,182 @@
+[
+  {
+    "question": "What feeds VW_LOAN_RISK_SUMMARY?",
+    "expected_citations": [
+      "DW_LOAN.loanapplication",
+      "DW_LOAN.creditcheck"
+    ],
+    "anchor": "VW_LOAN_RISK_SUMMARY",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Which columns does PROC_RISK_ASSESSMENT transform?",
+    "expected_citations": [
+      "DW_LOAN.creditcheck.score"
+    ],
+    "anchor": "PROC_RISK_ASSESSMENT",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What is the lineage of loanApplicationId?",
+    "expected_citations": [
+      "DW_LOAN.loanapplication.loanApplicationId"
+    ],
+    "anchor": "loanApplicationId",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "Show Attention Required columns",
+    "expected_citations": [
+      "DW_LOAN.loanapplicationcollateralvaluation.valuation"
+    ],
+    "anchor": "attention",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What feeds DW_LOAN.contact?",
+    "expected_citations": [
+      "RETAIL_CUSTOMER.customer",
+      "ETL_RETAIL_CUSTOMER_TO_DW"
+    ],
+    "anchor": "DW_LOAN.contact",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What feeds ADW.loan_risk_mart?",
+    "expected_citations": [
+      "VW_LOAN_RISK_SUMMARY",
+      "ETL_DW_LOAN_TO_ADW_RISK"
+    ],
+    "anchor": "ADW.loan_risk_mart",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What is downstream of RETAIL_CUSTOMER.customer?",
+    "expected_citations": [
+      "ETL_RETAIL_CUSTOMER_TO_DW",
+      "DW_LOAN.contact"
+    ],
+    "anchor": "RETAIL_CUSTOMER.customer",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What renders ADW.loan_risk_mart?",
+    "expected_citations": [
+      "ADW_RISK_MART_DASH"
+    ],
+    "anchor": "ADW.loan_risk_mart",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What is the CEO's favorite color?",
+    "expected_citations": [],
+    "anchor": "unanswerable",
+    "category": "unanswerable",
+    "answerable": false
+  },
+  {
+    "question": "What is the CEO's favorite color?",
+    "expected_citations": [],
+    "anchor": "unanswerable",
+    "category": "unanswerable",
+    "answerable": false
+  },
+  {
+    "question": "What feeds VW_LOAN_RISK_SUMMARY?",
+    "expected_citations": [
+      "VW_LOAN_RISK_SUMMARY"
+    ],
+    "anchor": "lineage",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What feeds VW_LOAN_COLLATERAL_NET?",
+    "expected_citations": [
+      "VW_LOAN_COLLATERAL_NET"
+    ],
+    "anchor": "lineage",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What feeds VW_BORROWER_DTI?",
+    "expected_citations": [
+      "VW_BORROWER_DTI"
+    ],
+    "anchor": "lineage",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What feeds VW_KYC_PENDING?",
+    "expected_citations": [
+      "VW_KYC_PENDING"
+    ],
+    "anchor": "lineage",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What feeds VW_CREDIT_SCORE_BAND?",
+    "expected_citations": [
+      "VW_CREDIT_SCORE_BAND"
+    ],
+    "anchor": "lineage",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What feeds VW_LOAN_APPLICATION_DETAIL?",
+    "expected_citations": [
+      "VW_LOAN_APPLICATION_DETAIL"
+    ],
+    "anchor": "lineage",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What feeds VW_COLLATERAL_VALUATION_STATUS?",
+    "expected_citations": [
+      "VW_COLLATERAL_VALUATION_STATUS"
+    ],
+    "anchor": "lineage",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What feeds VW_BORROWER_NET_WORTH?",
+    "expected_citations": [
+      "VW_BORROWER_NET_WORTH"
+    ],
+    "anchor": "lineage",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What feeds VW_TELCO_CDR_AGG_ADJ?",
+    "expected_citations": [
+      "VW_TELCO_CDR_AGG_ADJ"
+    ],
+    "anchor": "lineage",
+    "category": "lineage",
+    "answerable": true
+  },
+  {
+    "question": "What feeds VW_LOAN_STATUS_SUMMARY?",
+    "expected_citations": [
+      "VW_LOAN_STATUS_SUMMARY"
+    ],
+    "anchor": "lineage",
+    "category": "lineage",
+    "answerable": true
+  }
+]

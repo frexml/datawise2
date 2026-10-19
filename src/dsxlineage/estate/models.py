@@ -36,7 +36,7 @@ class Estate(Base):
     display_name = Column(String, default="NorthStar Synthetic Estate")
     description = Column(Text, default="On-prem Oracle DW: SAP + Salesforce + Flat Files -> DW -> BI. Synthetic POC.")
     source_type = Column(String, default="synthetic")  # synthetic | catalog_dump | hybrid
-    estate_type = Column(String, default="banking", index=True)  # banking | telecom - for multi-estate allowance
+    estate_type = Column(String, default="banking", index=True)  # banking | telecom | loan_onboarding - for multi-estate allowance
     status = Column(String, default="ACTIVE")  # PENDING | ACTIVE | ARCHIVED - PENDING until survey completes
     # Mock connection for demo - {host, port, user, db_type, status, latency_ms, last_tested_at}
     connection = Column(JsonCol, default=dict)
@@ -146,7 +146,7 @@ class MigrationPlan(Base):
     id = Column(Integer, primary_key=True, index=True)
     estate_id = Column(Integer, ForeignKey("estates.id"), index=True, nullable=False)
     name = Column(String, nullable=False)  # e.g. "Snowflake Wedge - Finance Mart"
-    target_platform = Column(String, default="snowflake")  # snowflake | bigquery | synapse
+    target_platform = Column(String, default="snowflake")  # snowflake | databricks | aws | microsoft | other
     scope_description = Column(Text)
     # scope: list of FQNs included in this wedge
     scope_fqns = Column(JsonCol, default=list)

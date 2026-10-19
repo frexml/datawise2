@@ -43,29 +43,47 @@ export default function ColumnLineageTable({ columnLineage }) {
         <table className="w-full text-xs">
           <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900 text-gray-500">
             <tr>
-              <th className="text-left px-3 py-2">Target</th>
-              <th className="text-left px-3 py-2">Source</th>
+              <th className="text-left px-3 py-2">Target (Schema → Table → Column)</th>
+              <th className="text-left px-3 py-2">Source (Schema → Table → Column)</th>
               <th className="text-left px-3 py-2">What changed</th>
+              <th className="text-left px-3 py-2">Hops</th>
               <th className="text-left px-3 py-2">Confidence</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {filtered.slice(0, 200).map((c, i) => (
-              <tr key={`${c.target_table}.${c.target_column}-${c.source_table}.${c.source_column}-${i}`} className={`hover:bg-gray-50 dark:hover:bg-gray-700/30 ${c.unresolved ? 'bg-red-50/60 dark:bg-red-950/20' : ''}`}>
-                <td className="px-3 py-2 font-mono"><span className="font-medium text-gray-900 dark:text-white">{c.target_table.split('.').pop()}</span>.{c.target_column}</td>
-                <td className="px-3 py-2 font-mono text-gray-600 dark:text-gray-300">{c.unresolved ? <span className="text-gray-400 italic">—</span> : `${c.source_table.split('.').pop()}.${c.source_column}`}</td>
+              <tr key={`${c.target_table}.${c.target_column}-${c.source_table}.${c.source_column}-${i}`} className={`hover:bg-gray-50 dark:hover:bg-gray-700/30 ${c.unresolved ? 'bg-red-50/60 dark:bg-red-950/20' : ''}`} title={c.full_path || `${c.source_table}.${c.source_column} -> ${c.target_table}.${c.target_column} (${c.hops || 1} hops)`}>
+                <td className="px-3 py-2 font-mono">
+                  <div className="font-medium text-gray-900 dark:text-white">{c.target_schema || c.target_table.split('.')[0]} → {c.target_table.split('.').pop()}.{c.target_column}</div>
+                  <div className="text-[10px] text-gray-400">{c.target_table}</div>
+                </td>
+                <td className="px-3 py-2 font-mono text-gray-600 dark:text-gray-300">
+                  {c.unresolved ? (
+                    <span className="inline-flex px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 text-[11px]">Attention Required</span>
+                  ) : (
+                    <div>
+                      <div>{(c.source_schema || c.source_table.split('.')[0])} → {c.source_table.split('.').pop()}.{c.source_column}</div>
+                      <div className="text-[10px] text-gray-400">{c.source_table}</div>
+                    </div>
+                  )}
+                </td>
                 <td className="px-3 py-2">
                   {c.unresolved ? (
-                    <span className="inline-flex px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-[11px] max-w-[320px] truncate" title={c.unresolved_reason}>
-                      unresolved: {c.unresolved_reason}
+                    <span className="inline-flex px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-[11px] max-w-[280px] truncate" title={c.unresolved_reason}>
+                      No clear lineage
                     </span>
                   ) : c.transform_expr ? (
-                    <span className="inline-flex px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 font-mono text-[11px] max-w-[320px] truncate" title={c.transform_expr}>
+                    <span className="inline-flex px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 font-mono text-[11px] max-w-[280px] truncate" title={c.transform_expr}>
                       {c.transform_expr}
                     </span>
                   ) : (
                     <span className="text-gray-400">direct</span>
                   )}
+                </td>
+                <td className="px-3 py-2 text-center">
+                  <span className="inline-flex px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-[11px] font-medium" title={c.full_path || `${c.hops || 1} hops`}>
+                    {c.hops || 1} hops
+                  </span>
                 </td>
                 <td className="px-3 py-2">
                   <span className={`px-1.5 py-0.5 rounded text-[11px] ${c.unresolved ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' : c.confidence >= 0.9 ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'}`}>
@@ -83,7 +101,7 @@ export default function ColumnLineageTable({ columnLineage }) {
         <span className="text-xs text-gray-500">{filtered.length} column lineage rows (of {columnLineage.length})</span>
         <button
           onClick={() => {
-            const csv = ['target_table,target_column,source_table,source_column,transform,confidence', ...filtered.map((c) => `${c.target_table},${c.target_column},${c.source_table},${c.source_column},"${(c.transform_expr || '').replace(/"/g, '""')}",${c.confidence}`)].join('\n');
+            const csv = ['target_schema,target_table,target_column,source_schema,source_table,source_column,transform,hops,full_path,confidence', ...filtered.map((c) => `${c.target_schema || c.target_table.split('.')[0] || ''},${c.target_table},${c.target_column},${c.source_schema || c.source_table.split('.')[0] || ''},${c.source_table},${c.source_column},"${(c.transform_expr || '').replace(/"/g, '""')}",${c.hops || 1},"${(c.full_path || '').replace(/"/g, '""')}",${c.confidence}`)].join('\n');
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');

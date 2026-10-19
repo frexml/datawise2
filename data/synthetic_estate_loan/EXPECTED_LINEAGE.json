@@ -1,0 +1,412 @@
+[
+  {
+    "source": "DW_LOAN.LOANAPPLICATION",
+    "target": "VW_LOAN_RISK_SUMMARY",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.LOANAPPLICATIONCONTACT",
+    "target": "VW_LOAN_RISK_SUMMARY",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.CREDITCHECK",
+    "target": "VW_LOAN_RISK_SUMMARY",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.LOANAPPLICATIONCOLLATERAL",
+    "target": "VW_LOAN_COLLATERAL_NET",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.LOANAPPLICATIONCOLLATERALVALUATION",
+    "target": "VW_LOAN_COLLATERAL_NET",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.LOANAPPLICATIONCONTACT",
+    "target": "VW_BORROWER_DTI",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.LOANAPPLICATIONCONTACTLIABILITY",
+    "target": "VW_BORROWER_DTI",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.LOANAPPLICATIONLIABILITY",
+    "target": "VW_BORROWER_DTI",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.EMPLOYMENT",
+    "target": "VW_BORROWER_DTI",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.KYC",
+    "target": "VW_KYC_PENDING",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.CREDITCHECK",
+    "target": "VW_CREDIT_SCORE_BAND",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.LOANAPPLICATION",
+    "target": "VW_LOAN_APPLICATION_DETAIL",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.LOANAPPLICATIONCONTACT",
+    "target": "VW_LOAN_APPLICATION_DETAIL",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.LOANAPPLICATIONCOLLATERALVALUATION",
+    "target": "VW_COLLATERAL_VALUATION_STATUS",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.LOANAPPLICATIONCONTACT",
+    "target": "VW_BORROWER_NET_WORTH",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.LOANAPPLICATIONCONTACTASSET",
+    "target": "VW_BORROWER_NET_WORTH",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.LOANAPPLICATIONASSET",
+    "target": "VW_BORROWER_NET_WORTH",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.LOANAPPLICATIONCONTACTLIABILITY",
+    "target": "VW_BORROWER_NET_WORTH",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.LOANAPPLICATIONLIABILITY",
+    "target": "VW_BORROWER_NET_WORTH",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.LOANAPPLICATIONCOLLATERALVALUATION",
+    "target": "VW_TELCO_CDR_AGG_ADJ",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "DW_LOAN.LOANAPPLICATION",
+    "target": "VW_LOAN_STATUS_SUMMARY",
+    "type": "VIEW_DEPENDS"
+  },
+  {
+    "source": "CREDIT_BUREAU",
+    "target": "PROC_CREDIT_SCORE_INGEST",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_CREDIT_SCORE_INGEST",
+    "target": "DW_LOAN.creditcheck",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "DW_LOAN.contact",
+    "target": "PROC_KYC_CHECK",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_KYC_CHECK",
+    "target": "DW_LOAN.kyc",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "DW_LOAN.creditcheck",
+    "target": "PROC_RISK_ASSESSMENT",
+    "type": "SP_READS"
+  },
+  {
+    "source": "DW_LOAN.employment",
+    "target": "PROC_RISK_ASSESSMENT",
+    "type": "SP_READS"
+  },
+  {
+    "source": "DW_LOAN.loanapplicationcollateralvaluation",
+    "target": "PROC_RISK_ASSESSMENT",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_RISK_ASSESSMENT",
+    "target": "DW_LOAN.loanapplication",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "PROC_RISK_ASSESSMENT",
+    "target": "UNRESOLVED_DYNAMIC",
+    "type": "UNRESOLVED"
+  },
+  {
+    "source": "DW_LOAN.collateral",
+    "target": "PROC_COLLATERAL_VALUATION",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_COLLATERAL_VALUATION",
+    "target": "DW_LOAN.loanapplicationcollateralvaluation",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "DW_LOAN.loanapplicationliability",
+    "target": "PROC_BORROWER_DTI_CALC",
+    "type": "SP_READS"
+  },
+  {
+    "source": "DW_LOAN.employment",
+    "target": "PROC_BORROWER_DTI_CALC",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_BORROWER_DTI_CALC",
+    "target": "DW_LOAN.loanapplicationcontact",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "DW_LOAN.loanapplication",
+    "target": "PROC_LOAN_APPROVAL",
+    "type": "SP_READS"
+  },
+  {
+    "source": "DW_LOAN.kyc",
+    "target": "PROC_LOAN_APPROVAL",
+    "type": "SP_READS"
+  },
+  {
+    "source": "DW_LOAN.creditcheck",
+    "target": "PROC_LOAN_APPROVAL",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_LOAN_APPROVAL",
+    "target": "DW_LOAN.loanapplication",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "DW_LOAN.contact",
+    "target": "PROC_CONTACT_LINK",
+    "type": "SP_READS"
+  },
+  {
+    "source": "PROC_CONTACT_LINK",
+    "target": "DW_LOAN.loanapplicationcontact",
+    "type": "SP_WRITES"
+  },
+  {
+    "source": "STG_LOAN_APPLICATION",
+    "target": "ETL_LOAN_APP_TO_DW",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_LOAN_APP_TO_DW",
+    "target": "DW_LOAN.loanapplication",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "STG_CREDIT_SCORE",
+    "target": "ETL_CREDIT_TO_DW",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_CREDIT_TO_DW",
+    "target": "DW_LOAN.creditcheck",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "STG_COLLATERAL",
+    "target": "ETL_COLLATERAL_TO_DW",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_COLLATERAL_TO_DW",
+    "target": "DW_LOAN.collateral",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "STG_KYC",
+    "target": "ETL_KYC_TO_DW",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_KYC_TO_DW",
+    "target": "DW_LOAN.kyc",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "STG_EMPLOYMENT",
+    "target": "ETL_EMPLOYMENT_TO_DW",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_EMPLOYMENT_TO_DW",
+    "target": "DW_LOAN.employment",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "STG_LIABILITY",
+    "target": "ETL_LIABILITY_TO_DW",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_LIABILITY_TO_DW",
+    "target": "DW_LOAN.loanapplicationliability",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "RETAIL_CUSTOMER.customer",
+    "target": "ETL_RETAIL_CUSTOMER_TO_DW",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_RETAIL_CUSTOMER_TO_DW",
+    "target": "DW_LOAN.contact",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "RETAIL_CUSTOMER.account",
+    "target": "ETL_RETAIL_ACCOUNT_TO_DW",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_RETAIL_ACCOUNT_TO_DW",
+    "target": "DW_LOAN.loanapplicationasset",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "VW_LOAN_RISK_SUMMARY",
+    "target": "ETL_DW_LOAN_TO_ADW_RISK",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_DW_LOAN_TO_ADW_RISK",
+    "target": "ADW.loan_risk_mart",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "VW_BORROWER_NET_WORTH",
+    "target": "ETL_DW_LOAN_TO_ADW_BORROWER",
+    "type": "ETL_READS"
+  },
+  {
+    "source": "ETL_DW_LOAN_TO_ADW_BORROWER",
+    "target": "ADW.borrower_mart",
+    "type": "ETL_WRITES"
+  },
+  {
+    "source": "ETL_RETAIL_CUSTOMER_TO_DW",
+    "target": "JOB_LOAN_ONBOARDING",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "ETL_RETAIL_ACCOUNT_TO_DW",
+    "target": "JOB_LOAN_ONBOARDING",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "ETL_LOAN_APP_TO_DW",
+    "target": "JOB_LOAN_ONBOARDING",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "PROC_CONTACT_LINK",
+    "target": "JOB_LOAN_ONBOARDING",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "PROC_CREDIT_SCORE_INGEST",
+    "target": "JOB_LOAN_ONBOARDING",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "PROC_KYC_CHECK",
+    "target": "JOB_LOAN_ONBOARDING",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "PROC_RISK_ASSESSMENT",
+    "target": "JOB_LOAN_ONBOARDING",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "ETL_COLLATERAL_TO_DW",
+    "target": "JOB_COLLATERAL_VALUATION",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "PROC_COLLATERAL_VALUATION",
+    "target": "JOB_COLLATERAL_VALUATION",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "ETL_KYC_TO_DW",
+    "target": "JOB_KYC_DAILY",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "PROC_KYC_CHECK",
+    "target": "JOB_KYC_DAILY",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "PROC_BORROWER_DTI_CALC",
+    "target": "JOB_DAILY_RECON_LOAN",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "PROC_LOAN_APPROVAL",
+    "target": "JOB_DAILY_RECON_LOAN",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "ETL_DW_LOAN_TO_ADW_RISK",
+    "target": "JOB_ADW_MART_LOAD",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "ETL_DW_LOAN_TO_ADW_BORROWER",
+    "target": "JOB_ADW_MART_LOAD",
+    "type": "SCHEDULE_DEPENDS"
+  },
+  {
+    "source": "VW_LOAN_RISK_SUMMARY",
+    "target": "LOAN_RISK_DASH",
+    "type": "DASHBOARD_RENDERS"
+  },
+  {
+    "source": "VW_KYC_PENDING",
+    "target": "KYC_DASH_LOAN",
+    "type": "DASHBOARD_RENDERS"
+  },
+  {
+    "source": "VW_LOAN_COLLATERAL_NET",
+    "target": "COLLATERAL_DASH",
+    "type": "DASHBOARD_RENDERS"
+  },
+  {
+    "source": "VW_BORROWER_DTI",
+    "target": "DTI_DASH",
+    "type": "DASHBOARD_RENDERS"
+  },
+  {
+    "source": "ADW.loan_risk_mart",
+    "target": "ADW_RISK_MART_DASH",
+    "type": "DASHBOARD_RENDERS"
+  },
+  {
+    "source": "ADW.borrower_mart",
+    "target": "ADW_BORROWER_MART_DASH",
+    "type": "DASHBOARD_RENDERS"
+  }
+]

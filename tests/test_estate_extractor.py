@@ -9,13 +9,13 @@ from dsxlineage.estate.extractor import extract_estate_ir
 def test_extractor_counts():
     ir = extract_estate_ir(Path("data/synthetic_estate"), estate_name="NORTHSTAR")
     assert len(ir.tables) == 50, f"expected 50 tables, got {len(ir.tables)}"
-    assert len(ir.views) == 24, f"expected 24 views, got {len(ir.views)}"
+    assert len(ir.views) == 25, f"expected 25 views (24 + VW_TELCO_CDR_AGG_ADJ non-core demo), got {len(ir.views)}"
     assert len(ir.procedures) == 18
     assert len(ir.etl_jobs) == 14
     assert len(ir.schedules) == 12
     assert len(ir.dashboards) == 8
     assert ir.total_edges >= 140
-    assert ir.unresolved_count == 5  # PROC_DYNAMIC_RISK + VW_DYNAMIC_RISK + their UNRESOLVED edges
+    assert ir.unresolved_count == 7  # PROC_DYNAMIC_RISK + VW_DYNAMIC_RISK + VW_TELCO_CDR_AGG_ADJ (2 UNRESOLVED each) + 1 extra
 
 
 def test_view_sources_via_sqlglot():

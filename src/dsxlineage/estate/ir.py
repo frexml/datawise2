@@ -136,6 +136,11 @@ class ColumnLineage(BaseModel):
     via_edge: str | None = None
     unresolved: bool = False
     unresolved_reason: str | None = None
+    # Schema → Table → Column hierarchy + hops
+    target_schema: str = Field(default="", description="Schema of target_table, e.g. DW")
+    source_schema: str = Field(default="", description="Schema of source_table")
+    hops: int = Field(default=1, description="Number of hops from source to target (1 = direct, 2 = via one intermediate)")
+    full_path: str = Field(default="", description="Full lineage path, e.g. SAP_ECC.SAP_ORDERS.ORDER_ID → DW.FACT_ORDERS.ORDER_ID → VW_ORDER_SUMMARY.ORDER_ID")
 
 
 class ColumnIdentity(BaseModel):

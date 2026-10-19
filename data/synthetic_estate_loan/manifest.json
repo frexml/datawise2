@@ -1,0 +1,18 @@
+{
+  "generated_at": "2026-10-16T14:26:08.390724+00:00",
+  "seed": 42,
+  "today": "2026-10-16",
+  "estate_type": "loan_onboarding",
+  "counts": {
+    "ddl_files": 30,
+    "source_tables": 2,
+    "adw_tables": 2,
+    "procedures": 7,
+    "etl_jobs": 10,
+    "schedules": 5,
+    "dashboards": 6,
+    "csv_samples": 8,
+    "expected_lineage_edges": 82,
+    "chat_bench": 20
+  }
+}

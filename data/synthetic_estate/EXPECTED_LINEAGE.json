@@ -210,6 +210,12 @@
     "complexity": "dynamic"
   },
   {
+    "source": "DW_TELCO.CDR_FACT",
+    "target": "VW_TELCO_CDR_AGG_ADJ",
+    "type": "VIEW_DEPENDS",
+    "complexity": "dynamic"
+  },
+  {
     "source": "DW.ORDER_LINE",
     "target": "VW_ORDER_LINE_DETAIL",
     "type": "VIEW_DEPENDS",
