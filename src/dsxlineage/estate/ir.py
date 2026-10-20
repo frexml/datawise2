@@ -90,15 +90,23 @@ class ProcedureDef(BaseModel):
     complexity: Literal["low", "medium", "high"] = "low"
     # Source text for determinism checks
     source_text: str | None = None
+    unresolved: bool = False
+    unresolved_reason: str | None = None
 
 
 class ETLJobDef(BaseModel):
     fqn: str
-    dialect: Literal["datastage", "ssis", "informatica"] = "datastage"
+    dialect: Literal[
+        "datastage", "ssis", "informatica", "talend", "python", "controlm", "tsql"
+    ] = "datastage"
     source_fqn: str
     target_fqn: str
     schedule: str | None = None
     raw_path: str | None = None
+    source_fqns: list[str] = Field(default_factory=list)
+    target_fqns: list[str] = Field(default_factory=list)
+    tool: str | None = None
+    declared_only: bool = False
 
 
 class ScheduleDef(BaseModel):
@@ -143,6 +151,60 @@ class ColumnLineage(BaseModel):
     full_path: str = Field(default="", description="Full lineage path, e.g. SAP_ECC.SAP_ORDERS.ORDER_ID → DW.FACT_ORDERS.ORDER_ID → VW_ORDER_SUMMARY.ORDER_ID")
 
 
+class UnresolvedRef(BaseModel):
+    """A referenced object that is never defined anywhere in the estate."""
+
+    fqn: str
+    referenced_by: str = Field(description="Object or artifact that references the missing object")
+    reason: str = "referenced but never defined"
+
+
+class RejectFlow(BaseModel):
+    """A REJECT route inside an ETL job that lands rows in an audit/reject table."""
+
+    job_fqn: str
+    target_table: str
+    artifact: str
+    route: str = "REJECT"
+
+
+class RuntimeEvidence(BaseModel):
+    """One job's status from an executed run summary (ground truth per run)."""
+
+    job_fqn: str = Field(description="IR job FQN when matched, else the raw run-summary job name")
+    artifact: str
+    status: str = Field(description="COMPLETED | COMPLETED_WITH_ERRORS | FAILED ...")
+    ran_on: str | None = Field(default=None, description="run_time string from the summary")
+    elapsed_s: float | None = None
+    failed_steps: list[str] = Field(default_factory=list)
+    skipped_steps: list[str] = Field(default_factory=list)
+    mode: str | None = None
+
+
+class RoutineDef(BaseModel):
+    """A non-SQL routine: ML pipeline or model asset referenced by the estate."""
+
+    fqn: str
+    kind: Literal["ml_pipeline", "model_asset"] = "ml_pipeline"
+    language: str = "python"
+    artifact: str = ""
+    description: str = ""
+    reads: list[str] = Field(default_factory=list)
+    writes: list[str] = Field(default_factory=list)
+    features: list[str] = Field(default_factory=list)
+    model_files: list[str] = Field(default_factory=list)
+    unresolved: bool = False
+    unresolved_reason: str | None = None
+
+
+class UnknownAsset(BaseModel):
+    """A snapshot artifact deliberately not parsed (binary, PII fixture, duplicate)."""
+
+    path: str
+    kind: Literal["binary", "pii_fixture", "credential_template", "duplicate", "non_text"]
+    reason: str = ""
+
+
 class ColumnIdentity(BaseModel):
     """Entity-resolution for lineage continuity (hard problem #4)."""
 
@@ -169,7 +231,9 @@ class EstateIR(BaseModel):
     version: str = Field(default="1.0.0")
     estate_name: str = Field(default="NORTHSTAR")
     generated_on: date = Field(default_factory=date.today)
-    source: str = Field(default="synthetic", description="synthetic | catalog_dump | hybrid")
+    source: str = Field(default="synthetic", description="synthetic | catalog_dump | hybrid | git")
+    source_repo: str | None = Field(default=None, description="Origin repository for git-sourced estates")
+    source_commit: str | None = Field(default=None, description="Pinned commit SHA of the vendored snapshot")
 
     systems: list[str] = Field(default_factory=list)
     tables: list[TableDef] = Field(default_factory=list)
@@ -182,6 +246,24 @@ class EstateIR(BaseModel):
     edges: list[LineageEdge] = Field(default_factory=list, description="All graph edges, deduplicated")
     column_lineage: list[ColumnLineage] = Field(default_factory=list)
     column_identities: list[ColumnIdentity] = Field(default_factory=list)
+    unresolved_refs: list[UnresolvedRef] = Field(
+        default_factory=list, description="Referenced-but-undefined objects (attention cases)"
+    )
+    file_status: dict[str, str] = Field(
+        default_factory=dict, description="Artifact path -> parsed | truncated | excluded"
+    )
+    routines: list[RoutineDef] = Field(
+        default_factory=list, description="ML pipelines / model assets (non-SQL routines)"
+    )
+    runtime_evidence: list[RuntimeEvidence] = Field(
+        default_factory=list, description="Job statuses from executed run summaries"
+    )
+    reject_flows: list[RejectFlow] = Field(
+        default_factory=list, description="ETL REJECT routes into audit/reject tables"
+    )
+    unknown_assets: list[UnknownAsset] = Field(
+        default_factory=list, description="Snapshot artifacts recorded but not parsed"
+    )
 
     tolerances: Tolerances = Field(default_factory=Tolerances)
 
@@ -191,7 +273,7 @@ class EstateIR(BaseModel):
     unresolved_count: int = 0
 
     def compute_summaries(self) -> None:
-        self.total_nodes = len(self.tables) + len(self.views) + len(self.procedures) + len(self.etl_jobs) + len(self.schedules) + len(self.dashboards)
+        self.total_nodes = len(self.tables) + len(self.views) + len(self.procedures) + len(self.etl_jobs) + len(self.schedules) + len(self.dashboards) + len(self.routines)
         self.total_edges = len(self.edges)
         self.unresolved_count = sum(1 for e in self.edges if e.unresolved)
 

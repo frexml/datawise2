@@ -1,0 +1,190 @@
+{
+  "source": "azure_sql",
+  "pulled_at": "2026-10-19",
+  "pulled_utc": "2026-10-19T19:14:53.657870+00:00",
+  "server": "datawise.database.windows.net",
+  "database": "Datawise_demo",
+  "table_count": 36,
+  "tables": [
+    {
+      "table_schema": "BI",
+      "table_name": "BI_CUSTOMER_360_DASHBOARD",
+      "row_count": 336
+    },
+    {
+      "table_schema": "BI",
+      "table_name": "BI_CUSTOMER_CHURN_ALERT",
+      "row_count": 547
+    },
+    {
+      "table_schema": "BI",
+      "table_name": "BI_CUSTOMER_REGIONAL_SUMMARY",
+      "row_count": 39
+    },
+    {
+      "table_schema": "DIM",
+      "table_name": "DIM_BRANCH",
+      "row_count": 11
+    },
+    {
+      "table_schema": "DIM",
+      "table_name": "DIM_CUSTOMER",
+      "row_count": 14335
+    },
+    {
+      "table_schema": "DIM",
+      "table_name": "DIM_PRODUCT",
+      "row_count": 6
+    },
+    {
+      "table_schema": "DW_AUDIT",
+      "table_name": "ETL_BATCH_LOG",
+      "row_count": 194
+    },
+    {
+      "table_schema": "FACT",
+      "table_name": "FACT_GL",
+      "row_count": 19506
+    },
+    {
+      "table_schema": "FACT",
+      "table_name": "FACT_LOAN",
+      "row_count": 6502
+    },
+    {
+      "table_schema": "FACT",
+      "table_name": "FACT_PAYMENT",
+      "row_count": 6502
+    },
+    {
+      "table_schema": "FACT",
+      "table_name": "FACT_TRANSACTION",
+      "row_count": 10000
+    },
+    {
+      "table_schema": "LOAN_SRC",
+      "table_name": "BORROWER",
+      "row_count": 10000
+    },
+    {
+      "table_schema": "LOAN_SRC",
+      "table_name": "BRANCH",
+      "row_count": 11
+    },
+    {
+      "table_schema": "LOAN_SRC",
+      "table_name": "COLLATERAL",
+      "row_count": 8359
+    },
+    {
+      "table_schema": "LOAN_SRC",
+      "table_name": "CREDIT_HISTORY",
+      "row_count": 10000
+    },
+    {
+      "table_schema": "LOAN_SRC",
+      "table_name": "LOAN_ACCOUNT",
+      "row_count": 6502
+    },
+    {
+      "table_schema": "LOAN_SRC",
+      "table_name": "LOAN_APPLICATION",
+      "row_count": 10000
+    },
+    {
+      "table_schema": "LOAN_SRC",
+      "table_name": "LOAN_DB_RAW",
+      "row_count": 10000
+    },
+    {
+      "table_schema": "LOAN_SRC",
+      "table_name": "LOAN_PAYMENT",
+      "row_count": 6502
+    },
+    {
+      "table_schema": "LOAN_SRC",
+      "table_name": "LOAN_PRODUCT",
+      "row_count": 6
+    },
+    {
+      "table_schema": "MART",
+      "table_name": "MART_BRANCH_PERFORMANCE",
+      "row_count": 5627
+    },
+    {
+      "table_schema": "MART",
+      "table_name": "MART_CONCENTRATION_RISK",
+      "row_count": 11
+    },
+    {
+      "table_schema": "MART",
+      "table_name": "MART_CUSTOMER_360",
+      "row_count": 14335
+    },
+    {
+      "table_schema": "MART",
+      "table_name": "MART_FINANCE_SUMMARY",
+      "row_count": 3404
+    },
+    {
+      "table_schema": "MART",
+      "table_name": "MART_LOAN_PAYMENT_COMBINED",
+      "row_count": 5627
+    },
+    {
+      "table_schema": "MART",
+      "table_name": "MART_ML_SCORE_SUMMARY",
+      "row_count": 2
+    },
+    {
+      "table_schema": "MART",
+      "table_name": "MART_NPL_WATCHLIST",
+      "row_count": 918
+    },
+    {
+      "table_schema": "MART",
+      "table_name": "MART_SALES_PIPELINE",
+      "row_count": 6502
+    },
+    {
+      "table_schema": "ML",
+      "table_name": "LOAN_APPROVAL_FEATURES",
+      "row_count": 6502
+    },
+    {
+      "table_schema": "ML",
+      "table_name": "MODEL_SCORE_FRAUD",
+      "row_count": 20000
+    },
+    {
+      "table_schema": "ML",
+      "table_name": "MODEL_SCORE_LOAN",
+      "row_count": 13004
+    },
+    {
+      "table_schema": "ML",
+      "table_name": "TRANSACTION_FEATURES",
+      "row_count": 10000
+    },
+    {
+      "table_schema": "RETAIL_SRC",
+      "table_name": "RETAIL_CUSTOMER",
+      "row_count": 4335
+    },
+    {
+      "table_schema": "RETAIL_SRC",
+      "table_name": "RETAIL_DB_RAW",
+      "row_count": 10000
+    },
+    {
+      "table_schema": "RETAIL_SRC",
+      "table_name": "RETAIL_TRANSACTION",
+      "row_count": 10000
+    },
+    {
+      "table_schema": "STAGE",
+      "table_name": "STG_MODEL_PERFORMANCE",
+      "row_count": 2
+    }
+  ]
+}

@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE POWERMART SYSTEM "powrmart.dtd">
+<POWERMART CREATION_DATE="01/15/2024 12:00:00" REPOSITORY_VERSION="10.5.3">
+  <REPOSITORY NAME="REPO_DATAWISE" VERSION="10.5.3" CODEPAGE="UTF-8" DATABASETYPE="Microsoft SQL Server">
+    <FOLDER NAME="MART_CUSTOMER_360" OWNER="ETL_ADMIN" SHARED="SHARED"
+            DESCRIPTION="Build MART_CUSTOMER_360 - customer master with loan, transaction and ML score aggregates"
+            PERMISSIONS="rwx---r--" UUID="e5f6a7b8-c9d0-1234-efab-345678901234">
+
+      <!-- SOURCE QUALIFIER: join DIM_CUSTOMER + FACT_LOAN + FACT_TRANSACTION -->
+      <TRANSFORMATION NAME="SQ_CUSTOMER_360" TYPE="Source Qualifier" REUSABLE="NO" OBJECTVERSION="1" VERSIONNUMBER="1">
+        <TABLEATTRIBUTE NAME="Sql Query" VALUE="
+SELECT
+  dc.CustomerSK,
+  dc.CustomerID,
+  dc.FullName,
+  dc.Segment,
+  dc.LoyaltyTier,
+  dc.Region,
+  dc.City,
+  dc.AnnualIncome,
+  dc.CreditScore,
+  dc.CreditBand,
+  dc.KYCStatus,
+  dc.RelationshipScore,
+  dc.ChurnRisk,
+  dc.LifetimeValue,
+  ISNULL(la.TotalLoans, 0)                                           AS TotalLoans,
+  ISNULL(la.TotalLoanAmount, 0)                                      AS TotalLoanAmount,
+  ISNULL(la.TotalOutstanding, 0)                                     AS TotalOutstanding,
+  ISNULL(la.ActiveLoans, 0)                                          AS ActiveLoans,
+  ISNULL(la.NPLCount, 0)                                             AS NPLCount,
+  ISNULL(ta.TotalTransactions, 0)                                    AS TotalTransactions,
+  ISNULL(ta.TotalSpend, 0)                                           AS TotalSpend,
+  ISNULL(ta.AvgTransactionValue, 0)                                  AS AvgTransactionValue,
+  ta.LastTransactionDate,
+  ISNULL(ta.FraudAlerts, 0)                                          AS FraudAlerts,
+  ISNULL(pa.TotalPayments, 0)                                        AS TotalPayments,
+  ISNULL(pa.OnTimePayments, 0)                                       AS OnTimePayments,
+  ISNULL(pa.LatePayments, 0)                                         AS LatePayments,
+  ISNULL(la.MaxDPD, 0)                                               AS MaxDPD,
+  ISNULL(la.TotalRWA, 0)                                             AS TotalRWA,
+  ISNULL(la.TotalExpectedLoss, 0)                                    AS TotalExpectedLoss,
+  CASE WHEN la.TotalLoans > 0 THEN 1 ELSE 0 END                      AS HasLoan,
+  0                                                                  AS HasCurrentAccount,
+  0                                                                  AS HasSavingsAccount,
+  ISNULL(la.CrossSellScore, 50)                                      AS CrossSellScore,
+  ISNULL(la.NextBestProduct, 'Personal Loan')                        AS NextBestProduct,
+  GETDATE()                                                          AS ETL_LOAD_DT
+FROM DIM.DIM_CUSTOMER dc
+LEFT JOIN (
+  SELECT CustomerSK,
+    COUNT(LoanFactSK)                                                AS TotalLoans,
+    SUM(ISNULL(LoanAmount,0))                                        AS TotalLoanAmount,
+    SUM(ISNULL(OutstandingBalance,0))                                AS TotalOutstanding,
+    SUM(CASE WHEN AccountStatus='Active' THEN 1 ELSE 0 END)          AS ActiveLoans,
+    SUM(ISNULL(IsNPL,0))                                             AS NPLCount,
+    MAX(ISNULL(DaysPastDue,0))                                       AS MaxDPD,
+    SUM(ISNULL(RWA,0))                                               AS TotalRWA,
+    SUM(ISNULL(ExpectedLoss,0))                                      AS TotalExpectedLoss,
+    CAST(AVG(ISNULL(ML_ApprovalScore,0.5)) * 100 AS INT)             AS CrossSellScore,
+    'Personal Loan'                                                  AS NextBestProduct
+  FROM FACT.FACT_LOAN
+  GROUP BY CustomerSK
+) la ON la.CustomerSK = dc.CustomerSK
+LEFT JOIN (
+  SELECT CustomerSK,
+    COUNT(TransactionSK)                                             AS TotalTransactions,
+    SUM(ISNULL(Amount,0))                                            AS TotalSpend,
+    AVG(ISNULL(Amount,0))                                            AS AvgTransactionValue,
+    MAX(CAST(CONVERT(VARCHAR(8),TransactionDateSK) AS DATE))         AS LastTransactionDate,
+    SUM(CASE WHEN FraudFlag='Y' THEN 1 ELSE 0 END)                   AS FraudAlerts
+  FROM FACT.FACT_TRANSACTION
+  GROUP BY CustomerSK
+) ta ON ta.CustomerSK = dc.CustomerSK
+LEFT JOIN (
+  SELECT CustomerSK,
+    COUNT(PaymentSK)                                                 AS TotalPayments,
+    SUM(CASE WHEN ISNULL(IsLate,0)=0 THEN 1 ELSE 0 END)             AS OnTimePayments,
+    SUM(CASE WHEN ISNULL(IsLate,0)=1 THEN 1 ELSE 0 END)             AS LatePayments,
+    CAST(SUM(CASE WHEN ISNULL(IsLate,0)=0 THEN 1.0 ELSE 0 END)
+         / NULLIF(COUNT(PaymentSK),0) AS FLOAT)                      AS PaymentReliabilityScore
+  FROM FACT.FACT_PAYMENT
+  GROUP BY CustomerSK
+) pa ON pa.CustomerSK = dc.CustomerSK
+WHERE dc.IsCurrent = 1"/>
+        <TABLEATTRIBUTE NAME="Source Filter" VALUE=""/>
+      </TRANSFORMATION>
+
+      <!-- TARGET: MART.MART_CUSTOMER_360 -->
+      <TARGET BUSINESSNAME="" DATABASETYPE="Microsoft SQL Server" DBDNAME="Datawise_demo"
+              NAME="TGT_MART_CUSTOMER_360" OBJECTVERSION="1" OWNERNAME="MART"
+              TABLEOPTIONS="TRUNCATE_INSERT" VERSIONNUMBER="1"
+              DESCRIPTION="Customer 360 mart - read by DataStage BI_CUSTOMER_360_BUILD">
+        <TARGETFIELD FIELDNUMBER="1"  NAME="CustomerSK"          DATATYPE="integer"  KEYTYPE="PRIMARY KEY" NULLABLE="NOTNULL" PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="2"  NAME="CustomerID"          DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NOTNULL" PRECISION="50" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="3"  NAME="FullName"            DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="200" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="4"  NAME="Segment"             DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="50" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="5"  NAME="LoyaltyTier"         DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="30" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="6"  NAME="Region"              DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="100" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="7"  NAME="City"                DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="100" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="8"  NAME="AnnualIncome"        DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="18" SCALE="2"/>
+        <TARGETFIELD FIELDNUMBER="9"  NAME="CreditScore"         DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="5"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="10" NAME="CreditBand"          DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="20" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="11" NAME="KYCStatus"           DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="20" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="12" NAME="RelationshipScore"   DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="5"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="13" NAME="ChurnRisk"           DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="20" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="14" NAME="LifetimeValue"       DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="18" SCALE="2"/>
+        <TARGETFIELD FIELDNUMBER="15" NAME="PreferredChannel"    DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="50" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="16" NAME="ActiveLoanCount"     DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="5"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="17" NAME="TotalLoanAmount"     DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="18" SCALE="2"/>
+        <TARGETFIELD FIELDNUMBER="18" NAME="NPLCount"            DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="5"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="19" NAME="TxnCount"            DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="20" NAME="TotalSpend"          DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="18" SCALE="2"/>
+        <TARGETFIELD FIELDNUMBER="21" NAME="AvgTxnAmount"        DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="18" SCALE="2"/>
+        <TARGETFIELD FIELDNUMBER="22" NAME="FraudAlertCount"     DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="5"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="23" NAME="CrossSellScore"      DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="3"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="24" NAME="AvgApprovalScore"    DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="4"/>
+        <TARGETFIELD FIELDNUMBER="25" NAME="AvgFraudScore"       DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="4"/>
+        <TARGETFIELD FIELDNUMBER="26" NAME="ETL_LOAD_DT"         DATATYPE="date"     KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="19" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="27" NAME="BatchID"             DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="50" SCALE="0"/>
+      </TARGET>
+
+      <!-- EXPRESSION: derive ETL fields -->
+      <TRANSFORMATION NAME="EXP_C360_FIELDS" TYPE="Expression" REUSABLE="NO" OBJECTVERSION="1" VERSIONNUMBER="1">
+        <TRANSFORMFIELD NAME="ETL_LOAD_DT" DATATYPE="date"   PORTTYPE="OUTPUT" PRECISION="19" SCALE="0"
+          EXPRESSION="SYSDATE"/>
+        <TRANSFORMFIELD NAME="BatchID"     DATATYPE="string" PORTTYPE="OUTPUT" PRECISION="50" SCALE="0"
+          EXPRESSION="TO_CHAR(SYSDATE, 'YYYYMMDDHHMMSS')"/>
+      </TRANSFORMATION>
+
+      <!-- MAPPING -->
+      <MAPPING NAME="M_MART_CUSTOMER_360_BUILD" OBJECTVERSION="1" VERSIONNUMBER="1"
+               DESCRIPTION="Build MART_CUSTOMER_360 from DIM_CUSTOMER + FACT_LOAN + FACT_TRANSACTION aggregates">
+        <CONNECTOR FROMFIELD="CustomerSK"        FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CustomerSK"          TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="CustomerID"        FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CustomerID"          TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="FullName"          FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="FullName"            TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="Segment"           FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="Segment"             TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="LoyaltyTier"       FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="LoyaltyTier"         TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="Region"            FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="Region"              TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="City"              FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="City"                TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="AnnualIncome"      FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="AnnualIncome"        TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="CreditScore"       FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CreditScore"         TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="CreditBand"        FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CreditBand"          TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="KYCStatus"         FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="KYCStatus"           TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="RelationshipScore" FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="RelationshipScore"   TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="ChurnRisk"         FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="ChurnRisk"           TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="LifetimeValue"     FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="LifetimeValue"       TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="PreferredChannel"  FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="PreferredChannel"    TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="ActiveLoanCount"   FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="ActiveLoanCount"     TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="TotalLoanAmount"   FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="TotalLoanAmount"     TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="NPLCount"          FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="NPLCount"            TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="TxnCount"          FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="TxnCount"            TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="TotalSpend"        FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="TotalSpend"          TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="AvgTxnAmount"      FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="AvgTxnAmount"        TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="FraudAlertCount"   FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="FraudAlertCount"     TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="CrossSellScore"    FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CrossSellScore"      TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="AvgApprovalScore"  FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="AvgApprovalScore"    TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="AvgFraudScore"     FROMINSTANCE="SQ_CUSTOMER_360"   FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="AvgFraudScore"       TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="ETL_LOAD_DT"       FROMINSTANCE="EXP_C360_FIELDS"   FROMINSTANCETYPE="Expression"
+                   TOFIELD="ETL_LOAD_DT"         TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="BatchID"           FROMINSTANCE="EXP_C360_FIELDS"   FROMINSTANCETYPE="Expression"
+                   TOFIELD="BatchID"             TOINSTANCE="TGT_MART_CUSTOMER_360" TOINSTANCETYPE="Target Definition"/>
+      </MAPPING>
+
+      <!-- WORKFLOW -->
+      <WORKFLOW NAME="WF_MART_CUSTOMER_360_BUILD" OBJECTVERSION="1" VERSIONNUMBER="1"
+                DESCRIPTION="Build MART_CUSTOMER_360 - runs after ML scoring so ML scores are included">
+        <WORKLET NAME="WL_CUSTOMER_360" OBJECTVERSION="1" VERSIONNUMBER="1">
+          <SESSION NAME="S_M_MART_CUSTOMER_360_BUILD" OBJECTVERSION="1" VERSIONNUMBER="1"
+                   MAPPINGNAME="M_MART_CUSTOMER_360_BUILD">
+            <ATTRIBUTE NAME="$Source connection value"  VALUE="Datawise_demo"/>
+            <ATTRIBUTE NAME="$Target connection value"  VALUE="Datawise_demo"/>
+            <ATTRIBUTE NAME="Treat source rows as"      VALUE="Data Driven"/>
+            <ATTRIBUTE NAME="Commit Type"               VALUE="Target"/>
+            <ATTRIBUTE NAME="Commit Interval"           VALUE="5000"/>
+          </SESSION>
+        </WORKLET>
+      </WORKFLOW>
+
+    </FOLDER>
+  </REPOSITORY>
+</POWERMART>

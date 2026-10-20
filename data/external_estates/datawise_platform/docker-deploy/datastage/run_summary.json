@@ -1,0 +1,92 @@
+{
+  "run_time": "2026-10-19 09:30:29",
+  "total_elapsed_s": 58.1,
+  "jobs": [
+    {
+      "job": "MART_TRANSACTION_BUILD",
+      "status": "COMPLETED",
+      "elapsed_s": 6.6,
+      "nodes": 27,
+      "failed": [],
+      "skipped": []
+    },
+    {
+      "job": "MART_CREDIT_RISK_BUILD",
+      "status": "COMPLETED",
+      "elapsed_s": 6.6,
+      "nodes": 25,
+      "failed": [],
+      "skipped": []
+    },
+    {
+      "job": "MART_BRANCH_PERFORMANCE_BUILD",
+      "status": "COMPLETED",
+      "elapsed_s": 6.0,
+      "nodes": 25,
+      "failed": [],
+      "skipped": []
+    },
+    {
+      "job": "FACT_GL_BUILD",
+      "status": "COMPLETED",
+      "elapsed_s": 4.7,
+      "nodes": 25,
+      "failed": [],
+      "skipped": []
+    },
+    {
+      "job": "ML_SCORE_WRITEBACK",
+      "status": "COMPLETED",
+      "elapsed_s": 6.1,
+      "nodes": 23,
+      "failed": [
+        "DQ_CHECK",
+        "AUDIT_END"
+      ],
+      "skipped": [
+        "DQ_CHECK",
+        "AUDIT_END"
+      ]
+    },
+    {
+      "job": "BI_LOAN_APPROVAL_BUILD",
+      "status": "COMPLETED",
+      "elapsed_s": 5.8,
+      "nodes": 23,
+      "failed": [],
+      "skipped": []
+    },
+    {
+      "job": "BI_CUSTOMER_360_BUILD",
+      "status": "COMPLETED",
+      "elapsed_s": 5.6,
+      "nodes": 21,
+      "failed": [],
+      "skipped": []
+    },
+    {
+      "job": "BI_RETAIL_PERFORMANCE_BUILD",
+      "status": "COMPLETED",
+      "elapsed_s": 5.6,
+      "nodes": 22,
+      "failed": [],
+      "skipped": []
+    },
+    {
+      "job": "BI_RISK_COMPLIANCE_BUILD",
+      "status": "COMPLETED",
+      "elapsed_s": 5.6,
+      "nodes": 23,
+      "failed": [],
+      "skipped": []
+    },
+    {
+      "job": "CREATE_VIEWS_AND_PROCEDURES",
+      "status": "COMPLETED",
+      "elapsed_s": 5.2,
+      "nodes": 12,
+      "failed": [],
+      "skipped": []
+    }
+  ]
+}

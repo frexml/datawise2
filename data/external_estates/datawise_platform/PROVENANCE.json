@@ -1,0 +1,52 @@
+{
+  "repo_url": "https://github.com/Kunal-dataengineer/Datawise-Datamodel.git",
+  "commit_sha": "337088fddeb6426e2bea1b6ca703f8833d7e97f8",
+  "snapshot_at": "2026-10-19",
+  "snapshot_utc": "2026-10-19T19:14:17.375717+00:00",
+  "canonical_root": "git_upload_etls",
+  "file_count": 56,
+  "bytes": 904531,
+  "redactions": 22,
+  "header_only": [
+    "data/loan_db/LOAN_DB_TEST.csv",
+    "data/retail_db/RETAIL_DB_TEST.csv"
+  ],
+  "excluded": [
+    {
+      "path": ".env.example",
+      "reason": "row-level PII / credential template"
+    },
+    {
+      "path": "artifacts/ssis",
+      "reason": "duplicate or non-lineage artifact"
+    },
+    {
+      "path": "data/loan_db/LOAN_DB_RAW.csv",
+      "reason": "row-level PII / credential template"
+    },
+    {
+      "path": "data/retail_db/RETAIL_DB_RAW.csv",
+      "reason": "row-level PII / credential template"
+    },
+    {
+      "path": "docker-deploy/datastage/files",
+      "reason": "duplicate or non-lineage artifact"
+    },
+    {
+      "path": "docker-deploy/ddl",
+      "reason": "duplicate or non-lineage artifact"
+    },
+    {
+      "path": "docker-deploy/informatica/files",
+      "reason": "duplicate or non-lineage artifact"
+    },
+    {
+      "path": "git_upload_etls/ssis/DataWise_SSIS.ispac",
+      "reason": "binary artifact"
+    },
+    {
+      "path": "graphical",
+      "reason": "duplicate or non-lineage artifact"
+    }
+  ]
+}

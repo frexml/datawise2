@@ -1,0 +1,103 @@
+services:
+
+  # ============================================================
+  # CONTROL-M API — monitoring + lineage UI (DataWise Platform)
+  # Serves the graphical Control-M UI at http://localhost:8084/ui
+  # ============================================================
+  controlm-api:
+    image: python:3.11-slim
+    container_name: datawise-controlm-api
+    working_dir: /app
+    env_file:
+      - .env
+    volumes:
+      - ./api:/app/api
+      - ./jobs:/app/jobs
+      - ./graphical:/app/graphical
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/app/platform
+    command: >
+      bash -c "pip install -q fastapi uvicorn python-dotenv pydantic requests &&
+               apt-get update -qq && apt-get install -y -qq curl &&
+               curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-27.3.1.tgz | tar xz --strip=1 -C /usr/local/bin docker/docker &&
+               curl -fsSL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose &&
+               chmod +x /usr/local/bin/docker-compose &&
+               uvicorn api.main:app --host 0.0.0.0 --port 8082 --reload"
+    ports:
+      - "8084:8082"
+    restart: unless-stopped
+
+  # ============================================================
+  # STAGE 1 — SSIS: runs on Azure Data Factory (Azure-SSIS IR)
+  # Triggered by controlm_orchestrator.py via ADF REST API
+  # Source: ADLS bronze/loandb/ + bronze/retaildb/
+  # Target: LOAN_SRC.* + RETAIL_SRC.*
+  # ============================================================
+  # (no Docker service — ADF-managed)
+
+  # ============================================================
+  # STAGE 2 + 3 — TALEND: Staging → DIM + FACT loads
+  # Source: LOAN_SRC.* + RETAIL_SRC.*
+  # Target: DIM.* + FACT.FACT_LOAN + FACT.FACT_TRANSACTION + FACT.FACT_PAYMENT
+  # ============================================================
+  datawise-talend-payments:
+    build:
+      context: ./docker-deploy/talend
+      dockerfile: Dockerfile
+    container_name: datawise-talend-payments
+    env_file:
+      - .env
+    restart: "no"
+
+  # ============================================================
+  # STAGE 4 (DataStage) — Facts → Data Marts + GL + BI + ML writeback
+  # Source: FACT.* + DIM.*
+  # Target: MART.* + BI.* + FACT.FACT_GL + ML score writeback
+  # Run single job: docker-compose run datawise-datastage-marts MART_CREDIT_RISK_BUILD
+  # Run all jobs:   docker-compose run datawise-datastage-marts
+  # ============================================================
+  datawise-datastage-marts:
+    build:
+      context: ./docker-deploy/datastage
+      dockerfile: Dockerfile
+    container_name: datawise-datastage-marts
+    env_file:
+      - .env
+    volumes:
+      - c:\Users\jangr\OneDrive\Desktop\Data wise\synthetic_estate\datawise-platform\docker-deploy\datastage\files:/app/files
+    restart: "no"
+
+  # ============================================================
+  # STAGE 4 (Informatica) + STAGE 5 — Feature Engineering + MART builds
+  # Source: FACT.* + DIM.*
+  # Target: MART.MART_CUSTOMER_360 + MART.MART_SALES_PIPELINE
+  #         ML.LOAN_APPROVAL_FEATURES + ML.TRANSACTION_FEATURES
+  # Run single job: docker-compose run datawise-informatica MART_CUSTOMER_360_BUILD
+  # Run all jobs:   docker-compose run datawise-informatica
+  # ============================================================
+  datawise-informatica:
+    build:
+      context: ./docker-deploy
+      dockerfile: informatica/Dockerfile
+    container_name: datawise-informatica
+    env_file:
+      - .env
+    restart: "no"
+
+  # ============================================================
+  # STAGE 6 — ML SCORING: Feature Store → Model Scores
+  # Source: ML.LOAN_APPROVAL_FEATURES + ML.TRANSACTION_FEATURES
+  # Target: ML.MODEL_SCORE_LOAN + ML.MODEL_SCORE_FRAUD
+  # Score both:  docker-compose run datawise-ml
+  # Score loan:  docker-compose run datawise-ml --model loan
+  # Score fraud: docker-compose run datawise-ml --model fraud
+  # Retrain:     docker-compose run datawise-ml --mode train
+  # ============================================================
+  datawise-ml:
+    build:
+      context: ./docker-deploy/ml
+      dockerfile: Dockerfile
+    container_name: datawise-ml
+    env_file:
+      - .env
+    restart: "no"

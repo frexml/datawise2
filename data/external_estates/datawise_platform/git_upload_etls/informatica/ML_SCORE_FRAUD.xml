@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE POWERMART SYSTEM "powrmart.dtd">
+<POWERMART CREATION_DATE="01/15/2024 11:30:00" REPOSITORY_VERSION="10.5.3">
+  <REPOSITORY NAME="REPO_DATAWISE" VERSION="10.5.3" CODEPAGE="UTF-8" DATABASETYPE="Microsoft SQL Server">
+    <FOLDER NAME="ML_FRAUD_SCORING" OWNER="ETL_ADMIN" SHARED="SHARED"
+            DESCRIPTION="Fraud detection ML scoring - reads features, writes scores to MODEL_SCORE_FRAUD"
+            PERMISSIONS="rwx---r--" UUID="d4e5f6a7-b8c9-0123-defa-234567890123">
+
+      <!-- SOURCE: ML.TRANSACTION_FEATURES -->
+      <SOURCE BUSINESSNAME="" DATABASETYPE="Microsoft SQL Server" DBDNAME="Datawise_demo"
+              NAME="SQ_TRANSACTION_FEATURES" OBJECTVERSION="1" OWNERNAME="ML" VERSIONNUMBER="1"
+              DESCRIPTION="Transaction feature store">
+        <SOURCEFIELD FIELDNUMBER="1"  NAME="FeatureID"              DATATYPE="integer"  KEYTYPE="PRIMARY KEY" NULLABLE="NOTNULL" LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="2"  NAME="TransactionSK"          DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NOTNULL" LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="3"  NAME="TransactionID"          DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NOTNULL" LENGTH="50" PRECISION="50" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="4"  NAME="CustomerSK"             DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="5"  NAME="Amount"                 DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="18" PRECISION="18" SCALE="2"/>
+        <SOURCEFIELD FIELDNUMBER="6"  NAME="Channel"                DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="50" PRECISION="50" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="7"  NAME="MerchantCategory"       DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="100" PRECISION="100" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="8"  NAME="FraudFlag"              DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="1"  PRECISION="1"  SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="9"  NAME="FraudScore"             DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="8"  PRECISION="8"  SCALE="4"/>
+        <SOURCEFIELD FIELDNUMBER="10" NAME="CustomerCreditScore"    DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="5"  PRECISION="5"  SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="11" NAME="CustomerChurnRisk"      DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="20" PRECISION="20" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="12" NAME="AmountToIncomeRatio"    DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="8"  PRECISION="8"  SCALE="4"/>
+        <SOURCEFIELD FIELDNUMBER="13" NAME="BalanceChangeRatio"     DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="8"  PRECISION="8"  SCALE="4"/>
+        <SOURCEFIELD FIELDNUMBER="14" NAME="IsUnusualChannel"       DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="1"  PRECISION="1"  SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="15" NAME="FraudLabel"             DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="1"  PRECISION="1"  SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="16" NAME="BatchID"                DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="50" PRECISION="50" SCALE="0"/>
+      </SOURCE>
+
+      <!-- TARGET: ML.MODEL_SCORE_FRAUD -->
+      <TARGET BUSINESSNAME="" DATABASETYPE="Microsoft SQL Server" DBDNAME="Datawise_demo"
+              NAME="TGT_MODEL_SCORE_FRAUD" OBJECTVERSION="1" OWNERNAME="ML"
+              TABLEOPTIONS="TRUNCATE_INSERT" VERSIONNUMBER="1"
+              DESCRIPTION="Fraud detection ML model scores - read by DataStage ML_SCORE_WRITEBACK">
+        <TARGETFIELD FIELDNUMBER="1"  NAME="ScoreID"             DATATYPE="integer"  KEYTYPE="PRIMARY KEY" NULLABLE="NOTNULL" PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="2"  NAME="TransactionID"       DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NOTNULL" PRECISION="50" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="3"  NAME="CustomerSK"          DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="4"  NAME="FraudProbability"    DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="6"/>
+        <TARGETFIELD FIELDNUMBER="5"  NAME="LegitProbability"    DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="6"/>
+        <TARGETFIELD FIELDNUMBER="6"  NAME="ModelDecision"       DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="20" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="7"  NAME="AlertLevel"          DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="20" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="8"  NAME="ModelName"           DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="50" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="9"  NAME="BatchRunID"          DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="50" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="10" NAME="ETL_LOAD_DT"         DATATYPE="date"     KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="19" SCALE="0"/>
+      </TARGET>
+
+      <!-- SOURCE QUALIFIER -->
+      <TRANSFORMATION NAME="SQ_TXN_FEATURES" TYPE="Source Qualifier" REUSABLE="NO" OBJECTVERSION="1" VERSIONNUMBER="1">
+        <TABLEATTRIBUTE NAME="Sql Query" VALUE="
+SELECT FeatureID, TransactionSK, TransactionID, CustomerSK, Amount, Channel,
+  MerchantCategory, FraudFlag, FraudScore, CustomerCreditScore, CustomerChurnRisk,
+  AmountToIncomeRatio, BalanceChangeRatio, IsUnusualChannel, FraudLabel, BatchID
+FROM ML.TRANSACTION_FEATURES
+WHERE FeatureExtractDate = CAST(GETDATE() AS DATE)"/>
+        <TABLEATTRIBUTE NAME="Source Filter" VALUE=""/>
+      </TRANSFORMATION>
+
+      <!-- EXPRESSION: compute fraud probability and decision -->
+      <TRANSFORMATION NAME="EXP_FRAUD_SCORE" TYPE="Expression" REUSABLE="NO" OBJECTVERSION="1" VERSIONNUMBER="1">
+        <TRANSFORMFIELD NAME="FraudProbability"  DATATYPE="decimal" PORTTYPE="OUTPUT" PRECISION="8" SCALE="6"
+          EXPRESSION="(IIF(FraudScore > 0, FraudScore, 0) * 0.4) + (AmountToIncomeRatio * 0.2) + (BalanceChangeRatio * 0.2) + (IsUnusualChannel * 0.2)"/>
+        <TRANSFORMFIELD NAME="LegitProbability"  DATATYPE="decimal" PORTTYPE="OUTPUT" PRECISION="8" SCALE="6"
+          EXPRESSION="1.0 - FraudProbability"/>
+        <TRANSFORMFIELD NAME="ModelDecision"     DATATYPE="string"  PORTTYPE="OUTPUT" PRECISION="20" SCALE="0"
+          EXPRESSION="IIF(FraudProbability >= 0.70, 'FRAUD', IIF(FraudProbability >= 0.40, 'REVIEW', 'LEGIT'))"/>
+        <TRANSFORMFIELD NAME="AlertLevel"        DATATYPE="string"  PORTTYPE="OUTPUT" PRECISION="20" SCALE="0"
+          EXPRESSION="IIF(FraudProbability >= 0.90, 'Critical', IIF(FraudProbability >= 0.70, 'High', IIF(FraudProbability >= 0.40, 'Medium', 'Low')))"/>
+        <TRANSFORMFIELD NAME="ModelName"         DATATYPE="string"  PORTTYPE="OUTPUT" PRECISION="50" SCALE="0"
+          EXPRESSION="'FRAUD_DETECTION_GRADIENT_BOOST_V1'"/>
+        <TRANSFORMFIELD NAME="ETL_LOAD_DT"       DATATYPE="date"    PORTTYPE="OUTPUT" PRECISION="19" SCALE="0"
+          EXPRESSION="SYSDATE"/>
+      </TRANSFORMATION>
+
+      <!-- SEQUENCE GENERATOR -->
+      <TRANSFORMATION NAME="SEQ_SCORE_ID" TYPE="Sequence Generator" REUSABLE="NO" OBJECTVERSION="1" VERSIONNUMBER="1">
+        <TABLEATTRIBUTE NAME="Start Value"   VALUE="1"/>
+        <TABLEATTRIBUTE NAME="Increment By"  VALUE="1"/>
+        <TABLEATTRIBUTE NAME="Reset"         VALUE="NO"/>
+      </TRANSFORMATION>
+
+      <!-- MAPPING -->
+      <MAPPING NAME="M_ML_SCORE_FRAUD" OBJECTVERSION="1" VERSIONNUMBER="1"
+               DESCRIPTION="Score transactions for fraud using engineered features, write to ML.MODEL_SCORE_FRAUD for DataStage writeback">
+        <CONNECTOR FROMFIELD="NEXTVAL"           FROMINSTANCE="SEQ_SCORE_ID"       FROMINSTANCETYPE="Sequence Generator"
+                   TOFIELD="ScoreID"             TOINSTANCE="TGT_MODEL_SCORE_FRAUD" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="TransactionID"     FROMINSTANCE="SQ_TXN_FEATURES"    FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="TransactionID"       TOINSTANCE="TGT_MODEL_SCORE_FRAUD" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="CustomerSK"        FROMINSTANCE="SQ_TXN_FEATURES"    FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CustomerSK"          TOINSTANCE="TGT_MODEL_SCORE_FRAUD" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="BatchID"           FROMINSTANCE="SQ_TXN_FEATURES"    FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="BatchRunID"          TOINSTANCE="TGT_MODEL_SCORE_FRAUD" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="FraudProbability"  FROMINSTANCE="EXP_FRAUD_SCORE"    FROMINSTANCETYPE="Expression"
+                   TOFIELD="FraudProbability"    TOINSTANCE="TGT_MODEL_SCORE_FRAUD" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="LegitProbability"  FROMINSTANCE="EXP_FRAUD_SCORE"    FROMINSTANCETYPE="Expression"
+                   TOFIELD="LegitProbability"    TOINSTANCE="TGT_MODEL_SCORE_FRAUD" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="ModelDecision"     FROMINSTANCE="EXP_FRAUD_SCORE"    FROMINSTANCETYPE="Expression"
+                   TOFIELD="ModelDecision"       TOINSTANCE="TGT_MODEL_SCORE_FRAUD" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="AlertLevel"        FROMINSTANCE="EXP_FRAUD_SCORE"    FROMINSTANCETYPE="Expression"
+                   TOFIELD="AlertLevel"          TOINSTANCE="TGT_MODEL_SCORE_FRAUD" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="ModelName"         FROMINSTANCE="EXP_FRAUD_SCORE"    FROMINSTANCETYPE="Expression"
+                   TOFIELD="ModelName"           TOINSTANCE="TGT_MODEL_SCORE_FRAUD" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="ETL_LOAD_DT"       FROMINSTANCE="EXP_FRAUD_SCORE"    FROMINSTANCETYPE="Expression"
+                   TOFIELD="ETL_LOAD_DT"         TOINSTANCE="TGT_MODEL_SCORE_FRAUD" TOINSTANCETYPE="Target Definition"/>
+      </MAPPING>
+
+      <!-- WORKFLOW -->
+      <WORKFLOW NAME="WF_ML_SCORE_FRAUD" OBJECTVERSION="1" VERSIONNUMBER="1"
+                DESCRIPTION="Fraud detection ML scoring workflow - runs after TRANSACTION_FEATURE_ENGINEERING">
+        <WORKLET NAME="WL_SCORE_FRAUD" OBJECTVERSION="1" VERSIONNUMBER="1">
+          <SESSION NAME="S_M_ML_SCORE_FRAUD" OBJECTVERSION="1" VERSIONNUMBER="1"
+                   MAPPINGNAME="M_ML_SCORE_FRAUD">
+            <ATTRIBUTE NAME="$Source connection value"  VALUE="Datawise_demo"/>
+            <ATTRIBUTE NAME="$Target connection value"  VALUE="Datawise_demo"/>
+            <ATTRIBUTE NAME="Treat source rows as"      VALUE="Data Driven"/>
+            <ATTRIBUTE NAME="Commit Type"               VALUE="Target"/>
+            <ATTRIBUTE NAME="Commit Interval"           VALUE="10000"/>
+          </SESSION>
+        </WORKLET>
+      </WORKFLOW>
+
+    </FOLDER>
+  </REPOSITORY>
+</POWERMART>

@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE POWERMART SYSTEM "powrmart.dtd">
+<POWERMART CREATION_DATE="01/15/2024 11:00:00" REPOSITORY_VERSION="10.5.3">
+  <REPOSITORY NAME="REPO_DATAWISE" VERSION="10.5.3" CODEPAGE="UTF-8" DATABASETYPE="Microsoft SQL Server">
+    <FOLDER NAME="ML_LOAN_SCORING" OWNER="ETL_ADMIN" SHARED="SHARED"
+            DESCRIPTION="Loan approval ML scoring - reads features, writes scores to MODEL_SCORE_LOAN"
+            PERMISSIONS="rwx---r--" UUID="c3d4e5f6-a7b8-9012-cdef-123456789012">
+
+      <!-- SOURCE: ML.LOAN_APPROVAL_FEATURES -->
+      <SOURCE BUSINESSNAME="" DATABASETYPE="Microsoft SQL Server" DBDNAME="Datawise_demo"
+              NAME="SQ_LOAN_APPROVAL_FEATURES" OBJECTVERSION="1" OWNERNAME="ML" VERSIONNUMBER="1"
+              DESCRIPTION="Loan approval feature store">
+        <SOURCEFIELD FIELDNUMBER="1"  NAME="FeatureID"           DATATYPE="integer"  KEYTYPE="PRIMARY KEY" NULLABLE="NOTNULL" LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="2"  NAME="LoanFactSK"          DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NOTNULL" LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="3"  NAME="CustomerSK"          DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="4"  NAME="LoanAmount"          DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="18" PRECISION="18" SCALE="2"/>
+        <SOURCEFIELD FIELDNUMBER="5"  NAME="DTIRatio"            DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="8"  PRECISION="8"  SCALE="4"/>
+        <SOURCEFIELD FIELDNUMBER="6"  NAME="LTVRatio"            DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="8"  PRECISION="8"  SCALE="4"/>
+        <SOURCEFIELD FIELDNUMBER="7"  NAME="PD"                  DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="8"  PRECISION="8"  SCALE="6"/>
+        <SOURCEFIELD FIELDNUMBER="8"  NAME="LGD"                 DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="8"  PRECISION="8"  SCALE="6"/>
+        <SOURCEFIELD FIELDNUMBER="9"  NAME="CreditScore"         DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="5"  PRECISION="5"  SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="10" NAME="AnnualIncome"        DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="18" PRECISION="18" SCALE="2"/>
+        <SOURCEFIELD FIELDNUMBER="11" NAME="YearsEmployed"       DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="5"  PRECISION="5"  SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="12" NAME="IsNPL"               DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="1"  PRECISION="1"  SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="13" NAME="DaysPastDue"         DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="5"  PRECISION="5"  SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="14" NAME="RiskScore"           DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="8"  PRECISION="8"  SCALE="4"/>
+        <SOURCEFIELD FIELDNUMBER="15" NAME="DebtToIncomeRatio"   DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="8"  PRECISION="8"  SCALE="4"/>
+        <SOURCEFIELD FIELDNUMBER="16" NAME="LoanToIncomeRatio"   DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="8"  PRECISION="8"  SCALE="4"/>
+        <SOURCEFIELD FIELDNUMBER="17" NAME="ApprovalLabel"       DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="1"  PRECISION="1"  SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="18" NAME="BatchID"             DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="50" PRECISION="50" SCALE="0"/>
+      </SOURCE>
+
+      <!-- TARGET: ML.MODEL_SCORE_LOAN -->
+      <TARGET BUSINESSNAME="" DATABASETYPE="Microsoft SQL Server" DBDNAME="Datawise_demo"
+              NAME="TGT_MODEL_SCORE_LOAN" OBJECTVERSION="1" OWNERNAME="ML"
+              TABLEOPTIONS="TRUNCATE_INSERT" VERSIONNUMBER="1"
+              DESCRIPTION="Loan approval ML model scores - read by DataStage ML_SCORE_WRITEBACK">
+        <TARGETFIELD FIELDNUMBER="1"  NAME="ScoreID"             DATATYPE="integer"  KEYTYPE="PRIMARY KEY" NULLABLE="NOTNULL" PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="2"  NAME="ApplicationID"       DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NOTNULL" PRECISION="50" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="3"  NAME="CustomerSK"          DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="4"  NAME="ApprovalProbability" DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="6"/>
+        <TARGETFIELD FIELDNUMBER="5"  NAME="DeclineProbability"  DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="6"/>
+        <TARGETFIELD FIELDNUMBER="6"  NAME="ModelDecision"       DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="20" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="7"  NAME="RiskBand"            DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="20" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="8"  NAME="RecommendedRate"     DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="4"/>
+        <TARGETFIELD FIELDNUMBER="9"  NAME="ModelName"           DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="50" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="10" NAME="BatchRunID"          DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="50" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="11" NAME="ETL_LOAD_DT"         DATATYPE="date"     KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="19" SCALE="0"/>
+      </TARGET>
+
+      <!-- SOURCE QUALIFIER -->
+      <TRANSFORMATION NAME="SQ_LOAN_FEATURES" TYPE="Source Qualifier" REUSABLE="NO" OBJECTVERSION="1" VERSIONNUMBER="1">
+        <TABLEATTRIBUTE NAME="Sql Query" VALUE="
+SELECT FeatureID, LoanFactSK, CustomerSK, LoanAmount, DTIRatio, LTVRatio,
+  PD, LGD, CreditScore, AnnualIncome, YearsEmployed, IsNPL, DaysPastDue,
+  RiskScore, DebtToIncomeRatio, LoanToIncomeRatio, ApprovalLabel, BatchID
+FROM ML.LOAN_APPROVAL_FEATURES
+WHERE FeatureExtractDate = CAST(GETDATE() AS DATE)"/>
+        <TABLEATTRIBUTE NAME="Source Filter" VALUE=""/>
+      </TRANSFORMATION>
+
+      <!-- EXPRESSION: compute approval probability and decision -->
+      <TRANSFORMATION NAME="EXP_LOAN_SCORE" TYPE="Expression" REUSABLE="NO" OBJECTVERSION="1" VERSIONNUMBER="1">
+        <TRANSFORMFIELD NAME="ApprovalProbability" DATATYPE="decimal" PORTTYPE="OUTPUT" PRECISION="8" SCALE="6"
+          EXPRESSION="1.0 - (RiskScore * 0.5 + (IIF(DaysPastDue > 90, 0.4, DaysPastDue / 225.0)) * 0.3 + (IIF(CreditScore = 0, 0.2, (850 - CreditScore) / 850.0)) * 0.2)"/>
+        <TRANSFORMFIELD NAME="DeclineProbability"  DATATYPE="decimal" PORTTYPE="OUTPUT" PRECISION="8" SCALE="6"
+          EXPRESSION="1.0 - ApprovalProbability"/>
+        <TRANSFORMFIELD NAME="ModelDecision"       DATATYPE="string"  PORTTYPE="OUTPUT" PRECISION="20" SCALE="0"
+          EXPRESSION="IIF(ApprovalProbability >= 0.65, 'APPROVE', IIF(ApprovalProbability >= 0.45, 'REVIEW', 'DECLINE'))"/>
+        <TRANSFORMFIELD NAME="RiskBand"            DATATYPE="string"  PORTTYPE="OUTPUT" PRECISION="20" SCALE="0"
+          EXPRESSION="IIF(ApprovalProbability >= 0.80, 'LOW', IIF(ApprovalProbability >= 0.60, 'MEDIUM', IIF(ApprovalProbability >= 0.40, 'HIGH', 'VERY_HIGH')))"/>
+        <TRANSFORMFIELD NAME="RecommendedRate"     DATATYPE="decimal" PORTTYPE="OUTPUT" PRECISION="8" SCALE="4"
+          EXPRESSION="IIF(RiskBand = 'LOW', 0.08, IIF(RiskBand = 'MEDIUM', 0.12, IIF(RiskBand = 'HIGH', 0.18, 0.24)))"/>
+        <TRANSFORMFIELD NAME="ModelName"           DATATYPE="string"  PORTTYPE="OUTPUT" PRECISION="50" SCALE="0"
+          EXPRESSION="'LOAN_APPROVAL_LOGISTIC_V1'"/>
+        <TRANSFORMFIELD NAME="ETL_LOAD_DT"         DATATYPE="date"    PORTTYPE="OUTPUT" PRECISION="19" SCALE="0"
+          EXPRESSION="SYSDATE"/>
+      </TRANSFORMATION>
+
+      <!-- SEQUENCE GENERATOR -->
+      <TRANSFORMATION NAME="SEQ_SCORE_ID" TYPE="Sequence Generator" REUSABLE="NO" OBJECTVERSION="1" VERSIONNUMBER="1">
+        <TABLEATTRIBUTE NAME="Start Value"   VALUE="1"/>
+        <TABLEATTRIBUTE NAME="Increment By"  VALUE="1"/>
+        <TABLEATTRIBUTE NAME="Reset"         VALUE="NO"/>
+      </TRANSFORMATION>
+
+      <!-- MAPPING -->
+      <MAPPING NAME="M_ML_SCORE_LOAN" OBJECTVERSION="1" VERSIONNUMBER="1"
+               DESCRIPTION="Score loan applications using engineered features, write to ML.MODEL_SCORE_LOAN for DataStage writeback">
+        <CONNECTOR FROMFIELD="NEXTVAL"             FROMINSTANCE="SEQ_SCORE_ID"      FROMINSTANCETYPE="Sequence Generator"
+                   TOFIELD="ScoreID"               TOINSTANCE="TGT_MODEL_SCORE_LOAN" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="LoanFactSK"          FROMINSTANCE="SQ_LOAN_FEATURES"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="ApplicationID"         TOINSTANCE="TGT_MODEL_SCORE_LOAN" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="CustomerSK"          FROMINSTANCE="SQ_LOAN_FEATURES"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CustomerSK"            TOINSTANCE="TGT_MODEL_SCORE_LOAN" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="BatchID"             FROMINSTANCE="SQ_LOAN_FEATURES"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="BatchRunID"            TOINSTANCE="TGT_MODEL_SCORE_LOAN" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="ApprovalProbability" FROMINSTANCE="EXP_LOAN_SCORE"    FROMINSTANCETYPE="Expression"
+                   TOFIELD="ApprovalProbability"   TOINSTANCE="TGT_MODEL_SCORE_LOAN" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="DeclineProbability"  FROMINSTANCE="EXP_LOAN_SCORE"    FROMINSTANCETYPE="Expression"
+                   TOFIELD="DeclineProbability"    TOINSTANCE="TGT_MODEL_SCORE_LOAN" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="ModelDecision"       FROMINSTANCE="EXP_LOAN_SCORE"    FROMINSTANCETYPE="Expression"
+                   TOFIELD="ModelDecision"         TOINSTANCE="TGT_MODEL_SCORE_LOAN" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="RiskBand"            FROMINSTANCE="EXP_LOAN_SCORE"    FROMINSTANCETYPE="Expression"
+                   TOFIELD="RiskBand"              TOINSTANCE="TGT_MODEL_SCORE_LOAN" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="RecommendedRate"     FROMINSTANCE="EXP_LOAN_SCORE"    FROMINSTANCETYPE="Expression"
+                   TOFIELD="RecommendedRate"       TOINSTANCE="TGT_MODEL_SCORE_LOAN" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="ModelName"           FROMINSTANCE="EXP_LOAN_SCORE"    FROMINSTANCETYPE="Expression"
+                   TOFIELD="ModelName"             TOINSTANCE="TGT_MODEL_SCORE_LOAN" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="ETL_LOAD_DT"         FROMINSTANCE="EXP_LOAN_SCORE"    FROMINSTANCETYPE="Expression"
+                   TOFIELD="ETL_LOAD_DT"           TOINSTANCE="TGT_MODEL_SCORE_LOAN" TOINSTANCETYPE="Target Definition"/>
+      </MAPPING>
+
+      <!-- WORKFLOW -->
+      <WORKFLOW NAME="WF_ML_SCORE_LOAN" OBJECTVERSION="1" VERSIONNUMBER="1"
+                DESCRIPTION="Loan approval ML scoring workflow - runs after LOAN_APPROVAL_FEATURE_ENGINEERING">
+        <WORKLET NAME="WL_SCORE_LOAN" OBJECTVERSION="1" VERSIONNUMBER="1">
+          <SESSION NAME="S_M_ML_SCORE_LOAN" OBJECTVERSION="1" VERSIONNUMBER="1"
+                   MAPPINGNAME="M_ML_SCORE_LOAN">
+            <ATTRIBUTE NAME="$Source connection value"  VALUE="Datawise_demo"/>
+            <ATTRIBUTE NAME="$Target connection value"  VALUE="Datawise_demo"/>
+            <ATTRIBUTE NAME="Treat source rows as"      VALUE="Data Driven"/>
+            <ATTRIBUTE NAME="Commit Type"               VALUE="Target"/>
+            <ATTRIBUTE NAME="Commit Interval"           VALUE="10000"/>
+          </SESSION>
+        </WORKLET>
+      </WORKFLOW>
+
+    </FOLDER>
+  </REPOSITORY>
+</POWERMART>

@@ -1,0 +1,438 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<talendfile:ProcessType xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:talendfile="platform:/resource/org.talend.model/model/TalendFile.xsd" defaultContext="Default" jobType="Standard">
+  <context confirmationNeeded="false" name="Default">
+    <contextParameter comment="" name="db_host" prompt="db_host?" promptNeeded="false" type="id_String" value="datawise.database.windows.net"/>
+    <contextParameter comment="" name="db_port" prompt="db_port?" promptNeeded="false" type="id_String" value="1433"/>
+    <contextParameter comment="" name="db_name" prompt="db_name?" promptNeeded="false" type="id_String" value="Datawise_demo"/>
+    <contextParameter comment="" name="db_user" prompt="db_user?" promptNeeded="false" type="id_String" value="datawise"/>
+    <contextParameter comment="" name="db_password" prompt="db_password?" promptNeeded="false" type="id_Password" value="***REDACTED***"/>
+  </context>
+  <parameters>
+    <elementParameter field="TEXT" name="SCREEN_OFFSET_X" value="0"/>
+    <elementParameter field="TEXT" name="SCREEN_OFFSET_Y" value="0"/>
+    <elementParameter field="TEXT" name="REPOSITORY_CONNECTION_ID" value=""/>
+    <elementParameter field="TEXT" name="OOZIE_PROPERTY_TYPENAME" value=""/>
+    <elementParameter field="TEXT" name="OOZIE_HADOOP_DISTRIBUTION" value=""/>
+    <elementParameter field="TEXT" name="OOZIE_HADOOP_VERSION" value=""/>
+    <elementParameter field="TEXT" name="OOZIE_ENABLE_KERBEROS" value=""/>
+    <elementParameter field="TEXT" name="OOZIE_NAME_NODE_PRINCIPAL" value=""/>
+    <elementParameter field="TEXT" name="OOZIE_USERNAME" value=""/>
+    <elementParameter field="TEXT" name="OOZIE_GROUP" value=""/>
+    <elementParameter field="TEXT" name="OOZIE_USE_KEYTAB" value=""/>
+    <elementParameter field="TEXT" name="OOZIE_KT_PRINCIPAL" value=""/>
+    <elementParameter field="TEXT" name="OOZIE_KEY_TAB" value=""/>
+    <elementParameter field="TEXT" name="OOZIE_ENABLE_OO_KERBEROS" value=""/>
+    <elementParameter field="TEXT" name="OOZIE_NAME_NODE_END_POINT" value=""/>
+    <elementParameter field="TEXT" name="OOZIE_JOB_TRACKER_ENDPOINT" value=""/>
+    <elementParameter field="TEXT" name="OOZIE_END_POINT" value=""/>
+  </parameters>
+  <node componentName="tMSSqlRow" componentVersion="0.102" offsetLabelX="0" offsetLabelY="0" posX="128" posY="64">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMSSqlRow_1_AUDIT_START"/>
+    <elementParameter field="TEXT" name="LABEL" value="AUDIT_START"/>
+    <elementParameter field="TEXT" name="HOST" value="context.db_host"/>
+    <elementParameter field="TEXT" name="PORT" value="context.db_port"/>
+    <elementParameter field="TEXT" name="DBNAME" value="context.db_name"/>
+    <elementParameter field="TEXT" name="SCHEMA_DB" value="&quot;DW_AUDIT&quot;"/>
+    <elementParameter field="TEXT" name="USER" value="context.db_user"/>
+    <elementParameter field="PASSWORD" name="PASS" value="context.db_password"/>
+    <elementParameter field="CHECK" name="USE_EXISTING_CONNECTION" value="false"/>
+    <elementParameter field="COMPONENT_LIST" name="CONNECTION" value=""/>
+    <elementParameter field="CHECK" name="USE_SHARED_CONNECTION" value="false"/>
+    <elementParameter field="TEXT" name="SHARED_CONNECTION_NAME" value=""/>
+    <elementParameter field="CHECK" name="SPECIFY_DATASOURCE_ALIAS" value="false"/>
+    <elementParameter field="TEXT" name="DATASOURCE_ALIAS" value="&quot;&quot;"/>
+    <elementParameter field="CHECK" name="USE_DYNAMIC_JOB" value="false"/>
+    <elementParameter field="TEXT" name="CONTEXT_JOB" value=""/>
+    <elementParameter field="CHECK" name="PROPAGATE_RECORD_SET" value="false"/>
+    <elementParameter field="CHECK" name="DIE_ON_ERROR" value="true"/>
+    <elementParameter field="MEMO_SQL" name="QUERY" value="&quot;INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID, PackageName, StepName, StartTime, Status)&#10;VALUES (&#10;    CONVERT(VARCHAR, GETDATE(), 112) + REPLACE(CONVERT(VARCHAR, GETDATE(), 108), &apos;:&apos;, &apos;&apos;),&#10;    &apos;FACT_PAYMENT_LOAD&apos;,&#10;    &apos;PACKAGE_START&apos;,&#10;    GETDATE(),&#10;    &apos;RUNNING&apos;&#10;)&quot;"/>
+    <elementParameter field="TEXT" name="CONNECTION_FORMAT" value="row"/>
+    <metadata connector="FLOW" name="tMSSqlRow_1_AUDIT_START"/>
+  </node>
+  <node componentName="tMSSqlRow" componentVersion="0.102" offsetLabelX="0" offsetLabelY="0" posX="128" posY="160">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMSSqlRow_2_VALIDATE_SOURCES"/>
+    <elementParameter field="TEXT" name="LABEL" value="VALIDATE_SOURCES"/>
+    <elementParameter field="TEXT" name="HOST" value="context.db_host"/>
+    <elementParameter field="TEXT" name="PORT" value="context.db_port"/>
+    <elementParameter field="TEXT" name="DBNAME" value="context.db_name"/>
+    <elementParameter field="TEXT" name="SCHEMA_DB" value="&quot;DW_AUDIT&quot;"/>
+    <elementParameter field="TEXT" name="USER" value="context.db_user"/>
+    <elementParameter field="PASSWORD" name="PASS" value="context.db_password"/>
+    <elementParameter field="CHECK" name="USE_EXISTING_CONNECTION" value="false"/>
+    <elementParameter field="COMPONENT_LIST" name="CONNECTION" value=""/>
+    <elementParameter field="CHECK" name="USE_SHARED_CONNECTION" value="false"/>
+    <elementParameter field="TEXT" name="SHARED_CONNECTION_NAME" value=""/>
+    <elementParameter field="CHECK" name="SPECIFY_DATASOURCE_ALIAS" value="false"/>
+    <elementParameter field="TEXT" name="DATASOURCE_ALIAS" value="&quot;&quot;"/>
+    <elementParameter field="CHECK" name="USE_DYNAMIC_JOB" value="false"/>
+    <elementParameter field="TEXT" name="CONTEXT_JOB" value=""/>
+    <elementParameter field="CHECK" name="PROPAGATE_RECORD_SET" value="false"/>
+    <elementParameter field="CHECK" name="DIE_ON_ERROR" value="true"/>
+    <elementParameter field="MEMO_SQL" name="QUERY" value="&quot;DECLARE @pc INT, @lc INT;&#10;&#10;SELECT @pc = COUNT(*) FROM LOAN_SRC.LOAN_PAYMENT;&#10;SELECT @lc = COUNT(*) FROM FACT.FACT_LOAN;&#10;&#10;INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID, PackageName, StepName, StartTime, RowsProcessed, Status)&#10;SELECT &#10;    CONVERT(VARCHAR, GETDATE(), 112) + REPLACE(CONVERT(VARCHAR, GETDATE(), 108), &apos;:&apos;, &apos;&apos;),&#10;    &apos;FACT_PAYMENT_LOAD&apos;,&#10;    &apos;VALIDATE_SOURCES&apos;,&#10;    GETDATE(),&#10;    @pc,&#10;    CASE WHEN @pc = 0 THEN &apos;WARN_EMPTY&apos; ELSE &apos;OK&apos; END;&#10;&#10;IF @pc = 0&#10;    RAISERROR(&apos;LOAN_PAYMENT table is empty&apos;, 16, 1);&#10;&#10;IF @lc = 0&#10;    RAISERROR(&apos;FACT_LOAN table is empty&apos;, 16, 1);&quot;"/>
+    <elementParameter field="TEXT" name="CONNECTION_FORMAT" value="row"/>
+    <metadata connector="FLOW" name="tMSSqlRow_2_VALIDATE_SOURCES"/>
+  </node>
+  <node componentName="tMSSqlRow" componentVersion="0.102" offsetLabelX="0" offsetLabelY="0" posX="32" posY="256">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMSSqlRow_3_CREATE_FACT_PAYMENT"/>
+    <elementParameter field="TEXT" name="LABEL" value="CREATE_FACT_PAYMENT"/>
+    <elementParameter field="TEXT" name="HOST" value="context.db_host"/>
+    <elementParameter field="TEXT" name="PORT" value="context.db_port"/>
+    <elementParameter field="TEXT" name="DBNAME" value="context.db_name"/>
+    <elementParameter field="TEXT" name="SCHEMA_DB" value="&quot;FACT&quot;"/>
+    <elementParameter field="TEXT" name="USER" value="context.db_user"/>
+    <elementParameter field="PASSWORD" name="PASS" value="context.db_password"/>
+    <elementParameter field="CHECK" name="USE_EXISTING_CONNECTION" value="false"/>
+    <elementParameter field="COMPONENT_LIST" name="CONNECTION" value=""/>
+    <elementParameter field="CHECK" name="USE_SHARED_CONNECTION" value="false"/>
+    <elementParameter field="TEXT" name="SHARED_CONNECTION_NAME" value=""/>
+    <elementParameter field="CHECK" name="SPECIFY_DATASOURCE_ALIAS" value="false"/>
+    <elementParameter field="TEXT" name="DATASOURCE_ALIAS" value="&quot;&quot;"/>
+    <elementParameter field="CHECK" name="USE_DYNAMIC_JOB" value="false"/>
+    <elementParameter field="TEXT" name="CONTEXT_JOB" value=""/>
+    <elementParameter field="CHECK" name="PROPAGATE_RECORD_SET" value="false"/>
+    <elementParameter field="CHECK" name="DIE_ON_ERROR" value="true"/>
+    <elementParameter field="MEMO_SQL" name="QUERY" value="&quot;IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N&apos;FACT.FACT_PAYMENT&apos;) AND type = N&apos;U&apos;)&#10;BEGIN&#10;    CREATE TABLE FACT.FACT_PAYMENT (&#10;        PaymentSK INT IDENTITY(1,1) PRIMARY KEY,&#10;        PaymentID NVARCHAR(50) NOT NULL,&#10;        AccountID NVARCHAR(50) NOT NULL,&#10;        LoanSK INT NULL,&#10;        CustomerSK INT NULL,&#10;        BranchSK INT NULL,&#10;        ProductSK INT NULL,&#10;        PaymentDateSK INT NULL,&#10;        DueDateSK INT NULL,&#10;        PrincipalAmount DECIMAL(18,2) DEFAULT 0,&#10;        InterestAmount DECIMAL(18,2) DEFAULT 0,&#10;        FeesAmount DECIMAL(18,2) DEFAULT 0,&#10;        PenaltyAmount DECIMAL(18,2) DEFAULT 0,&#10;        TotalAmount DECIMAL(18,2) DEFAULT 0,&#10;        RunningBalance DECIMAL(18,2) DEFAULT 0,&#10;        OutstandingBalanceAfter DECIMAL(18,2) DEFAULT 0,&#10;        DaysPastDue INT DEFAULT 0,&#10;        DaysLate INT DEFAULT 0,&#10;        IsLate BIT DEFAULT 0,&#10;        ArrearsFlag BIT DEFAULT 0,&#10;        ArrearsAmount DECIMAL(18,2) DEFAULT 0,&#10;        ArrearsAgingBucket VARCHAR(20) NULL,&#10;        PaymentMethod NVARCHAR(50) NULL,&#10;        PaymentStatus NVARCHAR(50) NULL,&#10;        PaymentChannel NVARCHAR(50) NULL,&#10;        AllocationStatus NVARCHAR(50) NULL,&#10;        PrincipalAllocation DECIMAL(18,2) DEFAULT 0,&#10;        InterestAllocation DECIMAL(18,2) DEFAULT 0,&#10;        FeesAllocation DECIMAL(18,2) DEFAULT 0,&#10;        CumulativePrincipalPaid DECIMAL(18,2) DEFAULT 0,&#10;        CumulativeInterestPaid DECIMAL(18,2) DEFAULT 0,&#10;        RemainingPrincipal DECIMAL(18,2) DEFAULT 0,&#10;        RemainingTerm INT DEFAULT 0,&#10;        EarlyPaymentFlag BIT DEFAULT 0,&#10;        PartialPaymentFlag BIT DEFAULT 0,&#10;        PaymentEfficiencyRatio DECIMAL(8,4) DEFAULT 0,&#10;        NPLFlag BIT DEFAULT 0,&#10;        WatchListFlag BIT DEFAULT 0,&#10;        ProvisionAmount DECIMAL(18,2) DEFAULT 0,&#10;        ProvisionRate DECIMAL(8,4) DEFAULT 0,&#10;        ECL_Stage INT DEFAULT 1,&#10;        ECL_Amount DECIMAL(18,2) DEFAULT 0,&#10;        GLPostingStatus VARCHAR(20) DEFAULT &apos;PENDING&apos;,&#10;        GLJournalRef NVARCHAR(100) NULL,&#10;        GLPostingDate DATE NULL,&#10;        ReconStatus VARCHAR(20) DEFAULT &apos;UNRECONCILED&apos;,&#10;        ReconVariance DECIMAL(18,2) DEFAULT 0,&#10;        ETL_LOAD_DT DATETIME DEFAULT GETDATE(),&#10;        ETL_SOURCE NVARCHAR(100) DEFAULT &apos;LOAN_SRC.LOAN_PAYMENT&apos;,&#10;        BATCH_ID BIGINT NULL,&#10;        CONSTRAINT UQ_FACT_PAYMENT_ID UNIQUE(PaymentID),&#10;        CONSTRAINT FK_FP_Customer FOREIGN KEY(CustomerSK) REFERENCES DIM.DIM_CUSTOMER(CustomerSK),&#10;        CONSTRAINT FK_FP_Loan FOREIGN KEY(LoanSK) REFERENCES FACT.FACT_LOAN(LoanFactSK),&#10;        &#10;    );&#10;    &#10;    CREATE INDEX IDX_FP_AccountID ON FACT.FACT_PAYMENT(AccountID);&#10;    CREATE INDEX IDX_FP_LoanSK ON FACT.FACT_PAYMENT(LoanSK);&#10;    CREATE INDEX IDX_FP_CustomerSK ON FACT.FACT_PAYMENT(CustomerSK);&#10;    CREATE INDEX IDX_FP_BranchSK ON FACT.FACT_PAYMENT(BranchSK);&#10;    CREATE INDEX IDX_FP_ProductSK ON FACT.FACT_PAYMENT(ProductSK);&#10;    CREATE INDEX IDX_FP_PaymentDateSK ON FACT.FACT_PAYMENT(PaymentDateSK);&#10;    CREATE INDEX IDX_FP_NPLFlag ON FACT.FACT_PAYMENT(NPLFlag);&#10;    CREATE INDEX IDX_FP_ECL_Stage ON FACT.FACT_PAYMENT(ECL_Stage);&#10;    CREATE INDEX IDX_FP_GLPostingStatus ON FACT.FACT_PAYMENT(GLPostingStatus);&#10;    CREATE INDEX IDX_FP_ReconStatus ON FACT.FACT_PAYMENT(ReconStatus);&#10;END&quot;"/>
+    <elementParameter field="TEXT" name="CONNECTION_FORMAT" value="row"/>
+    <metadata connector="FLOW" name="tMSSqlRow_3_CREATE_FACT_PAYMENT"/>
+  </node>
+  <node componentName="tMSSqlRow" componentVersion="0.102" offsetLabelX="0" offsetLabelY="0" posX="256" posY="256">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMSSqlRow_4_CREATE_FACT_GL"/>
+    <elementParameter field="TEXT" name="LABEL" value="CREATE_FACT_GL"/>
+    <elementParameter field="TEXT" name="HOST" value="context.db_host"/>
+    <elementParameter field="TEXT" name="PORT" value="context.db_port"/>
+    <elementParameter field="TEXT" name="DBNAME" value="context.db_name"/>
+    <elementParameter field="TEXT" name="SCHEMA_DB" value="&quot;FACT&quot;"/>
+    <elementParameter field="TEXT" name="USER" value="context.db_user"/>
+    <elementParameter field="PASSWORD" name="PASS" value="context.db_password"/>
+    <elementParameter field="CHECK" name="USE_EXISTING_CONNECTION" value="false"/>
+    <elementParameter field="COMPONENT_LIST" name="CONNECTION" value=""/>
+    <elementParameter field="CHECK" name="USE_SHARED_CONNECTION" value="false"/>
+    <elementParameter field="TEXT" name="SHARED_CONNECTION_NAME" value=""/>
+    <elementParameter field="CHECK" name="SPECIFY_DATASOURCE_ALIAS" value="false"/>
+    <elementParameter field="TEXT" name="DATASOURCE_ALIAS" value="&quot;&quot;"/>
+    <elementParameter field="CHECK" name="USE_DYNAMIC_JOB" value="false"/>
+    <elementParameter field="TEXT" name="CONTEXT_JOB" value=""/>
+    <elementParameter field="CHECK" name="PROPAGATE_RECORD_SET" value="false"/>
+    <elementParameter field="CHECK" name="DIE_ON_ERROR" value="true"/>
+    <elementParameter field="MEMO_SQL" name="QUERY" value="&quot;IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N&apos;FACT.FACT_GL&apos;) AND type = N&apos;U&apos;)&#10;BEGIN&#10;    CREATE TABLE FACT.FACT_GL (&#10;        GLSK INT IDENTITY(1,1) PRIMARY KEY,&#10;        GLJournalRef NVARCHAR(100) NOT NULL,&#10;        TransactionType VARCHAR(50) NOT NULL,&#10;        AccountID NVARCHAR(50) NULL,&#10;        PaymentSK INT NULL,&#10;        LoanSK INT NULL,&#10;        CustomerSK INT NULL,&#10;        GLDate DATE NULL,&#10;        GLPeriod VARCHAR(7) NULL,&#10;        GLYear INT NULL,&#10;        GLMonth INT NULL,&#10;        DebitAccount VARCHAR(30) NULL,&#10;        CreditAccount VARCHAR(30) NULL,&#10;        DebitAmount DECIMAL(18,2) DEFAULT 0,&#10;        CreditAmount DECIMAL(18,2) DEFAULT 0,&#10;        NetAmount DECIMAL(18,2) DEFAULT 0,&#10;        CostCentre VARCHAR(20) NULL,&#10;        ProfitCentre VARCHAR(20) NULL,&#10;        BranchID VARCHAR(20) NULL,&#10;        NIMContribution DECIMAL(18,2) DEFAULT 0,&#10;        RevenueCategory VARCHAR(50) NULL,&#10;        PeriodCloseStatus VARCHAR(20) DEFAULT &apos;PENDING&apos;,&#10;        ReconFlag BIT DEFAULT 0,&#10;        ReconVariance DECIMAL(18,2) DEFAULT 0,&#10;        ETL_LOAD_DT DATETIME DEFAULT GETDATE(),&#10;        ETL_SOURCE NVARCHAR(100) DEFAULT &apos;FACT_PAYMENT_LOAD&apos;,&#10;        BATCH_ID BIGINT NULL,&#10;        CONSTRAINT UQ_FACT_GL UNIQUE(GLJournalRef, TransactionType)&#10;    );&#10;    &#10;    CREATE INDEX IDX_FGL_PaymentSK ON FACT.FACT_GL(PaymentSK);&#10;    CREATE INDEX IDX_FGL_GLDate ON FACT.FACT_GL(GLDate);&#10;    CREATE INDEX IDX_FGL_GLPeriod ON FACT.FACT_GL(GLPeriod);&#10;    CREATE INDEX IDX_FGL_TransactionType ON FACT.FACT_GL(TransactionType);&#10;    CREATE INDEX IDX_FGL_BranchID ON FACT.FACT_GL(BranchID);&#10;    CREATE INDEX IDX_FGL_ReconFlag ON FACT.FACT_GL(ReconFlag);&#10;END&quot;"/>
+    <elementParameter field="TEXT" name="CONNECTION_FORMAT" value="row"/>
+    <metadata connector="FLOW" name="tMSSqlRow_4_CREATE_FACT_GL"/>
+  </node>
+  <node componentName="tMSSqlRow" componentVersion="0.102" offsetLabelX="0" offsetLabelY="0" posX="480" posY="256">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMSSqlRow_5_CREATE_MART_FINANCE"/>
+    <elementParameter field="TEXT" name="LABEL" value="CREATE_MART_FINANCE"/>
+    <elementParameter field="TEXT" name="HOST" value="context.db_host"/>
+    <elementParameter field="TEXT" name="PORT" value="context.db_port"/>
+    <elementParameter field="TEXT" name="DBNAME" value="context.db_name"/>
+    <elementParameter field="TEXT" name="SCHEMA_DB" value="&quot;MART&quot;"/>
+    <elementParameter field="TEXT" name="USER" value="context.db_user"/>
+    <elementParameter field="PASSWORD" name="PASS" value="context.db_password"/>
+    <elementParameter field="CHECK" name="USE_EXISTING_CONNECTION" value="false"/>
+    <elementParameter field="COMPONENT_LIST" name="CONNECTION" value=""/>
+    <elementParameter field="CHECK" name="USE_SHARED_CONNECTION" value="false"/>
+    <elementParameter field="TEXT" name="SHARED_CONNECTION_NAME" value=""/>
+    <elementParameter field="CHECK" name="SPECIFY_DATASOURCE_ALIAS" value="false"/>
+    <elementParameter field="TEXT" name="DATASOURCE_ALIAS" value="&quot;&quot;"/>
+    <elementParameter field="CHECK" name="USE_DYNAMIC_JOB" value="false"/>
+    <elementParameter field="TEXT" name="CONTEXT_JOB" value=""/>
+    <elementParameter field="CHECK" name="PROPAGATE_RECORD_SET" value="false"/>
+    <elementParameter field="CHECK" name="DIE_ON_ERROR" value="true"/>
+    <elementParameter field="MEMO_SQL" name="QUERY" value="&quot;IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = &apos;MART&apos;)&#10;BEGIN&#10;    EXEC(&apos;CREATE SCHEMA MART&apos;);&#10;END&#10;&#10;IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N&apos;MART.MART_FINANCE_SUMMARY&apos;) AND type = N&apos;U&apos;)&#10;BEGIN&#10;    CREATE TABLE MART.MART_FINANCE_SUMMARY (&#10;        SummaryID INT IDENTITY(1,1) PRIMARY KEY,&#10;        ReportDate DATE NOT NULL,&#10;        GLPeriod VARCHAR(7) NOT NULL,&#10;        BranchID VARCHAR(20) NOT NULL,&#10;        ProductID VARCHAR(20) NOT NULL,&#10;        TotalPaymentsReceived INT DEFAULT 0,&#10;        TotalPrincipalCollected DECIMAL(18,2) DEFAULT 0,&#10;        TotalInterestIncome DECIMAL(18,2) DEFAULT 0,&#10;        TotalFeesIncome DECIMAL(18,2) DEFAULT 0,&#10;        TotalPenaltyIncome DECIMAL(18,2) DEFAULT 0,&#10;        TotalRevenue DECIMAL(18,2) DEFAULT 0,&#10;        TotalArrearsAmount DECIMAL(18,2) DEFAULT 0,&#10;        ArrearsRatio DECIMAL(8,4) DEFAULT 0,&#10;        NPLCount INT DEFAULT 0,&#10;        NPLAmount DECIMAL(18,2) DEFAULT 0,&#10;        NPLRatio DECIMAL(8,4) DEFAULT 0,&#10;        ECL_Stage1_Amount DECIMAL(18,2) DEFAULT 0,&#10;        ECL_Stage2_Amount DECIMAL(18,2) DEFAULT 0,&#10;        ECL_Stage3_Amount DECIMAL(18,2) DEFAULT 0,&#10;        TotalProvision DECIMAL(18,2) DEFAULT 0,&#10;        ProvisionCoverageRatio DECIMAL(8,4) DEFAULT 0,&#10;        EarlyPaymentCount INT DEFAULT 0,&#10;        PartialPaymentCount INT DEFAULT 0,&#10;        LatePaymentCount INT DEFAULT 0,&#10;        PaymentEfficiencyAvg DECIMAL(8,4) DEFAULT 0,&#10;        NIM DECIMAL(8,4) DEFAULT 0,&#10;        CostOfRisk DECIMAL(8,4) DEFAULT 0,&#10;        RevenueAtRisk DECIMAL(18,2) DEFAULT 0,&#10;        ETL_LOAD_DT DATETIME DEFAULT GETDATE(),&#10;        ETL_SOURCE VARCHAR(50) DEFAULT &apos;FACT_PAYMENT_LOAD&apos;,&#10;        CONSTRAINT UQ_MART_FINANCE UNIQUE(ReportDate, GLPeriod, BranchID, ProductID)&#10;    );&#10;END&quot;"/>
+    <elementParameter field="TEXT" name="CONNECTION_FORMAT" value="row"/>
+    <metadata connector="FLOW" name="tMSSqlRow_5_CREATE_MART_FINANCE"/>
+  </node>
+  <node componentName="tMSSqlRow" componentVersion="0.102" offsetLabelX="0" offsetLabelY="0" posX="224" posY="320">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMSSqlRow_6_VERIFY_DATATYPES"/>
+    <elementParameter field="TEXT" name="LABEL" value="VERIFY_DATATYPES"/>
+    <elementParameter field="TEXT" name="HOST" value="context.db_host"/>
+    <elementParameter field="TEXT" name="PORT" value="context.db_port"/>
+    <elementParameter field="TEXT" name="DBNAME" value="context.db_name"/>
+    <elementParameter field="TEXT" name="SCHEMA_DB" value="&quot;LOAN_SRC&quot;"/>
+    <elementParameter field="TEXT" name="USER" value="context.db_user"/>
+    <elementParameter field="PASSWORD" name="PASS" value="context.db_password"/>
+    <elementParameter field="CHECK" name="USE_EXISTING_CONNECTION" value="false"/>
+    <elementParameter field="COMPONENT_LIST" name="CONNECTION" value=""/>
+    <elementParameter field="CHECK" name="USE_SHARED_CONNECTION" value="false"/>
+    <elementParameter field="TEXT" name="SHARED_CONNECTION_NAME" value=""/>
+    <elementParameter field="CHECK" name="SPECIFY_DATASOURCE_ALIAS" value="false"/>
+    <elementParameter field="TEXT" name="DATASOURCE_ALIAS" value="&quot;&quot;"/>
+    <elementParameter field="CHECK" name="USE_DYNAMIC_JOB" value="false"/>
+    <elementParameter field="TEXT" name="CONTEXT_JOB" value=""/>
+    <elementParameter field="CHECK" name="PROPAGATE_RECORD_SET" value="false"/>
+    <elementParameter field="CHECK" name="DIE_ON_ERROR" value="true"/>
+    <elementParameter field="MEMO_SQL" name="QUERY" value="-- VERIFY_DATATYPES: check source columns and fix type mismatches before load&#10;-- 1. Ensure PaymentDate and DueDate are valid dates&#10;UPDATE LOAN_SRC.LOAN_PAYMENT SET PaymentDate = NULL WHERE TRY_CAST(PaymentDate AS DATE) IS NULL AND PaymentDate IS NOT NULL;&#10;UPDATE LOAN_SRC.LOAN_PAYMENT SET DueDate = NULL WHERE TRY_CAST(DueDate AS DATE) IS NULL AND DueDate IS NOT NULL;&#10;-- 2. Ensure numeric columns are not overflowing&#10;UPDATE LOAN_SRC.LOAN_PAYMENT SET TotalAmount = 0 WHERE TRY_CAST(TotalAmount AS DECIMAL(18,2)) IS NULL;&#10;UPDATE LOAN_SRC.LOAN_PAYMENT SET PrincipalAmount = 0 WHERE TRY_CAST(PrincipalAmount AS DECIMAL(18,2)) IS NULL;&#10;UPDATE LOAN_SRC.LOAN_PAYMENT SET InterestAmount = 0 WHERE TRY_CAST(InterestAmount AS DECIMAL(18,2)) IS NULL;&#10;UPDATE LOAN_SRC.LOAN_PAYMENT SET FeesAmount = 0 WHERE TRY_CAST(FeesAmount AS DECIMAL(18,2)) IS NULL;&#10;UPDATE LOAN_SRC.LOAN_PAYMENT SET PenaltyAmount = 0 WHERE TRY_CAST(PenaltyAmount AS DECIMAL(18,2)) IS NULL;&#10;UPDATE LOAN_SRC.LOAN_PAYMENT SET RunningBalance = 0 WHERE TRY_CAST(RunningBalance AS DECIMAL(18,2)) IS NULL;&#10;UPDATE LOAN_SRC.LOAN_PAYMENT SET DaysPastDue = 0 WHERE TRY_CAST(DaysPastDue AS INT) IS NULL;&#10;-- 3. Ensure FACT_LOAN numeric columns are safe&#10;UPDATE FACT.FACT_LOAN SET LoanAmount = 0 WHERE LoanAmount IS NULL OR LoanAmount &lt; 0;&#10;UPDATE FACT.FACT_LOAN SET InterestRate = 0 WHERE InterestRate IS NULL OR InterestRate &lt; 0;&#10;UPDATE FACT.FACT_LOAN SET TermMonths = 12 WHERE TermMonths IS NULL OR TermMonths &lt;= 0;&#10;UPDATE FACT.FACT_LOAN SET MonthlyInstalment = 0 WHERE MonthlyInstalment IS NULL;&#10;UPDATE FACT.FACT_LOAN SET LGD = 0.45 WHERE LGD IS NULL OR LGD &lt;= 0;&#10;UPDATE FACT.FACT_LOAN SET OutstandingBalance = 0 WHERE OutstandingBalance IS NULL;&#10;-- 4. Log datatype verification result&#10;INSERT INTO DW_AUDIT.ETL_BATCH_LOG(BatchID,PackageName,StepName,StartTime,RowsProcessed,Status)&#10;SELECT CONVERT(VARCHAR,GETDATE(),112)+REPLACE(CONVERT(VARCHAR,GETDATE(),108),&apos;:&apos;,&apos;&apos;),&#10;&apos;FACT_PAYMENT_LOAD&apos;,&apos;VERIFY_DATATYPES&apos;,GETDATE(),COUNT(*),(CASE WHEN COUNT(*)&gt;0 THEN &apos;OK&apos; ELSE &apos;WARN_EMPTY&apos; END)&#10;FROM LOAN_SRC.LOAN_PAYMENT WHERE PaymentDate IS NOT NULL AND TotalAmount &gt; 0;"/>
+    <elementParameter field="TEXT" name="CONNECTION_FORMAT" value="row"/>
+    <metadata connector="FLOW" name="tMSSqlRow_6_VERIFY_DATATYPES"/>
+  </node>
+  <node componentName="tMSSqlRow" componentVersion="0.102" offsetLabelX="0" offsetLabelY="0" posX="224" posY="368">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMSSqlRow_7_LOAD_FACT_PAYMENT"/>
+    <elementParameter field="TEXT" name="LABEL" value="LOAD_FACT_PAYMENT"/>
+    <elementParameter field="TEXT" name="HOST" value="context.db_host"/>
+    <elementParameter field="TEXT" name="PORT" value="context.db_port"/>
+    <elementParameter field="TEXT" name="DBNAME" value="context.db_name"/>
+    <elementParameter field="TEXT" name="SCHEMA_DB" value="&quot;FACT&quot;"/>
+    <elementParameter field="TEXT" name="USER" value="context.db_user"/>
+    <elementParameter field="PASSWORD" name="PASS" value="context.db_password"/>
+    <elementParameter field="CHECK" name="USE_EXISTING_CONNECTION" value="false"/>
+    <elementParameter field="COMPONENT_LIST" name="CONNECTION" value=""/>
+    <elementParameter field="CHECK" name="USE_SHARED_CONNECTION" value="false"/>
+    <elementParameter field="TEXT" name="SHARED_CONNECTION_NAME" value=""/>
+    <elementParameter field="CHECK" name="SPECIFY_DATASOURCE_ALIAS" value="false"/>
+    <elementParameter field="TEXT" name="DATASOURCE_ALIAS" value="&quot;&quot;"/>
+    <elementParameter field="CHECK" name="USE_DYNAMIC_JOB" value="false"/>
+    <elementParameter field="TEXT" name="CONTEXT_JOB" value=""/>
+    <elementParameter field="CHECK" name="PROPAGATE_RECORD_SET" value="false"/>
+    <elementParameter field="CHECK" name="DIE_ON_ERROR" value="true"/>
+    <elementParameter field="MEMO_SQL" name="QUERY" value="INSERT INTO FACT.FACT_PAYMENT (PaymentID,AccountID,LoanSK,CustomerSK,BranchSK,ProductSK,PaymentDateSK,DueDateSK,PrincipalAmount,InterestAmount,FeesAmount,PenaltyAmount,TotalAmount,RunningBalance,OutstandingBalanceAfter,DaysPastDue,DaysLate,IsLate,ArrearsFlag,ArrearsAmount,ArrearsAgingBucket,PaymentMethod,PaymentStatus,PaymentChannel,AllocationStatus,PrincipalAllocation,InterestAllocation,FeesAllocation,CumulativePrincipalPaid,CumulativeInterestPaid,RemainingPrincipal,RemainingTerm,EarlyPaymentFlag,PartialPaymentFlag,PaymentEfficiencyRatio,NPLFlag,WatchListFlag,ProvisionAmount,ProvisionRate,ECL_Stage,ECL_Amount,GLPostingStatus,GLJournalRef,GLPostingDate,ReconStatus,ReconVariance,ETL_LOAD_DT,ETL_SOURCE,BATCH_ID)&#10;SELECT&#10;p.PaymentID,&#10;p.AccountID,&#10;fl.LoanFactSK,&#10;c.CustomerSK,&#10;b.BranchSK,&#10;pr.ProductSK,&#10;TRY_CAST(CONVERT(VARCHAR,p.PaymentDate,112) AS INT),&#10;TRY_CAST(CONVERT(VARCHAR,p.DueDate,112) AS INT),&#10;CAST(ISNULL(p.PrincipalAmount,0) AS DECIMAL(18,2)),&#10;CAST(ISNULL(p.InterestAmount,0) AS DECIMAL(18,2)),&#10;CAST(ISNULL(p.FeesAmount,0) AS DECIMAL(18,2)),&#10;CAST(ISNULL(p.PenaltyAmount,0) AS DECIMAL(18,2)),&#10;CAST(ISNULL(p.TotalAmount,0) AS DECIMAL(18,2)),&#10;CAST(ISNULL(p.RunningBalance,0) AS DECIMAL(18,2)),&#10;CAST(fl.OutstandingBalance-(p.TotalAmount*(fl.LoanAmount/NULLIF(fl.LoanAmount+fl.InterestRate*fl.LoanAmount*fl.TermMonths/1200.0,0))) AS DECIMAL(18,2)),&#10;CAST(ISNULL(p.DaysPastDue,0) AS INT),&#10;CAST(CASE WHEN p.PaymentDate&gt;p.DueDate THEN DATEDIFF(DAY,p.DueDate,p.PaymentDate) ELSE 0 END AS INT),&#10;CAST(CASE WHEN ISNULL(p.DaysPastDue,0)&gt;0 THEN 1 ELSE 0 END AS BIT),&#10;CAST(CASE WHEN ISNULL(p.DaysPastDue,0)&gt;0 THEN 1 ELSE 0 END AS BIT),&#10;CAST(CASE WHEN ISNULL(p.DaysPastDue,0)&gt;0 THEN ISNULL(p.TotalAmount,0) ELSE 0 END AS DECIMAL(18,2)),&#10;CAST(CASE WHEN ISNULL(p.DaysPastDue,0)=0 THEN &apos;Current&apos; WHEN p.DaysPastDue&lt;=30 THEN &apos;1-30&apos; WHEN p.DaysPastDue&lt;=60 THEN &apos;31-60&apos; WHEN p.DaysPastDue&lt;=90 THEN &apos;61-90&apos; ELSE &apos;90+&apos; END AS VARCHAR(20)),&#10;CAST(p.PaymentMethod AS NVARCHAR(50)),&#10;CAST(p.PaymentStatus AS NVARCHAR(50)),&#10;CAST(p.PaymentMethod AS NVARCHAR(50)),&#10;CAST(&apos;ALLOCATED&apos; AS NVARCHAR(50)),&#10;CAST(p.TotalAmount*(fl.LoanAmount/NULLIF(fl.LoanAmount+fl.InterestRate*fl.LoanAmount*fl.TermMonths/1200.0,0)) AS DECIMAL(18,2)),&#10;CAST(p.TotalAmount-(p.TotalAmount*(fl.LoanAmount/NULLIF(fl.LoanAmount+fl.InterestRate*fl.LoanAmount*fl.TermMonths/1200.0,0)))-ISNULL(p.FeesAmount,0)-ISNULL(p.PenaltyAmount,0) AS DECIMAL(18,2)),&#10;CAST(ISNULL(p.FeesAmount,0) AS DECIMAL(18,2)),&#10;CAST(0 AS DECIMAL(18,2)),&#10;CAST(0 AS DECIMAL(18,2)),&#10;CAST(fl.OutstandingBalance-(p.TotalAmount*(fl.LoanAmount/NULLIF(fl.LoanAmount+fl.InterestRate*fl.LoanAmount*fl.TermMonths/1200.0,0))) AS DECIMAL(18,2)),&#10;CAST(fl.TermMonths AS INT),&#10;CAST(CASE WHEN p.PaymentDate&lt;p.DueDate THEN 1 ELSE 0 END AS BIT),&#10;CAST(CASE WHEN p.TotalAmount&lt;fl.MonthlyInstalment*0.95 THEN 1 ELSE 0 END AS BIT),&#10;CAST(CASE WHEN fl.MonthlyInstalment&gt;0 THEN p.TotalAmount/fl.MonthlyInstalment ELSE 0 END AS DECIMAL(8,4)),&#10;CAST(CASE WHEN ISNULL(p.DaysPastDue,0)&gt;90 THEN 1 ELSE 0 END AS BIT),&#10;CAST(CASE WHEN ISNULL(p.DaysPastDue,0) BETWEEN 30 AND 90 THEN 1 ELSE 0 END AS BIT),&#10;CAST((fl.OutstandingBalance-(p.TotalAmount*(fl.LoanAmount/NULLIF(fl.LoanAmount+fl.InterestRate*fl.LoanAmount*fl.TermMonths/1200.0,0))))*CASE WHEN ISNULL(p.DaysPastDue,0)=0 THEN 0.01 WHEN p.DaysPastDue&lt;=90 THEN 0.20 ELSE 1.00 END AS DECIMAL(18,2)),&#10;CAST(CASE WHEN ISNULL(p.DaysPastDue,0)=0 THEN 0.01 WHEN p.DaysPastDue&lt;=90 THEN 0.20 ELSE 1.00 END AS DECIMAL(8,4)),&#10;CAST(CASE WHEN ISNULL(p.DaysPastDue,0)=0 THEN 1 WHEN p.DaysPastDue&lt;=90 THEN 2 ELSE 3 END AS INT),&#10;CAST((fl.OutstandingBalance-(p.TotalAmount*(fl.LoanAmount/NULLIF(fl.LoanAmount+fl.InterestRate*fl.LoanAmount*fl.TermMonths/1200.0,0))))*CASE WHEN ISNULL(p.DaysPastDue,0)=0 THEN 0.01 WHEN p.DaysPastDue&lt;=90 THEN 0.20 ELSE 1.00 END*ISNULL(fl.LGD,0.45) AS DECIMAL(18,2)),&#10;CAST(&apos;PENDING&apos; AS VARCHAR(20)),&#10;CAST(CONCAT(&apos;GL-&apos;,p.PaymentID,&apos;-&apos;,CONVERT(VARCHAR,GETDATE(),112)) AS NVARCHAR(100)),&#10;CAST(p.PaymentDate AS DATE),&#10;CAST(&apos;UNRECONCILED&apos; AS VARCHAR(20)),&#10;CAST(0 AS DECIMAL(18,2)),&#10;GETDATE(),&#10;CAST(&apos;LOAN_SRC.LOAN_PAYMENT&apos; AS NVARCHAR(100)),&#10;CONVERT(BIGINT,CONVERT(VARCHAR,GETDATE(),112)+REPLACE(CONVERT(VARCHAR,GETDATE(),108),&apos;:&apos;,&apos;&apos;))&#10;FROM LOAN_SRC.LOAN_PAYMENT p&#10;INNER JOIN FACT.FACT_LOAN fl ON p.AccountID=fl.AccountID&#10;INNER JOIN DIM.DIM_CUSTOMER c ON fl.CustomerSK=c.CustomerSK AND c.IsCurrent=1&#10;INNER JOIN DIM.DIM_BRANCH b ON fl.BranchSK=b.BranchSK&#10;INNER JOIN DIM.DIM_PRODUCT pr ON fl.ProductSK=pr.ProductSK&#10;LEFT JOIN DIM.DIM_DATE dd_pay ON dd_pay.DateSK=TRY_CAST(CONVERT(VARCHAR,p.PaymentDate,112) AS INT)&#10;LEFT JOIN DIM.DIM_DATE dd_due ON dd_due.DateSK=TRY_CAST(CONVERT(VARCHAR,p.DueDate,112) AS INT)&#10;WHERE NOT EXISTS (SELECT 1 FROM FACT.FACT_PAYMENT t WHERE t.PaymentID=p.PaymentID);&#10;INSERT INTO DW_AUDIT.ETL_BATCH_LOG(BatchID,PackageName,StepName,StartTime,RowsProcessed,Status)&#10;VALUES(CONVERT(VARCHAR,GETDATE(),112)+REPLACE(CONVERT(VARCHAR,GETDATE(),108),&apos;:&apos;,&apos;&apos;),&apos;FACT_PAYMENT_LOAD&apos;,&apos;LOAD_FACT_PAYMENT&apos;,GETDATE(),@@ROWCOUNT,&apos;OK&apos;);"/>
+    <elementParameter field="TEXT" name="CONNECTION_FORMAT" value="row"/>
+    <metadata connector="FLOW" name="tMSSqlRow_7_LOAD_FACT_PAYMENT"/>
+  </node>
+  <node componentName="tMSSqlRow" componentVersion="0.102" offsetLabelX="0" offsetLabelY="0" posX="224" posY="464">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMSSqlRow_8_LOAD_FACT_GL"/>
+    <elementParameter field="TEXT" name="LABEL" value="LOAD_FACT_GL"/>
+    <elementParameter field="TEXT" name="HOST" value="context.db_host"/>
+    <elementParameter field="TEXT" name="PORT" value="context.db_port"/>
+    <elementParameter field="TEXT" name="DBNAME" value="context.db_name"/>
+    <elementParameter field="TEXT" name="SCHEMA_DB" value="&quot;FACT&quot;"/>
+    <elementParameter field="TEXT" name="USER" value="context.db_user"/>
+    <elementParameter field="PASSWORD" name="PASS" value="context.db_password"/>
+    <elementParameter field="CHECK" name="USE_EXISTING_CONNECTION" value="false"/>
+    <elementParameter field="COMPONENT_LIST" name="CONNECTION" value=""/>
+    <elementParameter field="CHECK" name="USE_SHARED_CONNECTION" value="false"/>
+    <elementParameter field="TEXT" name="SHARED_CONNECTION_NAME" value=""/>
+    <elementParameter field="CHECK" name="SPECIFY_DATASOURCE_ALIAS" value="false"/>
+    <elementParameter field="TEXT" name="DATASOURCE_ALIAS" value="&quot;&quot;"/>
+    <elementParameter field="CHECK" name="USE_DYNAMIC_JOB" value="false"/>
+    <elementParameter field="TEXT" name="CONTEXT_JOB" value=""/>
+    <elementParameter field="CHECK" name="PROPAGATE_RECORD_SET" value="false"/>
+    <elementParameter field="CHECK" name="DIE_ON_ERROR" value="true"/>
+    <elementParameter field="MEMO_SQL" name="QUERY" value="&quot;INSERT INTO FACT.FACT_GL (&#10;    GLJournalRef, TransactionType, AccountID, PaymentSK, LoanSK, CustomerSK,&#10;    GLDate, GLPeriod, GLYear, GLMonth,&#10;    DebitAccount, CreditAccount, DebitAmount, CreditAmount, NetAmount,&#10;    CostCentre, ProfitCentre, BranchID,&#10;    NIMContribution, RevenueCategory,&#10;    PeriodCloseStatus, ReconFlag, ReconVariance,&#10;    ETL_LOAD_DT, ETL_SOURCE, BATCH_ID&#10;)&#10;SELECT &#10;    fp.GLJournalRef,&#10;    gl.TransactionType,&#10;    fp.AccountID,&#10;    fp.PaymentSK,&#10;    fp.LoanSK,&#10;    fp.CustomerSK,&#10;    fp.GLPostingDate,&#10;    FORMAT(fp.GLPostingDate, &apos;yyyy-MM&apos;),&#10;    YEAR(fp.GLPostingDate),&#10;    MONTH(fp.GLPostingDate),&#10;    gl.DebitAccount,&#10;    gl.CreditAccount,&#10;    gl.Amount,&#10;    gl.Amount,&#10;    gl.Amount,&#10;    b.BranchID,&#10;    b.BranchID,&#10;    b.BranchID,&#10;    CASE WHEN gl.TransactionType = &apos;INTEREST_INCOME&apos; THEN gl.Amount ELSE 0 END,&#10;    gl.RevenueCategory,&#10;    &apos;PENDING&apos;,&#10;    0,&#10;    0,&#10;    GETDATE(),&#10;    &apos;FACT_PAYMENT_LOAD&apos;,&#10;    CONVERT(BIGINT, CONVERT(VARCHAR, GETDATE(), 112) + REPLACE(CONVERT(VARCHAR, GETDATE(), 108), &apos;:&apos;, &apos;&apos;))&#10;FROM FACT.FACT_PAYMENT fp&#10;INNER JOIN FACT.FACT_LOAN fl ON fp.LoanSK = fl.LoanFactSK&#10;LEFT JOIN DIM.DIM_BRANCH b ON fp.BranchSK = b.BranchSK&#10;LEFT JOIN DIM.DIM_PRODUCT pr ON fp.ProductSK = pr.ProductSK&#10;CROSS APPLY (&#10;    VALUES&#10;        (&apos;1001-LOANS-RECEIVABLE&apos;, &apos;1002-CASH&apos;, fp.PrincipalAllocation, &apos;PRINCIPAL_REPAYMENT&apos;, &apos;Interest Revenue&apos;),&#10;        (&apos;1002-CASH&apos;, &apos;4001-INTEREST-INCOME&apos;, fp.InterestAllocation, &apos;INTEREST_INCOME&apos;, &apos;Interest Revenue&apos;),&#10;        (&apos;1002-CASH&apos;, &apos;4002-FEE-INCOME&apos;, fp.FeesAmount, &apos;FEE_INCOME&apos;, &apos;Fee Revenue&apos;),&#10;        (&apos;5001-PROVISION-EXPENSE&apos;, &apos;1003-LOAN-LOSS-RESERVE&apos;, fp.ProvisionAmount, &apos;PROVISION&apos;, &apos;Provision Expense&apos;)&#10;) gl(DebitAccount, CreditAccount, Amount, TransactionType, RevenueCategory)&#10;WHERE gl.Amount > 0&#10;AND NOT EXISTS (&#10;    SELECT 1 &#10;    FROM FACT.FACT_GL t &#10;    WHERE t.GLJournalRef = fp.GLJournalRef &#10;    AND t.TransactionType = gl.TransactionType&#10;);&#10;&#10;DECLARE @rows INT = @@ROWCOUNT;&#10;INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID, PackageName, StepName, StartTime, RowsProcessed, Status)&#10;VALUES (&#10;    CONVERT(VARCHAR, GETDATE(), 112) + REPLACE(CONVERT(VARCHAR, GETDATE(), 108), &apos;:&apos;, &apos;&apos;),&#10;    &apos;FACT_PAYMENT_LOAD&apos;,&#10;    &apos;LOAD_FACT_GL&apos;,&#10;    GETDATE(),&#10;    @rows,&#10;    &apos;OK&apos;&#10;);&quot;"/>
+    <elementParameter field="TEXT" name="CONNECTION_FORMAT" value="row"/>
+    <metadata connector="FLOW" name="tMSSqlRow_8_LOAD_FACT_GL"/>
+  </node>
+  <node componentName="tMSSqlRow" componentVersion="0.102" offsetLabelX="0" offsetLabelY="0" posX="64" posY="560">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMSSqlRow_9_GL_PERIOD_CLOSE"/>
+    <elementParameter field="TEXT" name="LABEL" value="GL_PERIOD_CLOSE"/>
+    <elementParameter field="TEXT" name="HOST" value="context.db_host"/>
+    <elementParameter field="TEXT" name="PORT" value="context.db_port"/>
+    <elementParameter field="TEXT" name="DBNAME" value="context.db_name"/>
+    <elementParameter field="TEXT" name="SCHEMA_DB" value="&quot;FACT&quot;"/>
+    <elementParameter field="TEXT" name="USER" value="context.db_user"/>
+    <elementParameter field="PASSWORD" name="PASS" value="context.db_password"/>
+    <elementParameter field="CHECK" name="USE_EXISTING_CONNECTION" value="false"/>
+    <elementParameter field="COMPONENT_LIST" name="CONNECTION" value=""/>
+    <elementParameter field="CHECK" name="USE_SHARED_CONNECTION" value="false"/>
+    <elementParameter field="TEXT" name="SHARED_CONNECTION_NAME" value=""/>
+    <elementParameter field="CHECK" name="SPECIFY_DATASOURCE_ALIAS" value="false"/>
+    <elementParameter field="TEXT" name="DATASOURCE_ALIAS" value="&quot;&quot;"/>
+    <elementParameter field="CHECK" name="USE_DYNAMIC_JOB" value="false"/>
+    <elementParameter field="TEXT" name="CONTEXT_JOB" value=""/>
+    <elementParameter field="CHECK" name="PROPAGATE_RECORD_SET" value="false"/>
+    <elementParameter field="CHECK" name="DIE_ON_ERROR" value="true"/>
+    <elementParameter field="MEMO_SQL" name="QUERY" value="&quot;DECLARE @prior VARCHAR(7) = FORMAT(DATEADD(MONTH, -1, GETDATE()), &apos;yyyy-MM&apos;);&#10;&#10;UPDATE FACT.FACT_GL &#10;SET PeriodCloseStatus = &apos;CLOSED&apos;,&#10;    ReconFlag = 1,&#10;    ReconVariance = ABS(DebitAmount - CreditAmount)&#10;WHERE ABS(DebitAmount - CreditAmount) &lt; 0.01 &#10;AND PeriodCloseStatus = &apos;PENDING&apos; &#10;AND GLPeriod = @prior;&#10;&#10;DECLARE @rows INT = @@ROWCOUNT;&#10;INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID,PackageName,StepName,StartTime,RowsProcessed,Status)&#10;VALUES(CONVERT(VARCHAR,GETDATE(),112)+REPLACE(CONVERT(VARCHAR,GETDATE(),108),&apos;:&apos;,&apos;&apos;),&apos;FACT_PAYMENT_LOAD&apos;,&apos;GL_PERIOD_CLOSE&apos;,GETDATE(),@rows,&apos;OK&apos;);&quot;"/>
+    <elementParameter field="TEXT" name="CONNECTION_FORMAT" value="row"/>
+    <metadata connector="FLOW" name="tMSSqlRow_9_GL_PERIOD_CLOSE"/>
+  </node>
+  <node componentName="tMSSqlRow" componentVersion="0.102" offsetLabelX="0" offsetLabelY="0" posX="384" posY="560">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMSSqlRow_10_RECONCILE_PAYMENTS"/>
+    <elementParameter field="TEXT" name="LABEL" value="RECONCILE_PAYMENTS"/>
+    <elementParameter field="TEXT" name="HOST" value="context.db_host"/>
+    <elementParameter field="TEXT" name="PORT" value="context.db_port"/>
+    <elementParameter field="TEXT" name="DBNAME" value="context.db_name"/>
+    <elementParameter field="TEXT" name="SCHEMA_DB" value="&quot;FACT&quot;"/>
+    <elementParameter field="TEXT" name="USER" value="context.db_user"/>
+    <elementParameter field="PASSWORD" name="PASS" value="context.db_password"/>
+    <elementParameter field="CHECK" name="USE_EXISTING_CONNECTION" value="false"/>
+    <elementParameter field="COMPONENT_LIST" name="CONNECTION" value=""/>
+    <elementParameter field="CHECK" name="USE_SHARED_CONNECTION" value="false"/>
+    <elementParameter field="TEXT" name="SHARED_CONNECTION_NAME" value=""/>
+    <elementParameter field="CHECK" name="SPECIFY_DATASOURCE_ALIAS" value="false"/>
+    <elementParameter field="TEXT" name="DATASOURCE_ALIAS" value="&quot;&quot;"/>
+    <elementParameter field="CHECK" name="USE_DYNAMIC_JOB" value="false"/>
+    <elementParameter field="TEXT" name="CONTEXT_JOB" value=""/>
+    <elementParameter field="CHECK" name="PROPAGATE_RECORD_SET" value="false"/>
+    <elementParameter field="CHECK" name="DIE_ON_ERROR" value="true"/>
+    <elementParameter field="MEMO_SQL" name="QUERY" value="&quot;UPDATE FACT.FACT_PAYMENT &#10;SET ReconStatus = &apos;RECONCILED&apos;,&#10;    GLPostingStatus = &apos;POSTED&apos;&#10;WHERE PaymentSK IN (&#10;    SELECT DISTINCT fp.PaymentSK &#10;    FROM FACT.FACT_PAYMENT fp&#10;    INNER JOIN FACT.FACT_GL gl ON gl.PaymentSK = fp.PaymentSK &#10;    WHERE gl.ReconFlag = 1&#10;)&#10;AND ReconStatus = &apos;UNRECONCILED&apos;;&#10;&#10;DECLARE @rows INT = @@ROWCOUNT;&#10;INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID, PackageName, StepName, StartTime, RowsProcessed, Status)&#10;VALUES (&#10;    CONVERT(VARCHAR, GETDATE(), 112) + REPLACE(CONVERT(VARCHAR, GETDATE(), 108), &apos;:&apos;, &apos;&apos;),&#10;    &apos;FACT_PAYMENT_LOAD&apos;,&#10;    &apos;RECONCILE_PAYMENTS&apos;,&#10;    GETDATE(),&#10;    @rows,&#10;    &apos;OK&apos;&#10;);&quot;"/>
+    <elementParameter field="TEXT" name="CONNECTION_FORMAT" value="row"/>
+    <metadata connector="FLOW" name="tMSSqlRow_10_RECONCILE_PAYMENTS"/>
+  </node>
+  <node componentName="tMSSqlRow" componentVersion="0.102" offsetLabelX="0" offsetLabelY="0" posX="224" posY="672">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMSSqlRow_11_LOAD_MART_FINANCE"/>
+    <elementParameter field="TEXT" name="LABEL" value="LOAD_MART_FINANCE"/>
+    <elementParameter field="TEXT" name="HOST" value="context.db_host"/>
+    <elementParameter field="TEXT" name="PORT" value="context.db_port"/>
+    <elementParameter field="TEXT" name="DBNAME" value="context.db_name"/>
+    <elementParameter field="TEXT" name="SCHEMA_DB" value="&quot;MART&quot;"/>
+    <elementParameter field="TEXT" name="USER" value="context.db_user"/>
+    <elementParameter field="PASSWORD" name="PASS" value="context.db_password"/>
+    <elementParameter field="CHECK" name="USE_EXISTING_CONNECTION" value="false"/>
+    <elementParameter field="COMPONENT_LIST" name="CONNECTION" value=""/>
+    <elementParameter field="CHECK" name="USE_SHARED_CONNECTION" value="false"/>
+    <elementParameter field="TEXT" name="SHARED_CONNECTION_NAME" value=""/>
+    <elementParameter field="CHECK" name="SPECIFY_DATASOURCE_ALIAS" value="false"/>
+    <elementParameter field="TEXT" name="DATASOURCE_ALIAS" value="&quot;&quot;"/>
+    <elementParameter field="CHECK" name="USE_DYNAMIC_JOB" value="false"/>
+    <elementParameter field="TEXT" name="CONTEXT_JOB" value=""/>
+    <elementParameter field="CHECK" name="PROPAGATE_RECORD_SET" value="false"/>
+    <elementParameter field="CHECK" name="DIE_ON_ERROR" value="true"/>
+    <elementParameter field="MEMO_SQL" name="QUERY" value="INSERT INTO MART.MART_FINANCE_SUMMARY (ReportDate,GLPeriod,BranchID,ProductID,TotalPaymentsReceived,TotalPrincipalCollected,TotalInterestIncome,TotalFeesIncome,TotalPenaltyIncome,TotalRevenue,TotalArrearsAmount,ArrearsRatio,NPLCount,NPLAmount,NPLRatio,ECL_Stage1_Amount,ECL_Stage2_Amount,ECL_Stage3_Amount,TotalProvision,ProvisionCoverageRatio,EarlyPaymentCount,PartialPaymentCount,LatePaymentCount,PaymentEfficiencyAvg,NIM,CostOfRisk,RevenueAtRisk,ETL_LOAD_DT,ETL_SOURCE)&#10;SELECT&#10;CAST(GETDATE() AS DATE),&#10;FORMAT(fp.GLPostingDate,&apos;yyyy-MM&apos;),&#10;b.BranchID,&#10;pr.ProductID,&#10;COUNT(*),&#10;SUM(fp.PrincipalAllocation),&#10;SUM(fp.InterestAllocation),&#10;SUM(fp.FeesAmount),&#10;SUM(fp.PenaltyAmount),&#10;SUM(fp.TotalAmount),&#10;SUM(fp.ArrearsAmount),&#10;SUM(fp.ArrearsAmount)/NULLIF(SUM(fl.LoanAmount),0),&#10;SUM(CAST(fp.NPLFlag AS INT)),&#10;SUM(CASE WHEN fp.NPLFlag=1 THEN fp.OutstandingBalanceAfter ELSE 0 END),&#10;SUM(CASE WHEN fp.NPLFlag=1 THEN fp.OutstandingBalanceAfter ELSE 0 END)/NULLIF(SUM(fp.OutstandingBalanceAfter),0),&#10;SUM(CASE WHEN fp.ECL_Stage=1 THEN fp.ECL_Amount ELSE 0 END),&#10;SUM(CASE WHEN fp.ECL_Stage=2 THEN fp.ECL_Amount ELSE 0 END),&#10;SUM(CASE WHEN fp.ECL_Stage=3 THEN fp.ECL_Amount ELSE 0 END),&#10;SUM(fp.ProvisionAmount),&#10;SUM(fp.ProvisionAmount)/NULLIF(SUM(CASE WHEN fp.NPLFlag=1 THEN fp.OutstandingBalanceAfter ELSE 0 END),0),&#10;SUM(CAST(fp.EarlyPaymentFlag AS INT)),&#10;SUM(CAST(fp.PartialPaymentFlag AS INT)),&#10;SUM(CAST(fp.IsLate AS INT)),&#10;AVG(fp.PaymentEfficiencyRatio),&#10;SUM(fp.InterestAllocation)/NULLIF(SUM(fp.OutstandingBalanceAfter),0),&#10;SUM(fp.ProvisionAmount)/NULLIF(SUM(fl.LoanAmount),0),&#10;SUM(CASE WHEN fp.WatchListFlag=1 OR fp.NPLFlag=1 THEN fp.TotalAmount ELSE 0 END),&#10;GETDATE(),&#10;&apos;FACT_PAYMENT_LOAD&apos;&#10;FROM FACT.FACT_PAYMENT fp&#10;INNER JOIN FACT.FACT_LOAN fl ON fp.LoanSK=fl.LoanFactSK&#10;INNER JOIN DIM.DIM_BRANCH b ON fp.BranchSK=b.BranchSK&#10;INNER JOIN DIM.DIM_PRODUCT pr ON fp.ProductSK=pr.ProductSK&#10;WHERE fp.GLPostingDate IS NOT NULL&#10;GROUP BY FORMAT(fp.GLPostingDate,&apos;yyyy-MM&apos;),b.BranchID,pr.ProductID&#10;HAVING NOT EXISTS (SELECT 1 FROM MART.MART_FINANCE_SUMMARY m WHERE m.ReportDate=CAST(GETDATE() AS DATE) AND m.GLPeriod=FORMAT(fp.GLPostingDate,&apos;yyyy-MM&apos;) AND m.BranchID=b.BranchID AND m.ProductID=pr.ProductID);&#10;INSERT INTO DW_AUDIT.ETL_BATCH_LOG(BatchID,PackageName,StepName,StartTime,RowsProcessed,Status)&#10;VALUES(CONVERT(VARCHAR,GETDATE(),112)+REPLACE(CONVERT(VARCHAR,GETDATE(),108),&apos;:&apos;,&apos;&apos;),&apos;FACT_PAYMENT_LOAD&apos;,&apos;LOAD_MART_FINANCE&apos;,GETDATE(),@@ROWCOUNT,&apos;OK&apos;);"/>
+    <elementParameter field="TEXT" name="CONNECTION_FORMAT" value="row"/>
+    <metadata connector="FLOW" name="tMSSqlRow_11_LOAD_MART_FINANCE"/>
+  </node>
+  <node componentName="tMSSqlRow" componentVersion="0.102" offsetLabelX="0" offsetLabelY="0" posX="224" posY="768">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMSSqlRow_12_DQ_CHECKS"/>
+    <elementParameter field="TEXT" name="LABEL" value="DQ_CHECKS"/>
+    <elementParameter field="TEXT" name="HOST" value="context.db_host"/>
+    <elementParameter field="TEXT" name="PORT" value="context.db_port"/>
+    <elementParameter field="TEXT" name="DBNAME" value="context.db_name"/>
+    <elementParameter field="TEXT" name="SCHEMA_DB" value="&quot;DW_AUDIT&quot;"/>
+    <elementParameter field="TEXT" name="USER" value="context.db_user"/>
+    <elementParameter field="PASSWORD" name="PASS" value="context.db_password"/>
+    <elementParameter field="CHECK" name="USE_EXISTING_CONNECTION" value="false"/>
+    <elementParameter field="COMPONENT_LIST" name="CONNECTION" value=""/>
+    <elementParameter field="CHECK" name="USE_SHARED_CONNECTION" value="false"/>
+    <elementParameter field="TEXT" name="SHARED_CONNECTION_NAME" value=""/>
+    <elementParameter field="CHECK" name="SPECIFY_DATASOURCE_ALIAS" value="false"/>
+    <elementParameter field="TEXT" name="DATASOURCE_ALIAS" value="&quot;&quot;"/>
+    <elementParameter field="CHECK" name="USE_DYNAMIC_JOB" value="false"/>
+    <elementParameter field="TEXT" name="CONTEXT_JOB" value=""/>
+    <elementParameter field="CHECK" name="PROPAGATE_RECORD_SET" value="false"/>
+    <elementParameter field="CHECK" name="DIE_ON_ERROR" value="true"/>
+    <elementParameter field="MEMO_SQL" name="QUERY" value="&quot;DECLARE @alloc_mismatch INT, @gl_imbalance INT, @stale_unrecon INT;&#10;&#10;SELECT @alloc_mismatch = COUNT(*)&#10;FROM FACT.FACT_PAYMENT&#10;WHERE ABS(PrincipalAllocation + InterestAllocation + FeesAmount + PenaltyAmount - TotalAmount) > 0.01;&#10;&#10;INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID, PackageName, StepName, StartTime, RowsProcessed, Status)&#10;VALUES (&#10;    CONVERT(VARCHAR, GETDATE(), 112) + REPLACE(CONVERT(VARCHAR, GETDATE(), 108), &apos;:&apos;, &apos;&apos;),&#10;    &apos;FACT_PAYMENT_LOAD&apos;,&#10;    &apos;DQ_CHECK_ALLOCATION&apos;,&#10;    GETDATE(),&#10;    @alloc_mismatch,&#10;    CASE WHEN @alloc_mismatch > 0 THEN &apos;WARN_ALLOCATION_MISMATCH&apos; ELSE &apos;OK&apos; END&#10;);&#10;&#10;SELECT @gl_imbalance = COUNT(*)&#10;FROM FACT.FACT_GL&#10;WHERE ABS(DebitAmount - CreditAmount) > 0.01;&#10;&#10;INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID, PackageName, StepName, StartTime, RowsProcessed, Status)&#10;VALUES (&#10;    CONVERT(VARCHAR, GETDATE(), 112) + REPLACE(CONVERT(VARCHAR, GETDATE(), 108), &apos;:&apos;, &apos;&apos;),&#10;    &apos;FACT_PAYMENT_LOAD&apos;,&#10;    &apos;DQ_CHECK_GL_BALANCE&apos;,&#10;    GETDATE(),&#10;    @gl_imbalance,&#10;    CASE WHEN @gl_imbalance > 0 THEN &apos;WARN_GL_IMBALANCE&apos; ELSE &apos;OK&apos; END&#10;);&#10;&#10;SELECT @stale_unrecon = COUNT(*)&#10;FROM FACT.FACT_PAYMENT&#10;WHERE ReconStatus = &apos;UNRECONCILED&apos; &#10;AND ETL_LOAD_DT &lt; DATEADD(DAY, -1, GETDATE());&#10;&#10;INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID, PackageName, StepName, StartTime, RowsProcessed, Status)&#10;VALUES (&#10;    CONVERT(VARCHAR, GETDATE(), 112) + REPLACE(CONVERT(VARCHAR, GETDATE(), 108), &apos;:&apos;, &apos;&apos;),&#10;    &apos;FACT_PAYMENT_LOAD&apos;,&#10;    &apos;DQ_CHECK_STALE_UNRECON&apos;,&#10;    GETDATE(),&#10;    @stale_unrecon,&#10;    CASE WHEN @stale_unrecon > 0 THEN &apos;WARN_STALE_UNRECONCILED&apos; ELSE &apos;OK&apos; END&#10;);&quot;"/>
+    <elementParameter field="TEXT" name="CONNECTION_FORMAT" value="row"/>
+    <metadata connector="FLOW" name="tMSSqlRow_12_DQ_CHECKS"/>
+  </node>
+  <node componentName="tMSSqlRow" componentVersion="0.102" offsetLabelX="0" offsetLabelY="0" posX="224" posY="864">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMSSqlRow_13_ROWCOUNT_METADATA"/>
+    <elementParameter field="TEXT" name="LABEL" value="ROWCOUNT_METADATA"/>
+    <elementParameter field="TEXT" name="HOST" value="context.db_host"/>
+    <elementParameter field="TEXT" name="PORT" value="context.db_port"/>
+    <elementParameter field="TEXT" name="DBNAME" value="context.db_name"/>
+    <elementParameter field="TEXT" name="SCHEMA_DB" value="&quot;DW_AUDIT&quot;"/>
+    <elementParameter field="TEXT" name="USER" value="context.db_user"/>
+    <elementParameter field="PASSWORD" name="PASS" value="context.db_password"/>
+    <elementParameter field="CHECK" name="USE_EXISTING_CONNECTION" value="false"/>
+    <elementParameter field="COMPONENT_LIST" name="CONNECTION" value=""/>
+    <elementParameter field="CHECK" name="USE_SHARED_CONNECTION" value="false"/>
+    <elementParameter field="TEXT" name="SHARED_CONNECTION_NAME" value=""/>
+    <elementParameter field="CHECK" name="SPECIFY_DATASOURCE_ALIAS" value="false"/>
+    <elementParameter field="TEXT" name="DATASOURCE_ALIAS" value="&quot;&quot;"/>
+    <elementParameter field="CHECK" name="USE_DYNAMIC_JOB" value="false"/>
+    <elementParameter field="TEXT" name="CONTEXT_JOB" value=""/>
+    <elementParameter field="CHECK" name="PROPAGATE_RECORD_SET" value="false"/>
+    <elementParameter field="CHECK" name="DIE_ON_ERROR" value="true"/>
+    <elementParameter field="MEMO_SQL" name="QUERY" value="&quot;INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID, PackageName, StepName, StartTime, RowsProcessed, Status)&#10;SELECT &#10;    b.batchid,&#10;    &apos;FACT_PAYMENT_LOAD&apos;,&#10;    x.tbl,&#10;    GETDATE(),&#10;    x.cnt,&#10;    &apos;OK&apos;&#10;FROM (&#10;    SELECT &apos;FACT_PAYMENT&apos; AS tbl, COUNT(*) AS cnt FROM FACT.FACT_PAYMENT&#10;    UNION ALL&#10;    SELECT &apos;FACT_GL&apos;, COUNT(*) FROM FACT.FACT_GL&#10;    UNION ALL&#10;    SELECT &apos;MART_FINANCE_SUMMARY&apos;, COUNT(*) FROM MART.MART_FINANCE_SUMMARY&#10;) x&#10;CROSS JOIN (&#10;    SELECT CONVERT(VARCHAR, GETDATE(), 112) + REPLACE(CONVERT(VARCHAR, GETDATE(), 108), &apos;:&apos;, &apos;&apos;) AS batchid&#10;) b;&quot;"/>
+    <elementParameter field="TEXT" name="CONNECTION_FORMAT" value="row"/>
+    <metadata connector="FLOW" name="tMSSqlRow_13_ROWCOUNT_METADATA"/>
+  </node>
+  <node componentName="tMSSqlRow" componentVersion="0.102" offsetLabelX="0" offsetLabelY="0" posX="224" posY="960">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMSSqlRow_14_AUDIT_END"/>
+    <elementParameter field="TEXT" name="LABEL" value="AUDIT_END"/>
+    <elementParameter field="TEXT" name="HOST" value="context.db_host"/>
+    <elementParameter field="TEXT" name="PORT" value="context.db_port"/>
+    <elementParameter field="TEXT" name="DBNAME" value="context.db_name"/>
+    <elementParameter field="TEXT" name="SCHEMA_DB" value="&quot;DW_AUDIT&quot;"/>
+    <elementParameter field="TEXT" name="USER" value="context.db_user"/>
+    <elementParameter field="PASSWORD" name="PASS" value="context.db_password"/>
+    <elementParameter field="CHECK" name="USE_EXISTING_CONNECTION" value="false"/>
+    <elementParameter field="COMPONENT_LIST" name="CONNECTION" value=""/>
+    <elementParameter field="CHECK" name="USE_SHARED_CONNECTION" value="false"/>
+    <elementParameter field="TEXT" name="SHARED_CONNECTION_NAME" value=""/>
+    <elementParameter field="CHECK" name="SPECIFY_DATASOURCE_ALIAS" value="false"/>
+    <elementParameter field="TEXT" name="DATASOURCE_ALIAS" value="&quot;&quot;"/>
+    <elementParameter field="CHECK" name="USE_DYNAMIC_JOB" value="false"/>
+    <elementParameter field="TEXT" name="CONTEXT_JOB" value=""/>
+    <elementParameter field="CHECK" name="PROPAGATE_RECORD_SET" value="false"/>
+    <elementParameter field="CHECK" name="DIE_ON_ERROR" value="true"/>
+    <elementParameter field="MEMO_SQL" name="QUERY" value="&quot;INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID, PackageName, StepName, StartTime, EndTime, Status)&#10;VALUES (&#10;    CONVERT(VARCHAR, GETDATE(), 112) + REPLACE(CONVERT(VARCHAR, GETDATE(), 108), &apos;:&apos;, &apos;&apos;),&#10;    &apos;FACT_PAYMENT_LOAD&apos;,&#10;    &apos;PACKAGE_END&apos;,&#10;    GETDATE(),&#10;    GETDATE(),&#10;    &apos;COMPLETED&apos;&#10;);&quot;"/>
+    <elementParameter field="TEXT" name="CONNECTION_FORMAT" value="row"/>
+    <metadata connector="FLOW" name="tMSSqlRow_14_AUDIT_END"/>
+  </node>
+  <subjob>
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMSSqlRow_1_AUDIT_START"/>
+    <elementParameter field="COLOR" name="SUBJOB_TITLE_COLOR" value="160;190;240"/>
+    <elementParameter field="COLOR" name="SUBJOB_COLOR" value="220;230;250"/>
+  </subjob>
+
+  <connection connectorName="SUBJOB_OK" label="OnSubjobOk" lineStyle="1"
+    metaname="tMSSqlRow_1_AUDIT_START" offsetLabelX="0" offsetLabelY="0"
+    source="tMSSqlRow_1_AUDIT_START" target="tMSSqlRow_2_VALIDATE_SOURCES">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Conn_1_to_2"/>
+  </connection>
+  <connection connectorName="SUBJOB_OK" label="OnSubjobOk" lineStyle="1"
+    metaname="tMSSqlRow_2_VALIDATE_SOURCES" offsetLabelX="0" offsetLabelY="0"
+    source="tMSSqlRow_2_VALIDATE_SOURCES" target="tMSSqlRow_3_CREATE_FACT_PAYMENT">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Conn_2_to_3"/>
+  </connection>
+  <connection connectorName="SUBJOB_OK" label="OnSubjobOk" lineStyle="1"
+    metaname="tMSSqlRow_2_VALIDATE_SOURCES" offsetLabelX="0" offsetLabelY="0"
+    source="tMSSqlRow_2_VALIDATE_SOURCES" target="tMSSqlRow_4_CREATE_FACT_GL">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Conn_2_to_4"/>
+  </connection>
+  <connection connectorName="SUBJOB_OK" label="OnSubjobOk" lineStyle="1"
+    metaname="tMSSqlRow_2_VALIDATE_SOURCES" offsetLabelX="0" offsetLabelY="0"
+    source="tMSSqlRow_2_VALIDATE_SOURCES" target="tMSSqlRow_5_CREATE_MART_FINANCE">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Conn_2_to_5"/>
+  </connection>
+  <connection connectorName="SUBJOB_OK" label="OnSubjobOk" lineStyle="1"
+    metaname="tMSSqlRow_3_CREATE_FACT_PAYMENT" offsetLabelX="0" offsetLabelY="0"
+    source="tMSSqlRow_3_CREATE_FACT_PAYMENT" target="tMSSqlRow_6_VERIFY_DATATYPES">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Conn_3_to_6"/>
+  </connection>
+  <connection connectorName="SUBJOB_OK" label="OnSubjobOk" lineStyle="1"
+    metaname="tMSSqlRow_4_CREATE_FACT_GL" offsetLabelX="0" offsetLabelY="0"
+    source="tMSSqlRow_4_CREATE_FACT_GL" target="tMSSqlRow_6_VERIFY_DATATYPES">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Conn_4_to_6"/>
+  </connection>
+  <connection connectorName="SUBJOB_OK" label="OnSubjobOk" lineStyle="1"
+    metaname="tMSSqlRow_5_CREATE_MART_FINANCE" offsetLabelX="0" offsetLabelY="0"
+    source="tMSSqlRow_5_CREATE_MART_FINANCE" target="tMSSqlRow_6_VERIFY_DATATYPES">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Conn_5_to_6"/>
+  </connection>
+  <connection connectorName="SUBJOB_OK" label="OnSubjobOk" lineStyle="1"
+    metaname="tMSSqlRow_6_VERIFY_DATATYPES" offsetLabelX="0" offsetLabelY="0"
+    source="tMSSqlRow_6_VERIFY_DATATYPES" target="tMSSqlRow_7_LOAD_FACT_PAYMENT">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Conn_6_to_7"/>
+  </connection>
+  <connection connectorName="SUBJOB_OK" label="OnSubjobOk" lineStyle="1"
+    metaname="tMSSqlRow_7_LOAD_FACT_PAYMENT" offsetLabelX="0" offsetLabelY="0"
+    source="tMSSqlRow_7_LOAD_FACT_PAYMENT" target="tMSSqlRow_8_LOAD_FACT_GL">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Conn_6_to_7"/>
+  </connection>
+  <connection connectorName="SUBJOB_OK" label="OnSubjobOk" lineStyle="1"
+    metaname="tMSSqlRow_8_LOAD_FACT_GL" offsetLabelX="0" offsetLabelY="0"
+    source="tMSSqlRow_8_LOAD_FACT_GL" target="tMSSqlRow_9_GL_PERIOD_CLOSE">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Conn_7_to_8"/>
+  </connection>
+  <connection connectorName="SUBJOB_OK" label="OnSubjobOk" lineStyle="1"
+    metaname="tMSSqlRow_8_LOAD_FACT_GL" offsetLabelX="0" offsetLabelY="0"
+    source="tMSSqlRow_8_LOAD_FACT_GL" target="tMSSqlRow_10_RECONCILE_PAYMENTS">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Conn_7_to_9"/>
+  </connection>
+  <connection connectorName="SUBJOB_OK" label="OnSubjobOk" lineStyle="1"
+    metaname="tMSSqlRow_9_GL_PERIOD_CLOSE" offsetLabelX="0" offsetLabelY="0"
+    source="tMSSqlRow_9_GL_PERIOD_CLOSE" target="tMSSqlRow_11_LOAD_MART_FINANCE">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Conn_8_to_10"/>
+  </connection>
+  <connection connectorName="SUBJOB_OK" label="OnSubjobOk" lineStyle="1"
+    metaname="tMSSqlRow_10_RECONCILE_PAYMENTS" offsetLabelX="0" offsetLabelY="0"
+    source="tMSSqlRow_10_RECONCILE_PAYMENTS" target="tMSSqlRow_11_LOAD_MART_FINANCE">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Conn_9_to_10"/>
+  </connection>
+  <connection connectorName="SUBJOB_OK" label="OnSubjobOk" lineStyle="1"
+    metaname="tMSSqlRow_11_LOAD_MART_FINANCE" offsetLabelX="0" offsetLabelY="0"
+    source="tMSSqlRow_11_LOAD_MART_FINANCE" target="tMSSqlRow_12_DQ_CHECKS">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Conn_10_to_11"/>
+  </connection>
+  <connection connectorName="SUBJOB_OK" label="OnSubjobOk" lineStyle="1"
+    metaname="tMSSqlRow_12_DQ_CHECKS" offsetLabelX="0" offsetLabelY="0"
+    source="tMSSqlRow_12_DQ_CHECKS" target="tMSSqlRow_13_ROWCOUNT_METADATA">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Conn_11_to_12"/>
+  </connection>
+  <connection connectorName="SUBJOB_OK" label="OnSubjobOk" lineStyle="1"
+    metaname="tMSSqlRow_13_ROWCOUNT_METADATA" offsetLabelX="0" offsetLabelY="0"
+    source="tMSSqlRow_13_ROWCOUNT_METADATA" target="tMSSqlRow_14_AUDIT_END">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Conn_12_to_13"/>
+  </connection>
+
+</talendfile:ProcessType>

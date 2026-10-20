@@ -7,6 +7,7 @@ Surfaces failure paths, dependencies, orchestration, reject handling, data quali
 
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import Any
 from pathlib import Path
 
@@ -79,6 +80,52 @@ def analyze_behavior(ir: EstateIR, estate_root: Path | None = None) -> dict[str,
             "confidence": 0.8,
             "source_ref": s.fqn,
             "meaning": f"Schedule {s.fqn} runs {s.frequency} at {s.schedule_expr}",
+        })
+
+    # Runtime evidence: executed run summaries are ground truth over declarations.
+    summaries: dict[str, list] = defaultdict(list)
+    for row in getattr(ir, "runtime_evidence", []):
+        summaries[row.artifact].append(row)
+        status = row.status.upper()
+        if status != "COMPLETED" or row.failed_steps:
+            detail = status
+            if row.failed_steps:
+                detail += f" (failed steps: {', '.join(row.failed_steps)})"
+            failures.append({
+                "type": "runtime_failure",
+                "evidence": {
+                    "fqn": row.job_fqn,
+                    "snippet": f"{detail} on run {row.ran_on or 'unknown'} via {row.artifact}",
+                },
+                "confidence": 0.95,
+                "source_ref": row.artifact,
+                "meaning": f"{row.job_fqn} finished {detail} in the executed pipeline run",
+            })
+    for artifact, rows in summaries.items():
+        ran_on = rows[0].ran_on or "unknown run"
+        completed = sum(1 for row in rows if row.status.upper() == "COMPLETED")
+        operational.append({
+            "type": "operational",
+            "evidence": {
+                "fqn": artifact,
+                "snippet": f"{len(rows)} jobs ran, {completed} completed ({ran_on})",
+            },
+            "confidence": 0.95,
+            "source_ref": artifact,
+            "meaning": f"Executed {len(rows)} jobs from {artifact} on {ran_on}",
+        })
+
+    # Reject handling: ETL REJECT routes quarantining rows into audit tables.
+    for flow in getattr(ir, "reject_flows", []):
+        rejects.append({
+            "type": "reject_handling",
+            "evidence": {
+                "fqn": flow.job_fqn,
+                "snippet": f"{flow.route} route -> {flow.target_table}",
+            },
+            "confidence": 0.9,
+            "source_ref": flow.artifact,
+            "meaning": f"{flow.job_fqn} quarantines rejected rows into {flow.target_table}",
         })
 
     # Runtime logs if available (synthetic runtime_logs/PROC_RISK_ASSESSMENT.log)

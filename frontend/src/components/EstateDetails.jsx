@@ -41,6 +41,64 @@ function findPath(edges, fromId, toId) {
   return empty; // no path - e.g. source/target aren't connected in the loaded graph
 }
 
+// Column perspective draws at most this many lineage rows: each row becomes a
+// source node + target node + edge, and the full 935-row list would overwhelm
+// ReactFlow. The complete list lives in the "Column Lineage" table tab.
+const MAX_COLUMN_EDGES = 160;
+
+// Build the column perspective graph. Every edge endpoint must exist as a node
+// (ReactFlow silently drops edges whose endpoints are missing) and node ids must
+// be unique (duplicates collapse), so we dedupe through a Map and always emit
+// both the source and target column nodes for each drawn row.
+function buildColumnView(columnLineage, colCase) {
+  let cols = columnLineage;
+  if (colCase === 'attention') cols = cols.filter((c) => c.unresolved);
+  else if (colCase === 'complete') cols = cols.filter((c) => !c.unresolved && !c.transform_expr);
+  else if (colCase === 'changed') cols = cols.filter((c) => c.transform_expr);
+
+  const edgeable = cols.filter((c) => c.source_table && c.source_column);
+  const specs = edgeable.slice(0, MAX_COLUMN_EDGES);
+  const orphanTargets = cols
+    .filter((c) => !(c.source_table && c.source_column))
+    .slice(0, MAX_COLUMN_EDGES - specs.length);
+
+  const nodeMap = new Map();
+  const columnNode = (fqn, color, isSource, index) => ({
+    id: fqn,
+    label: fqn.split('.').pop(),
+    type: 'column',
+    data: { label: fqn.split('.').pop(), fqn, kind: 'column' },
+    position: {
+      x: isSource ? (index % 3) * 190 : 900 + (index % 3) * 190,
+      y: Math.floor(index / 3) * 60,
+    },
+    style: { background: color, border: '1px solid #CBD5E1', fontSize: '9px', padding: '4px', borderRadius: '4px', width: 150 },
+  });
+
+  const edges = [];
+  specs.forEach((c, i) => {
+    const sourceId = `${c.source_table}.${c.source_column}`;
+    const targetId = `${c.target_table}.${c.target_column}`;
+    if (!nodeMap.has(sourceId)) nodeMap.set(sourceId, columnNode(sourceId, '#F1F5F9', true, nodeMap.size));
+    if (!nodeMap.has(targetId)) nodeMap.set(targetId, columnNode(targetId, c.unresolved ? '#FEE2E2' : c.transform_expr ? '#FEF3C7' : '#ECFDF5', false, i));
+    edges.push({
+      id: `${sourceId}->${targetId}:${i}`,
+      source: sourceId,
+      target: targetId,
+      label: c.transform_expr ? 'transform' : 'direct',
+      animated: !!c.transform_expr,
+      style: { stroke: c.unresolved ? '#EF4444' : '#6366F1' },
+      markerEnd: { type: MarkerType.ArrowClosed, color: c.unresolved ? '#EF4444' : '#6366F1' },
+    });
+  });
+  orphanTargets.forEach((c, i) => {
+    const targetId = `${c.target_table}.${c.target_column}`;
+    if (!nodeMap.has(targetId)) nodeMap.set(targetId, columnNode(targetId, '#FEE2E2', false, i));
+  });
+
+  return { nodes: [...nodeMap.values()], edges };
+}
+
 const TAB_LABELS = [
   { key: 'graph', label: 'Lineage Graph' },
   { key: 'knowledge', label: 'Knowledge Graph' },
@@ -64,6 +122,8 @@ export default function EstateDetails() {
   const [error, setError] = useState(null);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  // Full (unfiltered) graph used to rebuild any perspective without refetching.
+  const baseRef = useRef({ nodes: [], edges: [] });
   const [selected, setSelected] = useState(null);
   const [blast, setBlast] = useState(null);
   const [surveyTodo, setSurveyTodo] = useState([]);
@@ -100,43 +160,18 @@ export default function EstateDetails() {
       return { nodes, edges };
     }
     if (pers === 'column') {
-      // Column perspective: show column nodes (from ir) + table nodes, filtered by case
       if (!irData || !irData.column_lineage) return { nodes, edges };
-      let cols = irData.column_lineage;
-      if (colCase === 'attention') cols = cols.filter((c) => c.unresolved);
-      else if (colCase === 'complete') cols = cols.filter((c) => !c.unresolved && !c.transform_expr);
-      else if (colCase === 'changed') cols = cols.filter((c) => c.transform_expr);
-      const colNodes = cols.slice(0, 60).map((c, i) => ({
-        id: `${c.target_table}.${c.target_column}`,
-        label: `${c.target_column}`,
-        type: 'column',
-        data: { label: `${c.target_column}`, fqn: `${c.target_table}.${c.target_column}`, kind: 'column' },
-        position: { x: (i % 6) * 180, y: Math.floor(i / 6) * 70 },
-        style: { background: c.unresolved ? '#FEE2E2' : c.transform_expr ? '#FEF3C7' : '#ECFDF5', border: '1px solid #CBD5E1', fontSize: '9px', padding: '4px', borderRadius: '4px', width: 140 },
-      }));
-      const colEdges = cols.slice(0, 60).map((c) => ({
-        id: `${c.source_table}.${c.source_column}->${c.target_table}.${c.target_column}`,
-        source: `${c.source_table}.${c.source_column}`,
-        target: `${c.target_table}.${c.target_column}`,
-        label: c.transform_expr ? 'transform' : 'direct',
-        animated: !!c.transform_expr,
-        style: { stroke: c.unresolved ? '#EF4444' : '#6366F1' },
-        markerEnd: { type: MarkerType.ArrowClosed, color: c.unresolved ? '#EF4444' : '#6366F1' },
-      }));
-      // For column perspective, we need to also include the column nodes that are sources
-      // Add source column nodes that are not already in colNodes
-      const sourceCols = [...new Set(cols.map((c) => `${c.source_table}.${c.source_column}`))];
-      const sourceNodes = sourceCols.slice(0, 20).map((fqn, i) => ({
-        id: fqn,
-        label: fqn.split('.').pop(),
-        type: 'column',
-        data: { label: fqn.split('.').pop(), fqn, kind: 'column' },
-        position: { x: (i % 6) * 180, y: 300 + Math.floor(i / 6) * 70 },
-        style: { background: '#F1F5F9', border: '1px solid #CBD5E1', fontSize: '9px', padding: '4px', borderRadius: '4px', width: 140 },
-      }));
-      return { nodes: [...sourceNodes, ...colNodes], edges: colEdges };
+      return buildColumnView(irData.column_lineage, colCase);
     }
     return { nodes, edges };
+  };
+
+  // Recompute the visible graph for a perspective from the cached base graph.
+  const applyView = (pers, colCase, irData, base) => {
+    const b = base || baseRef.current;
+    const filtered = applyPerspective(b.nodes, b.edges, pers, colCase, irData);
+    setNodes(filtered.nodes);
+    setEdges(filtered.edges);
   };
 
   const loadAll = async (showGraph = true) => {
@@ -146,33 +181,43 @@ export default function EstateDetails() {
     setDisplayTodo(r.data.survey_todo || []);
     setSurveyStage(r.data.current_stage || '');
     setPreview(r.data.survey_preview || null);
-    if (showGraph && r.data.status === 'ACTIVE') {
-      const g = await axios.get(`/api/estates/${estateId}/graph`);
-      setGraph(g.data);
-      let rfNodes = g.data.nodes.map((n, i) => ({
-        id: n.id, position: n.position || { x: (i % 6) * 220, y: Math.floor(i / 6) * 80 },
-        data: { label: n.label, kind: n.type }, type: 'default',
-        style: {
-          background: n.type === 'table' ? '#EEF2FF' : n.type === 'view' ? (n.unresolved ? '#FEF3C7' : '#ECFDF5') : n.type === 'procedure' ? (n.has_dynamic ? '#FEE2E2' : '#F3E8FF') : n.type === 'dashboard' ? '#FFF7ED' : '#F1F5F9',
-          border: '1px solid #CBD5E1', fontSize: '10px', padding: '6px', borderRadius: '6px', width: 170,
-        }
-      }));
-      let rfEdges = g.data.edges.map((e) => ({ id: e.id, source: e.source, target: e.target, animated: true, style: { stroke: e.unresolved ? '#F59E0B' : '#6366F1' }, markerEnd: { type: MarkerType.ArrowClosed, color: e.unresolved ? '#F59E0B' : '#6366F1' }, label: e.type, type: e.type }));
-      // Apply perspective filter
-      const filtered = applyPerspective(rfNodes, rfEdges, perspective, columnCase, r.data.ir || ir);
-      setNodes(filtered.nodes); setEdges(filtered.edges);
-    }
     if (r.data.status === 'ACTIVE') {
+      // IR first: the column perspective needs column_lineage, so it must be
+      // in hand before the graph view is built.
+      let irData = ir;
+      try {
+        const irRes = await axios.get(`/api/estates/${estateId}/ir`);
+        irData = irRes.data;
+        setIr(irData);
+      } catch { setIr(null); }
+      if (showGraph) {
+        const g = await axios.get(`/api/estates/${estateId}/graph`);
+        setGraph(g.data);
+        setEstate((prev) => prev && ({
+          ...prev,
+          node_count: g.data.estate?.counts?.nodes ?? prev.node_count,
+          edge_count: g.data.estate?.counts?.edges ?? prev.edge_count,
+          unresolved_count: g.data.estate?.counts?.unresolved ?? prev.unresolved_count,
+        }));
+        const rfNodes = g.data.nodes.map((n, i) => ({
+          id: n.id, position: n.position || { x: (i % 6) * 220, y: Math.floor(i / 6) * 80 },
+          data: { label: n.label, kind: n.type }, type: 'default',
+          style: {
+            background: n.type === 'table' ? '#EEF2FF' : n.type === 'view' ? (n.unresolved ? '#FEF3C7' : '#ECFDF5') : n.type === 'procedure' ? (n.has_dynamic ? '#FEE2E2' : '#F3E8FF') : n.type === 'dashboard' ? '#FFF7ED' : '#F1F5F9',
+            border: '1px solid #CBD5E1', fontSize: '10px', padding: '6px', borderRadius: '6px', width: 170,
+          }
+        }));
+        const rfEdges = g.data.edges.map((e) => ({ id: e.id, source: e.source, target: e.target, animated: true, style: { stroke: e.unresolved ? '#F59E0B' : '#6366F1' }, markerEnd: { type: MarkerType.ArrowClosed, color: e.unresolved ? '#F59E0B' : '#6366F1' }, label: e.type, type: e.type }));
+        const base = { nodes: rfNodes, edges: rfEdges };
+        baseRef.current = base;
+        applyView(perspective, columnCase, irData, base);
+      }
       const a = await axios.get(`/api/estates/${estateId}/analytics`);
       setAnalytics(a.data);
       try {
         const rec = await axios.post(`/api/estates/${estateId}/bridge/recommend`);
         setRecommendation(rec.data);
       } catch { setRecommendation(null); }
-      try {
-        const irRes = await axios.get(`/api/estates/${estateId}/ir`);
-        setIr(irRes.data);
-      } catch { setIr(null); }
     }
     const l = await axios.get(`/api/estates/${estateId}/ledger`);
     setLedger(l.data);
@@ -353,29 +398,10 @@ export default function EstateDetails() {
           <LineagePerspectives
             active={perspective}
             onChange={(p) => {
-              if (p === 'column' && perspective !== 'column') setColumnCase('all');
+              const nextCase = p === 'column' && perspective !== 'column' ? 'all' : columnCase;
               setPerspective(p);
-              // Re-filter without refetch - simple client-side filter for demo
-              if (!graph || !ir) return;
-              let filteredNodes = graph.nodes;
-              let filteredEdges = graph.edges;
-              if (p === 'table') {
-                const keep = new Set(graph.nodes.filter((n) => n.type === 'table' || n.type === 'view').map((n) => n.id));
-                filteredNodes = graph.nodes.filter((n) => keep.has(n.id));
-                filteredEdges = graph.edges.filter((e) => keep.has(e.source) && keep.has(e.target));
-              } else if (p === 'job') {
-                filteredNodes = graph.nodes.filter((n) => n.type === 'etl' || n.type === 'schedule' || n.type === 'table');
-                filteredEdges = graph.edges.filter((e) => ['ETL_READS','ETL_WRITES','SCHEDULE_DEPENDS'].includes(e.type));
-              } else if (p === 'column') {
-                // Column perspective is handled via the drawer/table, keep full graph for context
-              }
-              const rfNodes = filteredNodes.map((n, i) => ({
-                id: n.id, position: n.position || { x: (i % 6) * 220, y: Math.floor(i / 6) * 80 },
-                data: { label: n.label, kind: n.type }, type: 'default',
-                style: { background: n.type === 'table' ? '#EEF2FF' : n.type === 'view' ? (n.unresolved ? '#FEF3C7' : '#ECFDF5') : n.type === 'procedure' ? (n.has_dynamic ? '#FEE2E2' : '#F3E8FF') : n.type === 'dashboard' ? '#FFF7ED' : '#F1F5F9', border: '1px solid #CBD5E1', fontSize: '10px', padding: '6px', borderRadius: '6px', width: 170 },
-              }));
-              const rfEdges = filteredEdges.map((e) => ({ id: e.id, source: e.source, target: e.target, animated: true, style: { stroke: e.unresolved ? '#F59E0B' : '#6366F1' }, markerEnd: { type: MarkerType.ArrowClosed, color: e.unresolved ? '#F59E0B' : '#6366F1' }, label: e.type }));
-              setNodes(rfNodes); setEdges(rfEdges);
+              if (nextCase !== columnCase) setColumnCase(nextCase);
+              applyView(p, nextCase);
             }}
             counts={{
               end_to_end: graph?.nodes?.length,
@@ -385,55 +411,34 @@ export default function EstateDetails() {
               column: ir?.column_lineage?.length || 0,
             }}
           />
+          {(graph?.estate?.counts?.declared_unverified ?? 0) > 0 && perspective !== 'column' && (
+            <div className="text-xs text-gray-500">
+              Every drawn edge is evidenced by the captured artifacts. {graph.estate.counts.declared_unverified} Control-M declared references are hidden — the schedule names them but the job artifact never mentions them.
+            </div>
+          )}
           {perspective === 'column' && (
-            <div className="flex gap-1">
-              <button onClick={() => setColumnCase('all')} className={`px-2 py-1 text-xs rounded ${columnCase === 'all' ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-gray-800 border'}`}>All ({ir?.column_lineage?.length || 0})</button>
-              <button onClick={() => setColumnCase('complete')} className={`px-2 py-1 text-xs rounded ${columnCase === 'complete' ? 'bg-emerald-600 text-white' : 'bg-white dark:bg-gray-800 border'}`}>Complete</button>
-              <button onClick={() => setColumnCase('attention')} className={`px-2 py-1 text-xs rounded ${columnCase === 'attention' ? 'bg-red-600 text-white' : 'bg-white dark:bg-gray-800 border'}`}>Attention Required ({(ir?.column_lineage || []).filter((c) => c.unresolved).length})</button>
-              <button onClick={() => setColumnCase('changed')} className={`px-2 py-1 text-xs rounded ${columnCase === 'changed' ? 'bg-amber-600 text-white' : 'bg-white dark:bg-gray-800 border'}`}>Changed + audit</button>
+            <div className="flex items-center gap-1">
+              <button onClick={() => { setColumnCase('all'); applyView('column', 'all'); }} className={`px-2 py-1 text-xs rounded ${columnCase === 'all' ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-gray-800 border'}`}>All ({ir?.column_lineage?.length || 0})</button>
+              <button onClick={() => { setColumnCase('complete'); applyView('column', 'complete'); }} className={`px-2 py-1 text-xs rounded ${columnCase === 'complete' ? 'bg-emerald-600 text-white' : 'bg-white dark:bg-gray-800 border'}`}>Complete</button>
+              <button onClick={() => { setColumnCase('attention'); applyView('column', 'attention'); }} className={`px-2 py-1 text-xs rounded ${columnCase === 'attention' ? 'bg-red-600 text-white' : 'bg-red-50 dark:bg-red-900/20 border border-red-200 text-red-700'}`}>Attention Required ({(ir?.column_lineage || []).filter((c) => c.unresolved).length})</button>
+              <button onClick={() => { setColumnCase('changed'); applyView('column', 'changed'); }} className={`px-2 py-1 text-xs rounded ${columnCase === 'changed' ? 'bg-amber-600 text-white' : 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 text-amber-700'}`}>Changed + audit</button>
+              <span className="ml-2 text-xs text-gray-500">drawing {edges.length} of {(ir?.column_lineage || []).length} column rows — full list in Column Lineage tab</span>
             </div>
           )}
           <div className="flex gap-4">
             <div className="flex-1 min-w-0">
               <GraphPanel
-                nodes={perspective === 'column' ? (() => {
-                  let cols = ir?.column_lineage || [];
-                  if (columnCase === 'attention') cols = cols.filter((c) => c.unresolved);
-                  else if (columnCase === 'complete') cols = cols.filter((c) => !c.unresolved && !c.transform_expr);
-                  else if (columnCase === 'changed') cols = cols.filter((c) => c.transform_expr);
-                  const colNodes = cols.slice(0, 40).map((c, i) => ({
-                    id: `${c.target_table}.${c.target_column}`,
-                    label: `${c.target_column}`,
-                    type: 'column',
-                    data: { label: c.target_column, kind: 'column' },
-                    position: { x: (i % 6) * 180, y: Math.floor(i / 6) * 70 },
-                    style: { background: c.unresolved ? '#FEE2E2' : c.transform_expr ? '#FEF3C7' : '#ECFDF5', border: '1px solid #CBD5E1', fontSize: '9px', padding: '4px', borderRadius: '4px', width: 140 },
-                  }));
-                  return colNodes.length ? colNodes : nodes;
-                })() : nodes}
-                edges={perspective === 'column' ? (() => {
-                  let cols = ir?.column_lineage || [];
-                  if (columnCase === 'attention') cols = cols.filter((c) => c.unresolved);
-                  else if (columnCase === 'complete') cols = cols.filter((c) => !c.unresolved && !c.transform_expr);
-                  else if (columnCase === 'changed') cols = cols.filter((c) => c.transform_expr);
-                  return cols.slice(0, 40).map((c) => ({
-                    id: `${c.source_table}.${c.source_column}->${c.target_table}.${c.target_column}`,
-                    source: `${c.source_table}.${c.source_column}`,
-                    target: `${c.target_table}.${c.target_column}`,
-                    label: c.transform_expr ? 'transform' : 'direct',
-                    animated: !!c.transform_expr,
-                    style: { stroke: c.unresolved ? '#EF4444' : '#6366F1' },
-                    markerEnd: { type: MarkerType.ArrowClosed, color: c.unresolved ? '#EF4444' : '#6366F1' },
-                  }));
-                })() : edges}
+                nodes={nodes}
+                edges={edges}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onNodeClick={onNodeClick}
                 onNodeMouseEnter={onNodeMouseEnter}
                 onNodeMouseLeave={onNodeMouseLeave}
+                onPaneClick={() => { setSelected(null); setBlast(null); }}
                 selected={selected}
                 blast={blast}
-                unresolvedCount={graph?.estate?.unresolved}
+                unresolvedCount={graph?.estate?.counts?.unresolved_edges ?? graph?.estate?.unresolved}
                 hoverPreview={hoverPreview}
                 highlightCol={highlightCol}
               />

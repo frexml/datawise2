@@ -181,8 +181,19 @@ def extract_estate_ir(
     estate_name: str = "NORTHSTAR",
     source: str = "synthetic",
 ) -> EstateIR:
-    """Build EstateIR from a synthetic estate directory on disk."""
+    """Build EstateIR from an estate directory on disk.
+
+    Git-sourced estates (vendored external repositories) are dispatched to the
+    dedicated ingestion builder; synthetic estates keep the layout-based parser.
+    """
     estate_root = Path(estate_root)
+    if (estate_root / "jobs" / "DATAWISE_PLATFORM.json").exists() and (
+        estate_root / "git_upload_etls"
+    ).is_dir():
+        from dsxlineage.estate.ingest.build import build_datawise_ir
+
+        return build_datawise_ir(estate_root, estate_name=estate_name)
+
     ir = EstateIR(estate_name=estate_name, source=source, generated_on=date.today())
 
     # Track FQNs for system inference

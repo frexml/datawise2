@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE POWERMART SYSTEM "powrmart.dtd">
+<POWERMART CREATION_DATE="01/15/2024 12:30:00" REPOSITORY_VERSION="10.5.3">
+  <REPOSITORY NAME="REPO_DATAWISE" VERSION="10.5.3" CODEPAGE="UTF-8" DATABASETYPE="Microsoft SQL Server">
+    <FOLDER NAME="MART_SALES_PIPELINE" OWNER="ETL_ADMIN" SHARED="SHARED"
+            DESCRIPTION="Build MART_SALES_PIPELINE - active loan pipeline with cross-sell opportunities"
+            PERMISSIONS="rwx---r--" UUID="f6a7b8c9-d0e1-2345-fabc-456789012345">
+
+      <TRANSFORMATION NAME="SQ_SALES_PIPELINE" TYPE="Source Qualifier" REUSABLE="NO" OBJECTVERSION="1" VERSIONNUMBER="1">
+        <TABLEATTRIBUTE NAME="Sql Query" VALUE="
+SELECT
+  fl.ApplicationDateSK                                               AS DateSK,
+  fl.BranchSK,
+  fl.ProductSK,
+  fl.CustomerSK,
+  CASE WHEN fl.ApplicationStatus = 'Approved' AND fl.AccountStatus = 'Active' THEN 'ACTIVE_LOAN'
+       WHEN fl.ApplicationStatus = 'Approved' THEN 'APPROVED_PENDING'
+       WHEN fl.ApplicationStatus = 'Under Review' THEN 'UNDER_REVIEW'
+       ELSE 'PROSPECT' END                                           AS OpportunityStage,
+  ISNULL(fl.LoanAmount, 0)                                           AS PipelineValue,
+  ISNULL(fl.ML_ApprovalScore, 0.5)                                   AS WinProbability,
+  ISNULL(mc.CrossSellScore, 50)                                      AS CrossSellScore,
+  ISNULL(mc.NextBestProduct, 'Personal Loan')                        AS NextBestProduct,
+  NULL                                                               AS CampaignID,
+  GETDATE()                                                          AS ETL_LOAD_DT
+FROM FACT.FACT_LOAN fl
+LEFT JOIN MART.MART_CUSTOMER_360 mc ON mc.CustomerSK = fl.CustomerSK
+WHERE fl.ApplicationStatus IN ('Pending', 'Under Review', 'Approved')
+   OR fl.AccountStatus = 'Active'"/>
+        <TABLEATTRIBUTE NAME="Source Filter" VALUE=""/>
+      </TRANSFORMATION>
+
+      <TARGET BUSINESSNAME="" DATABASETYPE="Microsoft SQL Server" DBDNAME="Datawise_demo"
+              NAME="TGT_MART_SALES_PIPELINE" OBJECTVERSION="1" OWNERNAME="MART"
+              TABLEOPTIONS="TRUNCATE_INSERT" VERSIONNUMBER="1"
+              DESCRIPTION="Sales pipeline mart">
+        <TARGETFIELD FIELDNUMBER="1"  NAME="DateSK"           DATATYPE="integer"  KEYTYPE="NOT A KEY" NULLABLE="NULL" PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="2"  NAME="BranchSK"         DATATYPE="integer"  KEYTYPE="NOT A KEY" NULLABLE="NULL" PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="3"  NAME="ProductSK"        DATATYPE="integer"  KEYTYPE="NOT A KEY" NULLABLE="NULL" PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="4"  NAME="CustomerSK"       DATATYPE="integer"  KEYTYPE="NOT A KEY" NULLABLE="NULL" PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="5"  NAME="OpportunityStage" DATATYPE="string"   KEYTYPE="NOT A KEY" NULLABLE="NULL" PRECISION="30" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="6"  NAME="PipelineValue"    DATATYPE="decimal"  KEYTYPE="NOT A KEY" NULLABLE="NULL" PRECISION="18" SCALE="2"/>
+        <TARGETFIELD FIELDNUMBER="7"  NAME="WinProbability"   DATATYPE="decimal"  KEYTYPE="NOT A KEY" NULLABLE="NULL" PRECISION="8"  SCALE="4"/>
+        <TARGETFIELD FIELDNUMBER="8"  NAME="ExpectedRevenue"  DATATYPE="decimal"  KEYTYPE="NOT A KEY" NULLABLE="NULL" PRECISION="18" SCALE="2"/>
+        <TARGETFIELD FIELDNUMBER="9"  NAME="CrossSellScore"   DATATYPE="integer"  KEYTYPE="NOT A KEY" NULLABLE="NULL" PRECISION="3"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="10" NAME="NextBestProduct"  DATATYPE="string"   KEYTYPE="NOT A KEY" NULLABLE="NULL" PRECISION="100" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="11" NAME="CampaignID"       DATATYPE="string"   KEYTYPE="NOT A KEY" NULLABLE="NULL" PRECISION="30" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="12" NAME="ETL_LOAD_DT"      DATATYPE="date"     KEYTYPE="NOT A KEY" NULLABLE="NULL" PRECISION="19" SCALE="0"/>
+      </TARGET>
+
+      <MAPPING NAME="M_MART_SALES_PIPELINE_BUILD" OBJECTVERSION="1" VERSIONNUMBER="1"
+               DESCRIPTION="Build MART_SALES_PIPELINE from FACT_LOAN + MART_CUSTOMER_360">
+        <CONNECTOR FROMFIELD="DateSK"           FROMINSTANCE="SQ_SALES_PIPELINE" FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="DateSK"             TOINSTANCE="TGT_MART_SALES_PIPELINE" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="BranchSK"         FROMINSTANCE="SQ_SALES_PIPELINE" FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="BranchSK"           TOINSTANCE="TGT_MART_SALES_PIPELINE" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="ProductSK"        FROMINSTANCE="SQ_SALES_PIPELINE" FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="ProductSK"          TOINSTANCE="TGT_MART_SALES_PIPELINE" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="CustomerSK"       FROMINSTANCE="SQ_SALES_PIPELINE" FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CustomerSK"         TOINSTANCE="TGT_MART_SALES_PIPELINE" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="OpportunityStage" FROMINSTANCE="SQ_SALES_PIPELINE" FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="OpportunityStage"   TOINSTANCE="TGT_MART_SALES_PIPELINE" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="PipelineValue"    FROMINSTANCE="SQ_SALES_PIPELINE" FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="PipelineValue"      TOINSTANCE="TGT_MART_SALES_PIPELINE" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="WinProbability"   FROMINSTANCE="SQ_SALES_PIPELINE" FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="WinProbability"     TOINSTANCE="TGT_MART_SALES_PIPELINE" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="ExpectedRevenue"  FROMINSTANCE="SQ_SALES_PIPELINE" FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="ExpectedRevenue"    TOINSTANCE="TGT_MART_SALES_PIPELINE" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="CrossSellScore"   FROMINSTANCE="SQ_SALES_PIPELINE" FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CrossSellScore"     TOINSTANCE="TGT_MART_SALES_PIPELINE" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="NextBestProduct"  FROMINSTANCE="SQ_SALES_PIPELINE" FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="NextBestProduct"    TOINSTANCE="TGT_MART_SALES_PIPELINE" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="CampaignID"       FROMINSTANCE="SQ_SALES_PIPELINE" FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CampaignID"         TOINSTANCE="TGT_MART_SALES_PIPELINE" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="ETL_LOAD_DT"      FROMINSTANCE="SQ_SALES_PIPELINE" FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="ETL_LOAD_DT"        TOINSTANCE="TGT_MART_SALES_PIPELINE" TOINSTANCETYPE="Target Definition"/>
+      </MAPPING>
+
+      <WORKFLOW NAME="WF_MART_SALES_PIPELINE_BUILD" OBJECTVERSION="1" VERSIONNUMBER="1">
+        <WORKLET NAME="WL_SALES_PIPELINE" OBJECTVERSION="1" VERSIONNUMBER="1">
+          <SESSION NAME="S_M_MART_SALES_PIPELINE_BUILD" OBJECTVERSION="1" VERSIONNUMBER="1"
+                   MAPPINGNAME="M_MART_SALES_PIPELINE_BUILD">
+            <ATTRIBUTE NAME="$Source connection value" VALUE="Datawise_demo"/>
+            <ATTRIBUTE NAME="$Target connection value" VALUE="Datawise_demo"/>
+          </SESSION>
+        </WORKLET>
+      </WORKFLOW>
+
+    </FOLDER>
+  </REPOSITORY>
+</POWERMART>

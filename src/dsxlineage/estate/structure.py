@@ -93,9 +93,36 @@ def analyze_structure(ir: EstateIR) -> dict[str, Any]:
             "confidence": 0.9,
             "source_ref": d.fqn,
         })
+    for routine in getattr(ir, "routines", []):
+        facts.append({
+            "type": "routine",
+            "evidence": {
+                "fqn": routine.fqn,
+                "snippet": f"{routine.kind} · {len(routine.features)} features · {', '.join(routine.model_files[:3]) or '—'}",
+            },
+            "confidence": 0.85 if routine.kind == "model_asset" else 0.9,
+            "source_ref": routine.artifact or routine.fqn,
+        })
+    for row in getattr(ir, "runtime_evidence", []):
+        facts.append({
+            "type": "runtime",
+            "evidence": {
+                "fqn": row.job_fqn,
+                "snippet": f"{row.status} · {row.elapsed_s if row.elapsed_s is not None else '—'}s · {row.ran_on or 'unknown run'}",
+            },
+            "confidence": 0.95,
+            "source_ref": row.artifact,
+        })
 
     # Unknowns — extensible
     unknowns = []
+    for asset in getattr(ir, "unknown_assets", []):
+        unknowns.append({
+            "type": f"unknown_asset:{asset.kind}",
+            "evidence": {"fqn": asset.path, "snippet": asset.reason or asset.kind},
+            "confidence": 0.6,
+            "source_ref": "PROVENANCE.json",
+        })
     for name, fn in _UNKNOWN_REGISTRY.items():
         try:
             result = fn(ir)

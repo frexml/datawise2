@@ -1,0 +1,648 @@
+{
+  "generated_on": "2026-10-19",
+  "source_commit": "337088fddeb6426e2bea1b6ca703f8833d7e97f8",
+  "schedule": "DATAWISE_PLATFORM",
+  "jobs": [
+    "STAGE1_SSIS_ALL",
+    "STAGE2_TAL_DIM_DATE_POPULATE",
+    "STAGE3_TAL_FACT_PAYMENT_LOAD",
+    "STAGE4_DS_FACT_GL_BUILD",
+    "STAGE4_DS_MART_CREDIT_RISK",
+    "STAGE4_DS_MART_TRANSACTION",
+    "STAGE4_DS_MART_BRANCH_PERFORMANCE",
+    "STAGE4_INF_MART_CUSTOMER_360",
+    "STAGE4_INF_MART_SALES_PIPELINE",
+    "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+    "STAGE5_INF_LOAN_FEATURE_ENGINEERING",
+    "STAGE5_INF_TRANSACTION_FEATURE_ENGINEERING",
+    "STAGE6_ML_LOAN_APPROVAL_SCORING",
+    "STAGE6_ML_FRAUD_SCORING",
+    "STAGE6B_DS_ML_SCORE_WRITEBACK",
+    "STAGE7_DS_BI_LOAN_APPROVAL",
+    "STAGE7_DS_BI_CUSTOMER_360",
+    "STAGE7_DS_BI_RISK_COMPLIANCE",
+    "STAGE7_DS_BI_RETAIL_PERFORMANCE"
+  ],
+  "job_edges": [
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "LOAN_SRC.BORROWER"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "LOAN_SRC.BRANCH"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "LOAN_SRC.COLLATERAL"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "LOAN_SRC.CREDIT_HISTORY"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "LOAN_SRC.LOAN_ACCOUNT"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "LOAN_SRC.LOAN_APPLICATION"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "LOAN_SRC.LOAN_DB_RAW"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "LOAN_SRC.LOAN_DB_REJECTED"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "LOAN_SRC.LOAN_PAYMENT"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "LOAN_SRC.LOAN_PRODUCT"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "LOAN_SRC.STG_LOANS"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "RETAIL_SRC.RETAIL_CUSTOMER"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "RETAIL_SRC.RETAIL_DB_RAW"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "RETAIL_SRC.RETAIL_TRANSACTION"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "RETAIL_SRC.STG_ACCOUNTS"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "DIM.DIM_BRANCH"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "DIM.DIM_PRODUCT"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "DIM.DIM_CUSTOMER"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "FACT.FACT_LOAN"
+    },
+    {
+      "job": "STAGE1_SSIS_ALL",
+      "direction": "writes",
+      "ref": "FACT.FACT_TRANSACTION"
+    },
+    {
+      "job": "STAGE2_TAL_DIM_DATE_POPULATE",
+      "direction": "writes",
+      "ref": "DIM.DIM_DATE"
+    },
+    {
+      "job": "STAGE3_TAL_FACT_PAYMENT_LOAD",
+      "direction": "reads",
+      "ref": "LOAN_SRC.LOAN_PAYMENT"
+    },
+    {
+      "job": "STAGE3_TAL_FACT_PAYMENT_LOAD",
+      "direction": "reads",
+      "ref": "FACT.FACT_LOAN"
+    },
+    {
+      "job": "STAGE3_TAL_FACT_PAYMENT_LOAD",
+      "direction": "reads",
+      "ref": "DIM.DIM_BRANCH"
+    },
+    {
+      "job": "STAGE3_TAL_FACT_PAYMENT_LOAD",
+      "direction": "reads",
+      "ref": "DIM.DIM_CUSTOMER"
+    },
+    {
+      "job": "STAGE3_TAL_FACT_PAYMENT_LOAD",
+      "direction": "reads",
+      "ref": "DIM.DIM_DATE"
+    },
+    {
+      "job": "STAGE3_TAL_FACT_PAYMENT_LOAD",
+      "direction": "reads",
+      "ref": "DIM.DIM_PRODUCT"
+    },
+    {
+      "job": "STAGE3_TAL_FACT_PAYMENT_LOAD",
+      "direction": "reads",
+      "ref": "DIM.DIM_RISK_RATING"
+    },
+    {
+      "job": "STAGE3_TAL_FACT_PAYMENT_LOAD",
+      "direction": "writes",
+      "ref": "FACT.FACT_PAYMENT"
+    },
+    {
+      "job": "STAGE3_TAL_FACT_PAYMENT_LOAD",
+      "direction": "writes",
+      "ref": "FACT.FACT_GL"
+    },
+    {
+      "job": "STAGE3_TAL_FACT_PAYMENT_LOAD",
+      "direction": "writes",
+      "ref": "MART.MART_FINANCE_SUMMARY"
+    },
+    {
+      "job": "STAGE4_DS_FACT_GL_BUILD",
+      "direction": "reads",
+      "ref": "FACT.FACT_PAYMENT"
+    },
+    {
+      "job": "STAGE4_DS_FACT_GL_BUILD",
+      "direction": "reads",
+      "ref": "FACT.FACT_LOAN"
+    },
+    {
+      "job": "STAGE4_DS_FACT_GL_BUILD",
+      "direction": "writes",
+      "ref": "MART.TGT_GL_PERIOD_SUMMARY"
+    },
+    {
+      "job": "STAGE4_DS_MART_CREDIT_RISK",
+      "direction": "reads",
+      "ref": "FACT.FACT_LOAN"
+    },
+    {
+      "job": "STAGE4_DS_MART_CREDIT_RISK",
+      "direction": "reads",
+      "ref": "DIM.DIM_CUSTOMER"
+    },
+    {
+      "job": "STAGE4_DS_MART_CREDIT_RISK",
+      "direction": "reads",
+      "ref": "DIM.DIM_PRODUCT"
+    },
+    {
+      "job": "STAGE4_DS_MART_CREDIT_RISK",
+      "direction": "writes",
+      "ref": "MART.MART_CREDIT_RISK"
+    },
+    {
+      "job": "STAGE4_DS_MART_TRANSACTION",
+      "direction": "reads",
+      "ref": "FACT.FACT_TRANSACTION"
+    },
+    {
+      "job": "STAGE4_DS_MART_TRANSACTION",
+      "direction": "reads",
+      "ref": "DIM.DIM_CUSTOMER"
+    },
+    {
+      "job": "STAGE4_DS_MART_TRANSACTION",
+      "direction": "reads",
+      "ref": "DIM.DIM_DATE"
+    },
+    {
+      "job": "STAGE4_DS_MART_TRANSACTION",
+      "direction": "writes",
+      "ref": "MART.MART_TRANSACTION"
+    },
+    {
+      "job": "STAGE4_DS_MART_TRANSACTION",
+      "direction": "writes",
+      "ref": "MART.MART_FRAUD_VELOCITY"
+    },
+    {
+      "job": "STAGE4_DS_MART_BRANCH_PERFORMANCE",
+      "direction": "reads",
+      "ref": "FACT.FACT_LOAN"
+    },
+    {
+      "job": "STAGE4_DS_MART_BRANCH_PERFORMANCE",
+      "direction": "reads",
+      "ref": "FACT.FACT_TRANSACTION"
+    },
+    {
+      "job": "STAGE4_DS_MART_BRANCH_PERFORMANCE",
+      "direction": "reads",
+      "ref": "DIM.DIM_BRANCH"
+    },
+    {
+      "job": "STAGE4_DS_MART_BRANCH_PERFORMANCE",
+      "direction": "reads",
+      "ref": "DIM.DIM_DATE"
+    },
+    {
+      "job": "STAGE4_DS_MART_BRANCH_PERFORMANCE",
+      "direction": "writes",
+      "ref": "MART.MART_BRANCH_PERFORMANCE"
+    },
+    {
+      "job": "STAGE4_INF_MART_CUSTOMER_360",
+      "direction": "reads",
+      "ref": "DIM.DIM_CUSTOMER"
+    },
+    {
+      "job": "STAGE4_INF_MART_CUSTOMER_360",
+      "direction": "reads",
+      "ref": "FACT.FACT_LOAN"
+    },
+    {
+      "job": "STAGE4_INF_MART_CUSTOMER_360",
+      "direction": "reads",
+      "ref": "FACT.FACT_TRANSACTION"
+    },
+    {
+      "job": "STAGE4_INF_MART_CUSTOMER_360",
+      "direction": "reads",
+      "ref": "FACT.FACT_PAYMENT"
+    },
+    {
+      "job": "STAGE4_INF_MART_CUSTOMER_360",
+      "direction": "writes",
+      "ref": "MART.MART_CUSTOMER_360"
+    },
+    {
+      "job": "STAGE4_INF_MART_SALES_PIPELINE",
+      "direction": "reads",
+      "ref": "FACT.FACT_LOAN"
+    },
+    {
+      "job": "STAGE4_INF_MART_SALES_PIPELINE",
+      "direction": "reads",
+      "ref": "MART.MART_CUSTOMER_360"
+    },
+    {
+      "job": "STAGE4_INF_MART_SALES_PIPELINE",
+      "direction": "writes",
+      "ref": "MART.MART_SALES_PIPELINE"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "DIM.DIM_BRANCH"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "DIM.DIM_CUSTOMER"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "DIM.DIM_DATE"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "DIM.DIM_PRODUCT"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "DIM.DIM_RISK_RATING"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "FACT.FACT_GL"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "FACT.FACT_LOAN"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "FACT.FACT_PAYMENT"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "FACT.FACT_TRANSACTION"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.BASEL_CAR_HISTORY"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_BRANCH_ALERT"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_BRANCH_PERFORMANCE"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_BRANCH_TREND"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_CONCENTRATION_RISK"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_CREDIT_RISK"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_CUSTOMER_360"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_FINANCE_SUMMARY"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_FRAUD_VELOCITY"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_GL_PERIOD_SUMMARY"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_LOAN_PAYMENT_COMBINED"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_ML_SCORE_SUMMARY"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_ML_UNMATCHED"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_NPL_WATCHLIST"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_SALES_PIPELINE"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_TRANSACTION"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_TRANSACTION_DAILY"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_TRANSACTION_MONTHLY"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "reads",
+      "ref": "MART.MART_TXN_BRANCH_DAILY"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "writes",
+      "ref": "DIM.VW_CUSTOMER_CURRENT"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "writes",
+      "ref": "FACT.VW_LOAN_PIPELINE"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "writes",
+      "ref": "VW_CREDIT_RISK_SUMMARY"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "writes",
+      "ref": "VW_BRANCH_PERFORMANCE"
+    },
+    {
+      "job": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES",
+      "direction": "writes",
+      "ref": "VW_BI_COMBINED"
+    },
+    {
+      "job": "STAGE5_INF_LOAN_FEATURE_ENGINEERING",
+      "direction": "reads",
+      "ref": "FACT.FACT_LOAN"
+    },
+    {
+      "job": "STAGE5_INF_LOAN_FEATURE_ENGINEERING",
+      "direction": "reads",
+      "ref": "DIM.DIM_CUSTOMER"
+    },
+    {
+      "job": "STAGE5_INF_LOAN_FEATURE_ENGINEERING",
+      "direction": "reads",
+      "ref": "LOAN_SRC.CREDIT_HISTORY"
+    },
+    {
+      "job": "STAGE5_INF_LOAN_FEATURE_ENGINEERING",
+      "direction": "writes",
+      "ref": "ML.LOAN_APPROVAL_FEATURES"
+    },
+    {
+      "job": "STAGE5_INF_TRANSACTION_FEATURE_ENGINEERING",
+      "direction": "reads",
+      "ref": "FACT.FACT_TRANSACTION"
+    },
+    {
+      "job": "STAGE5_INF_TRANSACTION_FEATURE_ENGINEERING",
+      "direction": "reads",
+      "ref": "DIM.DIM_CUSTOMER"
+    },
+    {
+      "job": "STAGE5_INF_TRANSACTION_FEATURE_ENGINEERING",
+      "direction": "writes",
+      "ref": "ML.TRANSACTION_FEATURES"
+    },
+    {
+      "job": "STAGE6_ML_LOAN_APPROVAL_SCORING",
+      "direction": "reads",
+      "ref": "ML.LOAN_APPROVAL_FEATURES"
+    },
+    {
+      "job": "STAGE6_ML_LOAN_APPROVAL_SCORING",
+      "direction": "writes",
+      "ref": "ML.MODEL_SCORE_LOAN"
+    },
+    {
+      "job": "STAGE6_ML_FRAUD_SCORING",
+      "direction": "reads",
+      "ref": "ML.TRANSACTION_FEATURES"
+    },
+    {
+      "job": "STAGE6_ML_FRAUD_SCORING",
+      "direction": "writes",
+      "ref": "ML.MODEL_SCORE_FRAUD"
+    },
+    {
+      "job": "STAGE6B_DS_ML_SCORE_WRITEBACK",
+      "direction": "reads",
+      "ref": "ML.MODEL_SCORE_LOAN"
+    },
+    {
+      "job": "STAGE6B_DS_ML_SCORE_WRITEBACK",
+      "direction": "reads",
+      "ref": "ML.MODEL_SCORE_FRAUD"
+    },
+    {
+      "job": "STAGE6B_DS_ML_SCORE_WRITEBACK",
+      "direction": "writes",
+      "ref": "FACT.FACT_LOAN"
+    },
+    {
+      "job": "STAGE6B_DS_ML_SCORE_WRITEBACK",
+      "direction": "writes",
+      "ref": "FACT.FACT_TRANSACTION"
+    },
+    {
+      "job": "STAGE7_DS_BI_LOAN_APPROVAL",
+      "direction": "reads",
+      "ref": "FACT.FACT_LOAN"
+    },
+    {
+      "job": "STAGE7_DS_BI_LOAN_APPROVAL",
+      "direction": "reads",
+      "ref": "ML.MODEL_SCORE_LOAN"
+    },
+    {
+      "job": "STAGE7_DS_BI_LOAN_APPROVAL",
+      "direction": "reads",
+      "ref": "DIM.DIM_BRANCH"
+    },
+    {
+      "job": "STAGE7_DS_BI_LOAN_APPROVAL",
+      "direction": "reads",
+      "ref": "DIM.DIM_CUSTOMER"
+    },
+    {
+      "job": "STAGE7_DS_BI_LOAN_APPROVAL",
+      "direction": "reads",
+      "ref": "DIM.DIM_DATE"
+    },
+    {
+      "job": "STAGE7_DS_BI_LOAN_APPROVAL",
+      "direction": "reads",
+      "ref": "DIM.DIM_PRODUCT"
+    },
+    {
+      "job": "STAGE7_DS_BI_LOAN_APPROVAL",
+      "direction": "reads",
+      "ref": "DIM.DIM_RISK_RATING"
+    },
+    {
+      "job": "STAGE7_DS_BI_LOAN_APPROVAL",
+      "direction": "writes",
+      "ref": "BI.BI_LOAN_APPROVAL"
+    },
+    {
+      "job": "STAGE7_DS_BI_CUSTOMER_360",
+      "direction": "reads",
+      "ref": "MART.MART_CUSTOMER_360"
+    },
+    {
+      "job": "STAGE7_DS_BI_CUSTOMER_360",
+      "direction": "reads",
+      "ref": "FACT.FACT_LOAN"
+    },
+    {
+      "job": "STAGE7_DS_BI_CUSTOMER_360",
+      "direction": "reads",
+      "ref": "FACT.FACT_TRANSACTION"
+    },
+    {
+      "job": "STAGE7_DS_BI_CUSTOMER_360",
+      "direction": "writes",
+      "ref": "BI.BI_CUSTOMER_360"
+    },
+    {
+      "job": "STAGE7_DS_BI_RISK_COMPLIANCE",
+      "direction": "reads",
+      "ref": "MART.MART_CREDIT_RISK"
+    },
+    {
+      "job": "STAGE7_DS_BI_RISK_COMPLIANCE",
+      "direction": "reads",
+      "ref": "FACT.FACT_LOAN"
+    },
+    {
+      "job": "STAGE7_DS_BI_RISK_COMPLIANCE",
+      "direction": "reads",
+      "ref": "DIM.DIM_DATE"
+    },
+    {
+      "job": "STAGE7_DS_BI_RISK_COMPLIANCE",
+      "direction": "writes",
+      "ref": "BI.BI_RISK_COMPLIANCE"
+    },
+    {
+      "job": "STAGE7_DS_BI_RETAIL_PERFORMANCE",
+      "direction": "reads",
+      "ref": "MART.MART_BRANCH_PERFORMANCE"
+    },
+    {
+      "job": "STAGE7_DS_BI_RETAIL_PERFORMANCE",
+      "direction": "reads",
+      "ref": "MART.MART_TRANSACTION"
+    },
+    {
+      "job": "STAGE7_DS_BI_RETAIL_PERFORMANCE",
+      "direction": "reads",
+      "ref": "DIM.DIM_BRANCH"
+    },
+    {
+      "job": "STAGE7_DS_BI_RETAIL_PERFORMANCE",
+      "direction": "writes",
+      "ref": "BI.BI_RETAIL_PERFORMANCE"
+    }
+  ]
+}

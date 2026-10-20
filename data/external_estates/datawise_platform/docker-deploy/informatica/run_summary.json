@@ -1,0 +1,25 @@
+{
+  "run_time": "2026-10-19 10:25:22",
+  "total_elapsed_s": 1683.7,
+  "mode": "inference",
+  "jobs": [
+    {
+      "job": "ML_SCORE_LOAN",
+      "status": "COMPLETED",
+      "elapsed_s": 1683.3,
+      "mappings": 1,
+      "failed": [],
+      "skipped": []
+    },
+    {
+      "job": "ML_SCORE_FRAUD",
+      "status": "COMPLETED_WITH_ERRORS",
+      "elapsed_s": 0.0,
+      "mappings": 1,
+      "failed": [
+        "ML_SCORE_FRAUD"
+      ],
+      "skipped": []
+    }
+  ]
+}

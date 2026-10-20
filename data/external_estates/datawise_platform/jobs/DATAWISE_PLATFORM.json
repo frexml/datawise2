@@ -1,0 +1,254 @@
+{
+  "DATAWISE_PLATFORM": {
+
+    "STAGE1_SSIS_ALL": {
+      "Type": "Job:Script",
+      "Tool": "SSIS via Azure-SSIS IR",
+      "Description": "Single ADF pipeline runs all 4 SSIS packages in sequence: LOAN_DB_EXTRACT → LOAN_DB_RAW_TO_STAGING → RETAIL_DB_EXTRACT → RETAIL_DB_RAW_TO_STAGING. Outputs: LOAN_SRC.* + RETAIL_SRC.* + DIM.DIM_BRANCH + DIM.DIM_PRODUCT + DIM.DIM_CUSTOMER (SCD2) + FACT.FACT_LOAN + FACT.FACT_TRANSACTION",
+      "Artifact": "DataWise_SSIS.ispac",
+      "Host": "Azure Data Factory (Azure-SSIS IR)",
+      "Source": "ADLS bronze/loandb/LOAN_DB_RAW.csv + ADLS bronze/retaildb/RETAIL_DB_RAW.csv",
+      "Target": "LOAN_SRC.* + RETAIL_SRC.* + DIM.DIM_BRANCH + DIM.DIM_PRODUCT + DIM.DIM_CUSTOMER (SCD2) + FACT.FACT_LOAN + FACT.FACT_TRANSACTION",
+      "DependsOn": []
+    },
+
+    "STAGE2_TAL_DIM_DATE_POPULATE": {
+      "Type": "Job:Script",
+      "Tool": "Talend Open Studio",
+      "Description": "Populate DIM.DIM_DATE calendar spine (2020-2030) — runs independently of SSIS",
+      "Artifact": "FACT_PAYMENT_LOAD.item",
+      "Host": "datawise-talend-payments",
+      "Source": "Generated calendar sequence",
+      "Target": "DIM.DIM_DATE",
+      "DependsOn": []
+    },
+
+    "STAGE3_TAL_FACT_PAYMENT_LOAD": {
+      "Type": "Job:Script",
+      "Tool": "Talend Open Studio",
+      "Description": "Load LOAN_SRC.LOAN_PAYMENT -> FACT.FACT_PAYMENT + FACT.FACT_GL + MART.MART_FINANCE_SUMMARY",
+      "Artifact": "FACT_PAYMENT_LOAD.item",
+      "Host": "datawise-talend-payments",
+      "Source": "LOAN_SRC.LOAN_PAYMENT + FACT.FACT_LOAN + DIM.*",
+      "Target": "FACT.FACT_PAYMENT + FACT.FACT_GL + MART.MART_FINANCE_SUMMARY",
+      "DependsOn": [
+        {"JobName": "STAGE1_SSIS_ALL"},
+        {"JobName": "STAGE2_TAL_DIM_DATE_POPULATE"}
+      ]
+    },
+
+    "STAGE4_DS_FACT_GL_BUILD": {
+      "Type": "Job:Script",
+      "Tool": "IBM DataStage 11.7",
+      "Description": "Build GL period summary from FACT_PAYMENT + FACT_LOAN -> MART.TGT_GL_PERIOD_SUMMARY",
+      "Artifact": "FACT_GL_BUILD.dsx",
+      "Host": "datawise-datastage-marts",
+      "Source": "FACT.FACT_PAYMENT + FACT.FACT_LOAN",
+      "Target": "MART.TGT_GL_PERIOD_SUMMARY",
+      "DependsOn": [
+        {"JobName": "STAGE3_TAL_FACT_PAYMENT_LOAD"}
+      ]
+    },
+
+    "STAGE4_DS_MART_CREDIT_RISK": {
+      "Type": "Job:Script",
+      "Tool": "IBM DataStage 11.7",
+      "Description": "Build credit risk mart from FACT_LOAN + DIM_CUSTOMER -> MART.MART_CREDIT_RISK",
+      "Artifact": "MART_CREDIT_RISK_BUILD.dsx",
+      "Host": "datawise-datastage-marts",
+      "Source": "FACT.FACT_LOAN + DIM.DIM_CUSTOMER + DIM.DIM_PRODUCT",
+      "Target": "MART.MART_CREDIT_RISK",
+      "DependsOn": [
+        {"JobName": "STAGE1_SSIS_ALL"}
+      ]
+    },
+
+    "STAGE4_DS_MART_TRANSACTION": {
+      "Type": "Job:Script",
+      "Tool": "IBM DataStage 11.7",
+      "Description": "Build transaction mart with fraud velocity from FACT_TRANSACTION -> MART.MART_TRANSACTION",
+      "Artifact": "MART_TRANSACTION_BUILD.dsx",
+      "Host": "datawise-datastage-marts",
+      "Source": "FACT.FACT_TRANSACTION + DIM.DIM_CUSTOMER + DIM.DIM_DATE",
+      "Target": "MART.MART_TRANSACTION + MART.MART_FRAUD_VELOCITY",
+      "DependsOn": [
+        {"JobName": "STAGE1_SSIS_ALL"}
+      ]
+    },
+
+    "STAGE4_DS_MART_BRANCH_PERFORMANCE": {
+      "Type": "Job:Script",
+      "Tool": "IBM DataStage 11.7",
+      "Description": "Build branch performance mart from FACT_LOAN + FACT_TRANSACTION -> MART.MART_BRANCH_PERFORMANCE",
+      "Artifact": "MART_BRANCH_PERFORMANCE_BUILD.dsx",
+      "Host": "datawise-datastage-marts",
+      "Source": "FACT.FACT_LOAN + FACT.FACT_TRANSACTION + DIM.DIM_BRANCH + DIM.DIM_DATE",
+      "Target": "MART.MART_BRANCH_PERFORMANCE",
+      "DependsOn": [
+        {"JobName": "STAGE1_SSIS_ALL"}
+      ]
+    },
+
+    "STAGE4_INF_MART_CUSTOMER_360": {
+      "Type": "Job:Script",
+      "Tool": "Informatica PowerCenter",
+      "Description": "Build 360 customer view joining DIM_CUSTOMER + FACT_LOAN + FACT_TRANSACTION + FACT_PAYMENT",
+      "Artifact": "MART_CUSTOMER_360_BUILD.xml",
+      "Host": "datawise-informatica",
+      "Source": "DIM.DIM_CUSTOMER + FACT.FACT_LOAN + FACT.FACT_TRANSACTION + FACT.FACT_PAYMENT",
+      "Target": "MART.MART_CUSTOMER_360",
+      "DependsOn": [
+        {"JobName": "STAGE3_TAL_FACT_PAYMENT_LOAD"}
+      ]
+    },
+
+    "STAGE4_INF_MART_SALES_PIPELINE": {
+      "Type": "Job:Script",
+      "Tool": "Informatica PowerCenter",
+      "Description": "Build sales pipeline mart from FACT_LOAN + MART_CUSTOMER_360",
+      "Artifact": "MART_SALES_PIPELINE_BUILD.xml",
+      "Host": "datawise-informatica",
+      "Source": "FACT.FACT_LOAN + MART.MART_CUSTOMER_360",
+      "Target": "MART.MART_SALES_PIPELINE",
+      "DependsOn": [
+        {"JobName": "STAGE4_INF_MART_CUSTOMER_360"}
+      ]
+    },
+
+    "STAGE4B_DS_CREATE_VIEWS_PROCEDURES": {
+      "Type": "Job:Script",
+      "Tool": "IBM DataStage 11.7",
+      "Description": "Create/refresh all views (VW_*) and stored procedures across DIM, FACT, MART, BI schemas",
+      "Artifact": "CREATE_VIEWS_AND_PROCEDURES.dsx",
+      "Host": "datawise-datastage-marts",
+      "Source": "DIM.* + FACT.* + MART.*",
+      "Target": "VW_CUSTOMER_CURRENT + VW_LOAN_PIPELINE + VW_CREDIT_RISK_SUMMARY + VW_BRANCH_PERFORMANCE + VW_BI_COMBINED",
+      "DependsOn": [
+        {"JobName": "STAGE4_DS_MART_CREDIT_RISK"},
+        {"JobName": "STAGE4_DS_MART_TRANSACTION"},
+        {"JobName": "STAGE4_DS_MART_BRANCH_PERFORMANCE"},
+        {"JobName": "STAGE4_INF_MART_CUSTOMER_360"},
+        {"JobName": "STAGE4_INF_MART_SALES_PIPELINE"}
+      ]
+    },
+
+    "STAGE5_INF_LOAN_FEATURE_ENGINEERING": {
+      "Type": "Job:Script",
+      "Tool": "Informatica PowerCenter",
+      "Description": "Feature engineering for loan approval model -> ML.LOAN_APPROVAL_FEATURES",
+      "Artifact": "LOAN_APPROVAL_FEATURE_ENGINEERING.xml",
+      "Host": "datawise-informatica",
+      "Source": "FACT.FACT_LOAN + DIM.DIM_CUSTOMER + LOAN_SRC.CREDIT_HISTORY",
+      "Target": "ML.LOAN_APPROVAL_FEATURES",
+      "DependsOn": [
+        {"JobName": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES"}
+      ]
+    },
+
+    "STAGE5_INF_TRANSACTION_FEATURE_ENGINEERING": {
+      "Type": "Job:Script",
+      "Tool": "Informatica PowerCenter",
+      "Description": "Feature engineering for fraud model -> ML.TRANSACTION_FEATURES",
+      "Artifact": "TRANSACTION_FEATURE_ENGINEERING.xml",
+      "Host": "datawise-informatica",
+      "Source": "FACT.FACT_TRANSACTION + DIM.DIM_CUSTOMER",
+      "Target": "ML.TRANSACTION_FEATURES",
+      "DependsOn": [
+        {"JobName": "STAGE4B_DS_CREATE_VIEWS_PROCEDURES"}
+      ]
+    },
+
+    "STAGE6_ML_LOAN_APPROVAL_SCORING": {
+      "Type": "Job:Script",
+      "Tool": "Python 3.11 (scikit-learn + XGBoost)",
+      "Description": "RF + XGBoost ensemble inference on ML.LOAN_APPROVAL_FEATURES -> ML.MODEL_SCORE_LOAN",
+      "Artifact": "ml_pipeline.py",
+      "Host": "datawise-ml",
+      "Source": "ML.LOAN_APPROVAL_FEATURES",
+      "Target": "ML.MODEL_SCORE_LOAN",
+      "DependsOn": [
+        {"JobName": "STAGE5_INF_LOAN_FEATURE_ENGINEERING"}
+      ]
+    },
+
+    "STAGE6_ML_FRAUD_SCORING": {
+      "Type": "Job:Script",
+      "Tool": "Python 3.11 (scikit-learn + XGBoost)",
+      "Description": "XGBoost + RF ensemble fraud inference on ML.TRANSACTION_FEATURES -> ML.MODEL_SCORE_FRAUD",
+      "Artifact": "fraud_pipeline.py",
+      "Host": "datawise-ml",
+      "Source": "ML.TRANSACTION_FEATURES",
+      "Target": "ML.MODEL_SCORE_FRAUD",
+      "DependsOn": [
+        {"JobName": "STAGE5_INF_TRANSACTION_FEATURE_ENGINEERING"}
+      ]
+    },
+
+    "STAGE6B_DS_ML_SCORE_WRITEBACK": {
+      "Type": "Job:Script",
+      "Tool": "IBM DataStage 11.7",
+      "Description": "Write ML scores back to FACT tables — MODEL_SCORE_LOAN -> FACT_LOAN.ML_* + MODEL_SCORE_FRAUD -> FACT_TRANSACTION.ML_*",
+      "Artifact": "ML_SCORE_WRITEBACK.dsx",
+      "Host": "datawise-datastage-marts",
+      "Source": "ML.MODEL_SCORE_LOAN + ML.MODEL_SCORE_FRAUD",
+      "Target": "FACT.FACT_LOAN (ML_ApprovalScore, ML_ModelDecision, ML_RiskBand) + FACT.FACT_TRANSACTION (ML_FraudScore, ML_FraudDecision, ML_FraudRiskLevel)",
+      "DependsOn": [
+        {"JobName": "STAGE6_ML_LOAN_APPROVAL_SCORING"},
+        {"JobName": "STAGE6_ML_FRAUD_SCORING"}
+      ]
+    },
+
+    "STAGE7_DS_BI_LOAN_APPROVAL": {
+      "Type": "Job:Script",
+      "Tool": "IBM DataStage 11.7",
+      "Description": "Build BI.BI_LOAN_APPROVAL from FACT_LOAN + ML scores + DIM lookups",
+      "Artifact": "BI_LOAN_APPROVAL_BUILD.dsx",
+      "Host": "datawise-datastage-marts",
+      "Source": "FACT.FACT_LOAN + ML.MODEL_SCORE_LOAN + DIM.*",
+      "Target": "BI.BI_LOAN_APPROVAL",
+      "DependsOn": [
+        {"JobName": "STAGE6B_DS_ML_SCORE_WRITEBACK"}
+      ]
+    },
+
+    "STAGE7_DS_BI_CUSTOMER_360": {
+      "Type": "Job:Script",
+      "Tool": "IBM DataStage 11.7",
+      "Description": "Build BI.BI_CUSTOMER_360 from MART_CUSTOMER_360 + FACT_LOAN + FACT_TRANSACTION",
+      "Artifact": "BI_CUSTOMER_360_BUILD.dsx",
+      "Host": "datawise-datastage-marts",
+      "Source": "MART.MART_CUSTOMER_360 + FACT.FACT_LOAN + FACT.FACT_TRANSACTION",
+      "Target": "BI.BI_CUSTOMER_360",
+      "DependsOn": [
+        {"JobName": "STAGE6B_DS_ML_SCORE_WRITEBACK"}
+      ]
+    },
+
+    "STAGE7_DS_BI_RISK_COMPLIANCE": {
+      "Type": "Job:Script",
+      "Tool": "IBM DataStage 11.7",
+      "Description": "Build BI.BI_RISK_COMPLIANCE from MART_CREDIT_RISK + FACT_LOAN Basel metrics",
+      "Artifact": "BI_RISK_COMPLIANCE_BUILD.dsx",
+      "Host": "datawise-datastage-marts",
+      "Source": "MART.MART_CREDIT_RISK + FACT.FACT_LOAN + DIM.DIM_DATE",
+      "Target": "BI.BI_RISK_COMPLIANCE",
+      "DependsOn": [
+        {"JobName": "STAGE6B_DS_ML_SCORE_WRITEBACK"}
+      ]
+    },
+
+    "STAGE7_DS_BI_RETAIL_PERFORMANCE": {
+      "Type": "Job:Script",
+      "Tool": "IBM DataStage 11.7",
+      "Description": "Build BI.BI_RETAIL_PERFORMANCE from MART_BRANCH_PERFORMANCE + MART_TRANSACTION",
+      "Artifact": "BI_RETAIL_PERFORMANCE_BUILD.dsx",
+      "Host": "datawise-datastage-marts",
+      "Source": "MART.MART_BRANCH_PERFORMANCE + MART.MART_TRANSACTION + DIM.DIM_BRANCH",
+      "Target": "BI.BI_RETAIL_PERFORMANCE",
+      "DependsOn": [
+        {"JobName": "STAGE6B_DS_ML_SCORE_WRITEBACK"}
+      ]
+    }
+
+  }
+}

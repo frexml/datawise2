@@ -1,0 +1,688 @@
+<?xml version="1.0"?>
+<DTS:Executable xmlns:DTS="www.microsoft.com/SqlServer/Dts"
+  DTS:refId="Package"
+  DTS:CreationDate="10/17/2026 3:24:09 PM"
+  DTS:CreationName="Microsoft.Package"
+  DTS:CreatorComputerName="KUNAL"
+  DTS:CreatorName="KUNAL\jangr"
+  DTS:DTSID="{82FA3B51-02BD-456C-B9A4-1C6884C61B06}"
+  DTS:ExecutableType="Microsoft.Package"
+  DTS:LastModifiedProductVersion="17.0.1016.0"
+  DTS:LocaleID="16393"
+  DTS:ObjectName="LOAN_DB_EXTRACT"
+  DTS:VersionBuild="6"
+  DTS:VersionGUID="{0AC66F53-6A70-4D2F-BCF9-5A2106FCB415}">
+  <DTS:Property
+    DTS:Name="PackageFormatVersion">8</DTS:Property>
+  <DTS:ConnectionManagers>
+    <DTS:ConnectionManager
+      DTS:refId="Package.ConnectionManagers[ADW_CONN]"
+      DTS:CreationName="OLEDB"
+      DTS:DTSID="{1997834C-FF0C-4CB4-852F-6BEAC8B10FD1}"
+      DTS:ObjectName="ADW_CONN">
+      <DTS:ObjectData>
+        <DTS:ConnectionManager
+          DTS:ConnectRetryCount="1"
+          DTS:ConnectRetryInterval="5"
+          DTS:ConnectionString="Data Source=datawise.database.windows.net;User ID=datawise;Initial Catalog=Datawise_demo;Provider=MSOLEDBSQL.1;Application Name=SSIS-LOAN_DB_EXTRACT-{1997834C-FF0C-4CB4-852F-6BEAC8B10FD1}ADW_CONN;">
+          <DTS:Password
+            DTS:Name="Password"
+            Sensitive="1"
+            Encrypted="1">***REDACTED***</DTS:Password>
+        </DTS:ConnectionManager>
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+  </DTS:ConnectionManagers>
+  <DTS:PackageParameters>
+    <DTS:PackageParameter
+      DTS:CreationName=""
+      DTS:DataType="8"
+      DTS:DTSID="{C4B042EF-10D6-4D08-90EF-BC5709D85873}"
+      DTS:ObjectName="ADW_DATABASE">
+      <DTS:Property
+        DTS:DataType="8"
+        DTS:Name="ParameterValue"
+        xml:space="preserve"></DTS:Property>
+    </DTS:PackageParameter>
+    <DTS:PackageParameter
+      DTS:CreationName=""
+      DTS:DataType="8"
+      DTS:DTSID="{123FFD7D-B21A-4689-BE9B-AB664873F15D}"
+      DTS:ObjectName="ADW_PASSWORD"
+      DTS:Sensitive="True">
+      <DTS:Property
+        DTS:Name="ParameterValue">
+        <DTS:Property
+          DTS:DataType="8"
+          DTS:Name="ParameterValue"
+          Encrypted="1">***REDACTED***</DTS:Property>
+      </DTS:Property>
+    </DTS:PackageParameter>
+    <DTS:PackageParameter
+      DTS:CreationName=""
+      DTS:DataType="8"
+      DTS:DTSID="{76BE8FDC-26FB-447D-A3B0-65E28870CF8A}"
+      DTS:ObjectName="ADW_SERVER">
+      <DTS:Property
+        DTS:DataType="8"
+        DTS:Name="ParameterValue"
+        xml:space="preserve"></DTS:Property>
+    </DTS:PackageParameter>
+    <DTS:PackageParameter
+      DTS:CreationName=""
+      DTS:DataType="8"
+      DTS:DTSID="{81120908-2AA6-4337-AADE-A671E6C1465F}"
+      DTS:ObjectName="ADW_USER">
+      <DTS:Property
+        DTS:DataType="8"
+        DTS:Name="ParameterValue"
+        xml:space="preserve"></DTS:Property>
+    </DTS:PackageParameter>
+    <DTS:PackageParameter
+      DTS:CreationName=""
+      DTS:DataType="8"
+      DTS:DTSID="{F788C0E4-9D96-4F28-80B0-721069ACCC89}"
+      DTS:ObjectName="LOAN_DB_PASSWORD"
+      DTS:Sensitive="True">
+      <DTS:Property
+        DTS:Name="ParameterValue">
+        <DTS:Property
+          DTS:DataType="8"
+          DTS:Name="ParameterValue"
+          Encrypted="1">***REDACTED***</DTS:Property>
+      </DTS:Property>
+    </DTS:PackageParameter>
+    <DTS:PackageParameter
+      DTS:CreationName=""
+      DTS:DataType="8"
+      DTS:DTSID="{66DE583A-F6F1-4DDC-B5C0-AEA6E44DCB35}"
+      DTS:ObjectName="LOAN_DB_USER">
+      <DTS:Property
+        DTS:DataType="8"
+        DTS:Name="ParameterValue"
+        xml:space="preserve"></DTS:Property>
+    </DTS:PackageParameter>
+  </DTS:PackageParameters>
+  <DTS:Variables />
+  <DTS:Executables>
+    <DTS:Executable
+      DTS:refId="Package\AUDIT_START"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="AUDIT_START"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{1997834C-FF0C-4CB4-852F-6BEAC8B10FD1}"
+          SQLTask:SqlStatementSource="IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name=&apos;DW_AUDIT&apos;) EXEC(&apos;CREATE SCHEMA DW_AUDIT&apos;); IF OBJECT_ID(&apos;DW_AUDIT.ETL_BATCH_LOG&apos;,&apos;U&apos;) IS NULL CREATE TABLE DW_AUDIT.ETL_BATCH_LOG (BatchID VARCHAR(50),PackageName VARCHAR(100),StepName VARCHAR(100),StartTime DATETIME,EndTime DATETIME,RowsProcessed INT,Status VARCHAR(20),ErrorMessage VARCHAR(500)); INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID,PackageName,StepName,StartTime,Status) VALUES (CONVERT(VARCHAR,GETDATE(),112)+REPLACE(CONVERT(VARCHAR,GETDATE(),108),&apos;:&apos;,&apos;&apos;),&apos;LOAN_DB_EXTRACT&apos;,&apos;PACKAGE_START&apos;,GETDATE(),&apos;RUNNING&apos;);" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\BORROWER"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{19BDD258-67E8-4568-8DF3-3EBF5B0A74AD}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="BORROWER"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{1997834C-FF0C-4CB4-852F-6BEAC8B10FD1}"
+          SQLTask:SqlStatementSource="IF OBJECT_ID('LOAN_SRC.LOAN_DB_RAW','U') IS NULL CREATE TABLE LOAN_SRC.LOAN_DB_RAW (BorrowerID VARCHAR(20),FirstName VARCHAR(100),LastName VARCHAR(100),DateOfBirth VARCHAR(20),NationalID VARCHAR(50),Email VARCHAR(200),Phone VARCHAR(30),EmploymentStatus VARCHAR(50),EmployerName VARCHAR(200),AnnualIncome VARCHAR(30),YearsEmployed VARCHAR(10),ResidentialStatus VARCHAR(50),AddressCity VARCHAR(100),AddressCountry VARCHAR(100),KYCStatus VARCHAR(20),KYCVerifiedDate VARCHAR(20),RelationshipManagerID VARCHAR(20),ApplicationID VARCHAR(30),ApplicationDate VARCHAR(20),ProductCode VARCHAR(20),BranchID VARCHAR(20),LoanAmount VARCHAR(30),LoanPurpose VARCHAR(100),LoanTermMonths VARCHAR(10),RequestedInterestRate VARCHAR(20),CollateralType VARCHAR(50),CollateralValue VARCHAR(30),ApplicationStatus VARCHAR(20),DecisionDate VARCHAR(20),RejectionReason VARCHAR(200),LoanOfficerID VARCHAR(20),AccountID VARCHAR(20),DisbursementDate VARCHAR(20),OutstandingBalance VARCHAR(30),CurrentInterestRate VARCHAR(20),MonthlyInstalment VARCHAR(30),AccountStatus VARCHAR(20),MaturityDate VARCHAR(20),DaysPastDue VARCHAR(10),ArrearsAmount VARCHAR(30),RiskRating VARCHAR(20),PD VARCHAR(20),LGD VARCHAR(20),EAD VARCHAR(30),RWA VARCHAR(30),CollateralID VARCHAR(20),CollateralDescription VARCHAR(500),EstimatedValue VARCHAR(30),ForcedSaleValue VARCHAR(30),ValuationDate VARCHAR(20),InsurancePolicyNo VARCHAR(50),LTVRatio VARCHAR(20),CreditScore VARCHAR(10),CreditBureau VARCHAR(100),BureauReportDate VARCHAR(20),MaxDPD12M VARCHAR(10),MaxDPD24M VARCHAR(10),PaymentHistoryScore VARCHAR(10),UtilisationRatio VARCHAR(20),TotalFacilities VARCHAR(10),NPLFacilities VARCHAR(10),Bankruptcies VARCHAR(10),EnquiriesLast6M VARCHAR(10),LastPaymentID VARCHAR(20),LastPaymentDate VARCHAR(20),LastPaymentAmount VARCHAR(30),LastPaymentStatus VARCHAR(20),LastPaymentMethod VARCHAR(50),RunningBalance VARCHAR(30),SourceSystem VARCHAR(30),ExtractTimestamp VARCHAR(30),BatchID VARCHAR(30)); DELETE FROM LOAN_SRC.LOAN_DB_RAW; BULK INSERT LOAN_SRC.LOAN_DB_RAW FROM 'loandb/LOAN_DB_RAW.csv' WITH (DATA_SOURCE='AzureBlobStorage',FORMAT='CSV',FIRSTROW=2,FIELDTERMINATOR=',',ROWTERMINATOR='0x0a',TABLOCK); INSERT INTO LOAN_SRC.BORROWER (BorrowerID,FirstName,LastName,DateOfBirth,NationalID,Email,Phone,EmploymentStatus,EmployerName,AnnualIncome,YearsEmployed,CreditScore,ExistingDebt,ResidentialStatus,AddressCity,AddressCountry,KYCStatus,RelationshipScore,CreatedDate) SELECT DISTINCT BorrowerID,FirstName,LastName,TRY_CAST(DateOfBirth AS DATE),NationalID,Email,Phone,EmploymentStatus,EmployerName,TRY_CAST(AnnualIncome AS DECIMAL(18,2)),TRY_CAST(YearsEmployed AS INT),TRY_CAST(CreditScore AS INT),0,ResidentialStatus,AddressCity,AddressCountry,KYCStatus,0,TRY_CAST(KYCVerifiedDate AS DATE) FROM LOAN_SRC.LOAN_DB_RAW r WHERE r.BorrowerID IS NOT NULL AND r.BorrowerID&lt;&gt;&apos;&apos; AND NOT EXISTS (SELECT 1 FROM LOAN_SRC.BORROWER t WHERE t.BorrowerID=r.BorrowerID); INSERT INTO LOAN_SRC.BRANCH (BranchID,BranchName,BranchCode,Region,City,State,Country,BranchManager,StaffCount,OpenDate,BranchType,ATMCount,Status) SELECT DISTINCT BranchID,BranchID,BranchID,NULL,NULL,NULL,&apos;Nigeria&apos;,NULL,NULL,NULL,&apos;Full Service&apos;,NULL,&apos;Active&apos; FROM LOAN_SRC.LOAN_DB_RAW r WHERE r.BranchID IS NOT NULL AND r.BranchID&lt;&gt;&apos;&apos; AND NOT EXISTS (SELECT 1 FROM LOAN_SRC.BRANCH t WHERE t.BranchID=r.BranchID); INSERT INTO LOAN_SRC.LOAN_PRODUCT (ProductID,ProductName,ProductCode,ProductCategory,MinAmount,MaxAmount,MinTermMonths,MaxTermMonths,BaseRate,CollateralRequired,TargetSegment,RiskWeight,BaselCategory,Status,LaunchDate) SELECT DISTINCT ProductCode,ProductCode,ProductCode,&apos;Loan&apos;,0,999999999,1,360,0,0,&apos;General&apos;,0,&apos;General&apos;,&apos;Active&apos;,CAST(&apos;2000-01-01&apos; AS DATE) FROM LOAN_SRC.LOAN_DB_RAW r WHERE r.ProductCode IS NOT NULL AND r.ProductCode&lt;&gt;&apos;&apos; AND NOT EXISTS (SELECT 1 FROM LOAN_SRC.LOAN_PRODUCT t WHERE t.ProductID=r.ProductCode);" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\PROFILE_RAW"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{B2C3D4E5-F678-9012-3456-789ABCDEF012}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="PROFILE_RAW"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{1997834C-FF0C-4CB4-852F-6BEAC8B10FD1}"
+          SQLTask:SqlStatementSource="IF OBJECT_ID(&apos;DW_AUDIT.ETL_BATCH_LOG&apos;,&apos;U&apos;) IS NOT NULL INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID,PackageName,StepName,StartTime,RowsProcessed,Status) SELECT CONVERT(VARCHAR,GETDATE(),112)+REPLACE(CONVERT(VARCHAR,GETDATE(),108),&apos;:&apos;,&apos;&apos;),&apos;LOAN_DB_EXTRACT&apos;,&apos;PROFILE_RAW&apos;,GETDATE(),COUNT(*),(CASE WHEN COUNT(*)&gt;0 THEN &apos;OK&apos; ELSE &apos;WARN_EMPTY&apos; END) FROM LOAN_SRC.LOAN_DB_RAW;" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\COLLATERAL"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{818A1B5E-7800-4CBD-870F-CE28C1A1EA38}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="COLLATERAL"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{1997834C-FF0C-4CB4-852F-6BEAC8B10FD1}"
+          SQLTask:SqlStatementSource="INSERT INTO LOAN_SRC.COLLATERAL (CollateralID,ApplicationID,AccountID,CollateralType,Description,EstimatedValue,ForcedSaleValue,ValuationDate,ValuationBy,InsuranceValue,InsurancePolicyNo,LTVRatio,CollateralStatus,LastReviewDate) SELECT DISTINCT CollateralID,ApplicationID,AccountID,CollateralType,CollateralDescription,TRY_CAST(EstimatedValue AS DECIMAL(18,2)),TRY_CAST(ForcedSaleValue AS DECIMAL(18,2)),TRY_CAST(ValuationDate AS DATE),'N/A',TRY_CAST(EstimatedValue AS DECIMAL(18,2)),InsurancePolicyNo,TRY_CAST(LTVRatio AS DECIMAL(5,4)),'Active',TRY_CAST(ValuationDate AS DATE) FROM LOAN_SRC.LOAN_DB_RAW r WHERE r.CollateralID IS NOT NULL AND r.CollateralID&lt;&gt;&apos;&apos; AND NOT EXISTS (SELECT 1 FROM LOAN_SRC.COLLATERAL t WHERE t.CollateralID=r.CollateralID);" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\CREDIT_HISTORY"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{6DD34094-A993-4CD5-B48E-DD09DF8A66BC}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="CREDIT_HISTORY"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{1997834C-FF0C-4CB4-852F-6BEAC8B10FD1}"
+          SQLTask:SqlStatementSource="INSERT INTO LOAN_SRC.CREDIT_HISTORY (HistoryID,BorrowerID,CreditBureau,ReportDate,CreditScore,TotalFacilities,TotalExposure,PerformingFacilities,NonPerformingFacilities,MaxDPD12Months,MaxDPD24Months,Bankruptcies,Judgements,EnquiriesLast6Months,PaymentHistoryScore,UtilisationRatio) SELECT DISTINCT CONCAT('CH-',BorrowerID),BorrowerID,CreditBureau,TRY_CAST(BureauReportDate AS DATE),TRY_CAST(CreditScore AS INT),TRY_CAST(TotalFacilities AS INT),TRY_CAST(AnnualIncome AS DECIMAL(18,2)),ISNULL(TRY_CAST(TotalFacilities AS INT),0)-ISNULL(TRY_CAST(NPLFacilities AS INT),0),TRY_CAST(NPLFacilities AS INT),TRY_CAST(MaxDPD12M AS INT),TRY_CAST(MaxDPD24M AS INT),TRY_CAST(Bankruptcies AS INT),0,TRY_CAST(EnquiriesLast6M AS INT),TRY_CAST(PaymentHistoryScore AS INT),TRY_CAST(UtilisationRatio AS DECIMAL(5,4)) FROM LOAN_SRC.LOAN_DB_RAW r WHERE r.BorrowerID IS NOT NULL AND r.BorrowerID&lt;&gt;&apos;&apos; AND NOT EXISTS (SELECT 1 FROM LOAN_SRC.CREDIT_HISTORY t WHERE t.HistoryID=CONCAT('CH-',r.BorrowerID));" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\LOAN_ACCOUNT"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{B896A1A7-5684-4CCC-9FAD-4792A830116F}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="LOAN_ACCOUNT"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{1997834C-FF0C-4CB4-852F-6BEAC8B10FD1}"
+          SQLTask:SqlStatementSource="INSERT INTO LOAN_SRC.LOAN_ACCOUNT (AccountID,ApplicationID,BorrowerID,ProductID,BranchID,DisbursementDate,LoanAmount,OutstandingBalance,InterestRate,TermMonths,MonthlyInstalment,AccountStatus,MaturityDate,DaysPastDue,ArrearsAmount,RiskRating,PD,LGD,EAD,RWA) SELECT DISTINCT AccountID,ApplicationID,BorrowerID,ProductCode,BranchID,TRY_CAST(DisbursementDate AS DATE),TRY_CAST(LoanAmount AS DECIMAL(18,2)),TRY_CAST(OutstandingBalance AS DECIMAL(18,2)),TRY_CAST(CurrentInterestRate AS DECIMAL(5,2)),TRY_CAST(LoanTermMonths AS INT),TRY_CAST(MonthlyInstalment AS DECIMAL(18,2)),AccountStatus,TRY_CAST(MaturityDate AS DATE),TRY_CAST(DaysPastDue AS INT),TRY_CAST(ArrearsAmount AS DECIMAL(18,2)),RiskRating,TRY_CAST(PD AS DECIMAL(8,6)),TRY_CAST(LGD AS DECIMAL(5,4)),TRY_CAST(EAD AS DECIMAL(18,2)),TRY_CAST(RWA AS DECIMAL(18,2)) FROM LOAN_SRC.LOAN_DB_RAW r WHERE r.AccountID IS NOT NULL AND r.AccountID&lt;&gt;&apos;&apos; AND NOT EXISTS (SELECT 1 FROM LOAN_SRC.LOAN_ACCOUNT t WHERE t.AccountID=r.AccountID);" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\LOAN_APPLICATION"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{E937CF1C-31BC-41AA-9129-3A52A7C63A9C}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="LOAN_APPLICATION"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{1997834C-FF0C-4CB4-852F-6BEAC8B10FD1}"
+          SQLTask:SqlStatementSource="INSERT INTO LOAN_SRC.LOAN_APPLICATION (ApplicationID,BorrowerID,ProductID,BranchID,ApplicationDate,LoanAmount,LoanPurpose,LoanTermMonths,RequestedRate,CollateralType,CollateralValue,DTIRatio,LTVRatio,ApplicationStatus,DecisionDate,DecisionBy,RejectionReason,OfficerID) SELECT DISTINCT ApplicationID,BorrowerID,ProductCode,BranchID,TRY_CAST(ApplicationDate AS DATE),TRY_CAST(LoanAmount AS DECIMAL(18,2)),LoanPurpose,TRY_CAST(LoanTermMonths AS INT),TRY_CAST(RequestedInterestRate AS DECIMAL(5,2)),CollateralType,TRY_CAST(CollateralValue AS DECIMAL(18,2)),0,TRY_CAST(LTVRatio AS DECIMAL(5,4)),ApplicationStatus,TRY_CAST(DecisionDate AS DATE),LoanOfficerID,RejectionReason,LoanOfficerID FROM LOAN_SRC.LOAN_DB_RAW r WHERE r.ApplicationID IS NOT NULL AND r.ApplicationID&lt;&gt;&apos;&apos; AND NOT EXISTS (SELECT 1 FROM LOAN_SRC.LOAN_APPLICATION t WHERE t.ApplicationID=r.ApplicationID);" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\QUARANTINE_INVALID"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{C3D4E5F6-7890-1234-5678-9ABCDEF01234}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="QUARANTINE_INVALID"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{1997834C-FF0C-4CB4-852F-6BEAC8B10FD1}"
+          SQLTask:SqlStatementSource="IF OBJECT_ID(&apos;LOAN_SRC.LOAN_DB_REJECTED&apos;,&apos;U&apos;) IS NULL CREATE TABLE LOAN_SRC.LOAN_DB_REJECTED (RejectedAt DATETIME,Reason VARCHAR(200),BorrowerID VARCHAR(20),ApplicationID VARCHAR(30),AccountID VARCHAR(20),RawData VARCHAR(500)); INSERT INTO LOAN_SRC.LOAN_DB_REJECTED (RejectedAt,Reason,BorrowerID,ApplicationID,AccountID,RawData) SELECT GETDATE(),&apos;INVALID_AMOUNT_OR_DATE&apos;,BorrowerID,ApplicationID,AccountID,CONCAT(&apos;LoanAmt:&apos;,LoanAmount,&apos; AppDate:&apos;,ApplicationDate,&apos; DisbDate:&apos;,DisbursementDate) FROM LOAN_SRC.LOAN_DB_RAW WHERE (TRY_CAST(LoanAmount AS DECIMAL(18,2)) IS NULL OR TRY_CAST(LoanAmount AS DECIMAL(18,2)) &lt;= 0) OR (TRY_CAST(ApplicationDate AS DATE) IS NULL) AND BorrowerID IS NOT NULL AND BorrowerID &lt;&gt; &apos;&apos;;" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\TRACK_CHANGES"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{D4E5F678-9012-3456-789A-BCDEF0123456}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="TRACK_CHANGES"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{1997834C-FF0C-4CB4-852F-6BEAC8B10FD1}"
+          SQLTask:SqlStatementSource="IF OBJECT_ID(&apos;DW_AUDIT.ETL_BATCH_LOG&apos;,&apos;U&apos;) IS NOT NULL INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID,PackageName,StepName,StartTime,RowsProcessed,Status) SELECT CONVERT(VARCHAR,GETDATE(),112)+REPLACE(CONVERT(VARCHAR,GETDATE(),108),&apos;:&apos;,&apos;&apos;),&apos;LOAN_DB_EXTRACT&apos;,&apos;TRACK_CHANGES&apos;,GETDATE(),COUNT(*),(CASE WHEN COUNT(*)&gt;=0 THEN &apos;OK&apos; ELSE &apos;WARN&apos; END) FROM (SELECT r.BorrowerID FROM LOAN_SRC.LOAN_DB_RAW r INNER JOIN LOAN_SRC.BORROWER b ON r.BorrowerID=b.BorrowerID WHERE TRY_CAST(r.AnnualIncome AS DECIMAL(18,2)) &lt;&gt; b.AnnualIncome OR r.EmploymentStatus &lt;&gt; b.EmploymentStatus OR r.KYCStatus &lt;&gt; b.KYCStatus) chg;" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\LOAN_PAYMENT"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{46F0A10D-BEE1-4B1E-8A17-0B3E2443BC66}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="LOAN_PAYMENT"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{1997834C-FF0C-4CB4-852F-6BEAC8B10FD1}"
+          SQLTask:SqlStatementSource="INSERT INTO LOAN_SRC.LOAN_PAYMENT (PaymentID,AccountID,BorrowerID,PaymentDate,DueDate,PrincipalAmount,InterestAmount,FeesAmount,TotalAmount,PaymentMethod,PaymentStatus,DaysPastDue,PenaltyAmount,RunningBalance,PaymentRef) SELECT DISTINCT LastPaymentID,AccountID,BorrowerID,TRY_CAST(LastPaymentDate AS DATE),TRY_CAST(LastPaymentDate AS DATE),TRY_CAST(LastPaymentAmount AS DECIMAL(18,2)),0,0,TRY_CAST(LastPaymentAmount AS DECIMAL(18,2)),LastPaymentMethod,LastPaymentStatus,TRY_CAST(DaysPastDue AS INT),0,TRY_CAST(RunningBalance AS DECIMAL(18,2)),LastPaymentID FROM LOAN_SRC.LOAN_DB_RAW r WHERE r.LastPaymentID IS NOT NULL AND r.LastPaymentID&lt;&gt;&apos;&apos; AND NOT EXISTS (SELECT 1 FROM LOAN_SRC.LOAN_PAYMENT t WHERE t.PaymentID=r.LastPaymentID);" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\ROWCOUNT_METADATA"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{E5F67890-1234-5678-9ABC-DEF012345678}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="ROWCOUNT_METADATA"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{1997834C-FF0C-4CB4-852F-6BEAC8B10FD1}"
+          SQLTask:SqlStatementSource="INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID,PackageName,StepName,StartTime,RowsProcessed,Status) SELECT CONVERT(VARCHAR,GETDATE(),112)+REPLACE(CONVERT(VARCHAR,GETDATE(),108),&apos;:&apos;,&apos;&apos;),&apos;LOAN_DB_EXTRACT&apos;,tbl,GETDATE(),cnt,&apos;OK&apos; FROM (SELECT &apos;BORROWER&apos; tbl,COUNT(*) cnt FROM LOAN_SRC.BORROWER UNION ALL SELECT &apos;LOAN_APPLICATION&apos;,COUNT(*) FROM LOAN_SRC.LOAN_APPLICATION UNION ALL SELECT &apos;LOAN_ACCOUNT&apos;,COUNT(*) FROM LOAN_SRC.LOAN_ACCOUNT UNION ALL SELECT &apos;LOAN_PAYMENT&apos;,COUNT(*) FROM LOAN_SRC.LOAN_PAYMENT UNION ALL SELECT &apos;COLLATERAL&apos;,COUNT(*) FROM LOAN_SRC.COLLATERAL UNION ALL SELECT &apos;CREDIT_HISTORY&apos;,COUNT(*) FROM LOAN_SRC.CREDIT_HISTORY) x;" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\AUDIT_END"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{F6789012-3456-789A-BCDE-F01234567890}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="AUDIT_END"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{1997834C-FF0C-4CB4-852F-6BEAC8B10FD1}"
+          SQLTask:SqlStatementSource="INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID,PackageName,StepName,StartTime,EndTime,Status) VALUES (CONVERT(VARCHAR,GETDATE(),112)+REPLACE(CONVERT(VARCHAR,GETDATE(),108),&apos;:&apos;,&apos;&apos;),&apos;LOAN_DB_EXTRACT&apos;,&apos;PACKAGE_END&apos;,GETDATE(),GETDATE(),&apos;COMPLETED&apos;);" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+  </DTS:Executables>
+  <DTS:PrecedenceConstraints>
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{4089B549-2AA7-4365-95A4-AE81B2A32563\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{4089B549-2AA7-4365-95A4-AE81B2A32563}"
+      DTS:From="Package\LOAN_APPLICATION"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{4089B549-2AA7-4365-95A4-AE81B2A32563}"
+      DTS:To="Package\QUARANTINE_INVALID" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{8A7113C8-AE4D-4FEA-916F-43B31014ECD9\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{8A7113C8-AE4D-4FEA-916F-43B31014ECD9}"
+      DTS:From="Package\LOAN_PAYMENT"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{8A7113C8-AE4D-4FEA-916F-43B31014ECD9}"
+      DTS:To="Package\COLLATERAL" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{8C298A56-3EF5-488C-8D09-738F578DBDEF\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{8C298A56-3EF5-488C-8D09-738F578DBDEF}"
+      DTS:From="Package\COLLATERAL"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{8C298A56-3EF5-488C-8D09-738F578DBDEF}"
+      DTS:To="Package\CREDIT_HISTORY" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{C0E0C19E-6A9F-441C-8A08-9F79B983E98D\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{C0E0C19E-6A9F-441C-8A08-9F79B983E98D}"
+      DTS:From="Package\LOAN_ACCOUNT"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{C0E0C19E-6A9F-441C-8A08-9F79B983E98D}"
+      DTS:To="Package\LOAN_PAYMENT" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{DC72F827-601A-468E-AD0F-71949BF87ADF\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{DC72F827-601A-468E-AD0F-71949BF87ADF}"
+      DTS:From="Package\BORROWER"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{DC72F827-601A-468E-AD0F-71949BF87ADF}"
+      DTS:To="Package\PROFILE_RAW" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{11223344-5566-7788-99AA-BBCCDDEEFF00\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{11223344-5566-7788-99AA-BBCCDDEEFF00}"
+      DTS:From="Package\AUDIT_START"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{11223344-5566-7788-99AA-BBCCDDEEFF00}"
+      DTS:To="Package\BORROWER" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{22334455-6677-8899-AABB-CCDDEEFF0011\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{22334455-6677-8899-AABB-CCDDEEFF0011}"
+      DTS:From="Package\PROFILE_RAW"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{22334455-6677-8899-AABB-CCDDEEFF0011}"
+      DTS:To="Package\QUARANTINE_INVALID" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{33445566-7788-99AA-BBCC-DDEEFF001122\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{33445566-7788-99AA-BBCC-DDEEFF001122}"
+      DTS:From="Package\QUARANTINE_INVALID"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{33445566-7788-99AA-BBCC-DDEEFF001122}"
+      DTS:To="Package\TRACK_CHANGES" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{44556677-8899-AABB-CCDD-EEFF00112233\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{44556677-8899-AABB-CCDD-EEFF00112233}"
+      DTS:From="Package\TRACK_CHANGES"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{44556677-8899-AABB-CCDD-EEFF00112233}"
+      DTS:To="Package\LOAN_ACCOUNT" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{55667788-99AA-BBCC-DDEE-FF0011223344\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{55667788-99AA-BBCC-DDEE-FF0011223344}"
+      DTS:From="Package\CREDIT_HISTORY"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{55667788-99AA-BBCC-DDEE-FF0011223344}"
+      DTS:To="Package\ROWCOUNT_METADATA" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{66778899-AABB-CCDD-EEFF-001122334455\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{66778899-AABB-CCDD-EEFF-001122334455}"
+      DTS:From="Package\ROWCOUNT_METADATA"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{66778899-AABB-CCDD-EEFF-001122334455}"
+      DTS:To="Package\AUDIT_END" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{77889900-BBCC-DDEE-FF00-112233445566\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{77889900-BBCC-DDEE-FF00-112233445566}"
+      DTS:From="Package\BORROWER"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{77889900-BBCC-DDEE-FF00-112233445566}"
+      DTS:To="Package\LOAN_APPLICATION" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{88990011-CCDD-EEFF-0011-223344556677\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{88990011-CCDD-EEFF-0011-223344556677}"
+      DTS:From="Package\LOAN_APPLICATION"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{88990011-CCDD-EEFF-0011-223344556677}"
+      DTS:To="Package\LOAN_ACCOUNT" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{99001122-DDEE-FF00-1122-334455667788\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{99001122-DDEE-FF00-1122-334455667788}"
+      DTS:From="Package\LOAN_ACCOUNT"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{99001122-DDEE-FF00-1122-334455667788}"
+      DTS:To="Package\COLLATERAL" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{AA112233-EEFF-0011-2233-445566778899\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{AA112233-EEFF-0011-2233-445566778899}"
+      DTS:From="Package\LOAN_PAYMENT"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{AA112233-EEFF-0011-2233-445566778899}"
+      DTS:To="Package\CREDIT_HISTORY" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{BB223344-FF00-1122-3344-5566778899AA\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{BB223344-FF00-1122-3344-5566778899AA}"
+      DTS:From="Package\TRACK_CHANGES"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{BB223344-FF00-1122-3344-5566778899AA}"
+      DTS:To="Package\ROWCOUNT_METADATA" />
+  </DTS:PrecedenceConstraints>
+  <DTS:DesignTimeProperties><![CDATA[<?xml version="1.0"?>
+<!--This CDATA section contains the layout information of the package. The section includes information such as (x,y) coordinates, width, and height.-->
+<!--If you manually edit this section and make a mistake, you can delete it. -->
+<!--The package will still be able to load normally but the previous layout information will be lost and the designer will automatically re-arrange the elements on the design surface.-->
+<Objects
+  Version="8">
+  <!--Each node below will contain properties that do not affect runtime behavior.-->
+  <Package
+    design-time-name="Package">
+    <LayoutInfo>
+      <GraphLayout
+        Capacity="64" xmlns="clr-namespace:Microsoft.SqlServer.IntegrationServices.Designer.Model.Serialization;assembly=Microsoft.SqlServer.IntegrationServices.Graph" xmlns:mssgle="clr-namespace:Microsoft.SqlServer.Graph.LayoutEngine;assembly=Microsoft.SqlServer.Graph" xmlns:assembly="http://schemas.microsoft.com/winfx/2006/xaml">
+        <NodeLayout
+          Size="145,42"
+          Id="Package\AUDIT_START"
+          TopLeft="250,5" />
+        <NodeLayout
+          Size="145,42"
+          Id="Package\BORROWER"
+          TopLeft="250,77" />
+        <NodeLayout
+          Size="155,42"
+          Id="Package\PROFILE_RAW"
+          TopLeft="150,149" />
+        <NodeLayout
+          Size="188,42"
+          Id="Package\LOAN_APPLICATION"
+          TopLeft="330,149" />
+        <NodeLayout
+          Size="195,42"
+          Id="Package\QUARANTINE_INVALID"
+          TopLeft="225,221" />
+        <NodeLayout
+          Size="175,42"
+          Id="Package\TRACK_CHANGES"
+          TopLeft="235,293" />
+        <NodeLayout
+          Size="169,42"
+          Id="Package\LOAN_ACCOUNT"
+          TopLeft="238,365" />
+        <NodeLayout
+          Size="168,42"
+          Id="Package\LOAN_PAYMENT"
+          TopLeft="150,437" />
+        <NodeLayout
+          Size="151,42"
+          Id="Package\COLLATERAL"
+          TopLeft="350,437" />
+        <NodeLayout
+          Size="175,42"
+          Id="Package\CREDIT_HISTORY"
+          TopLeft="235,509" />
+        <NodeLayout
+          Size="205,42"
+          Id="Package\ROWCOUNT_METADATA"
+          TopLeft="220,581" />
+        <NodeLayout
+          Size="145,42"
+          Id="Package\AUDIT_END"
+          TopLeft="250,653" />
+        <EdgeLayout
+          Id="Package.PrecedenceConstraints[{4089B549-2AA7-4365-95A4-AE81B2A32563\}]"
+          TopLeft="364.5,191">
+          <EdgeLayout.Curve>
+            <mssgle:Curve
+              StartConnector="{assembly:Null}"
+              EndConnector="-42,30"
+              Start="0,0"
+              End="-42,22.5">
+              <mssgle:Curve.Segments>
+                <mssgle:SegmentCollection
+                  Capacity="5">
+                  <mssgle:LineSegment
+                    End="0,11" />
+                  <mssgle:CubicBezierSegment
+                    Point1="0,11"
+                    Point2="0,15"
+                    Point3="-4,15" />
+                  <mssgle:LineSegment
+                    End="-38,15" />
+                  <mssgle:CubicBezierSegment
+                    Point1="-38,15"
+                    Point2="-42,15"
+                    Point3="-42,19" />
+                  <mssgle:LineSegment
+                    End="-42,22.5" />
+                </mssgle:SegmentCollection>
+              </mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels>
+            <EdgeLabelCollection />
+          </EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout
+          Id="Package.PrecedenceConstraints[{8A7113C8-AE4D-4FEA-916F-43B31014ECD9\}]"
+          TopLeft="234,479">
+          <EdgeLayout.Curve>
+            <mssgle:Curve
+              StartConnector="{assembly:Null}"
+              EndConnector="191,-42"
+              Start="0,0"
+              End="191,-34.5">
+              <mssgle:Curve.Segments>
+                <mssgle:SegmentCollection
+                  Capacity="5">
+                  <mssgle:LineSegment
+                    End="0,-17" />
+                  <mssgle:CubicBezierSegment
+                    Point1="0,-17"
+                    Point2="0,-21"
+                    Point3="4,-21" />
+                  <mssgle:LineSegment
+                    End="187,-21" />
+                  <mssgle:CubicBezierSegment
+                    Point1="187,-21"
+                    Point2="191,-21"
+                    Point3="191,-25" />
+                  <mssgle:LineSegment
+                    End="191,-34.5" />
+                </mssgle:SegmentCollection>
+              </mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels>
+            <EdgeLabelCollection />
+          </EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout
+          Id="Package.PrecedenceConstraints[{8C298A56-3EF5-488C-8D09-738F578DBDEF\}]"
+          TopLeft="366.75,479">
+          <EdgeLayout.Curve>
+            <mssgle:Curve
+              StartConnector="{assembly:Null}"
+              EndConnector="-44.25,30"
+              Start="0,0"
+              End="-44.25,22.5">
+              <mssgle:Curve.Segments>
+                <mssgle:SegmentCollection
+                  Capacity="5">
+                  <mssgle:LineSegment
+                    End="0,11" />
+                  <mssgle:CubicBezierSegment
+                    Point1="0,11"
+                    Point2="0,15"
+                    Point3="-4,15" />
+                  <mssgle:LineSegment
+                    End="-40.25,15" />
+                  <mssgle:CubicBezierSegment
+                    Point1="-40.25,15"
+                    Point2="-44.25,15"
+                    Point3="-44.25,19" />
+                  <mssgle:LineSegment
+                    End="-44.25,22.5" />
+                </mssgle:SegmentCollection>
+              </mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels>
+            <EdgeLabelCollection />
+          </EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout
+          Id="Package.PrecedenceConstraints[{C0E0C19E-6A9F-441C-8A08-9F79B983E98D\}]"
+          TopLeft="255.75,407">
+          <EdgeLayout.Curve>
+            <mssgle:Curve
+              StartConnector="{assembly:Null}"
+              EndConnector="-21.75,30"
+              Start="0,0"
+              End="-21.75,22.5">
+              <mssgle:Curve.Segments>
+                <mssgle:SegmentCollection
+                  Capacity="5">
+                  <mssgle:LineSegment
+                    End="0,11" />
+                  <mssgle:CubicBezierSegment
+                    Point1="0,11"
+                    Point2="0,15"
+                    Point3="-4,15" />
+                  <mssgle:LineSegment
+                    End="-17.75,15" />
+                  <mssgle:CubicBezierSegment
+                    Point1="-17.75,15"
+                    Point2="-21.75,15"
+                    Point3="-21.75,19" />
+                  <mssgle:LineSegment
+                    End="-21.75,22.5" />
+                </mssgle:SegmentCollection>
+              </mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels>
+            <EdgeLabelCollection />
+          </EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout
+          Id="Package.PrecedenceConstraints[{DC72F827-601A-468E-AD0F-71949BF87ADF\}]"
+          TopLeft="280.25,119">
+          <EdgeLayout.Curve>
+            <mssgle:Curve
+              StartConnector="{assembly:Null}"
+              EndConnector="-52.75,30"
+              Start="0,0"
+              End="-52.75,22.5">
+              <mssgle:Curve.Segments>
+                <mssgle:SegmentCollection
+                  Capacity="5">
+                  <mssgle:LineSegment
+                    End="0,11" />
+                  <mssgle:CubicBezierSegment
+                    Point1="0,11"
+                    Point2="0,15"
+                    Point3="-4,15" />
+                  <mssgle:LineSegment
+                    End="-48.75,15" />
+                  <mssgle:CubicBezierSegment
+                    Point1="-48.75,15"
+                    Point2="-52.75,15"
+                    Point3="-52.75,19" />
+                  <mssgle:LineSegment
+                    End="-52.75,22.5" />
+                </mssgle:SegmentCollection>
+              </mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels>
+            <EdgeLabelCollection />
+          </EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout
+          Id="Package.PrecedenceConstraints[{11223344-5566-7788-99AA-BBCCDDEEFF00\}]"
+          TopLeft="322.5,47">
+          <EdgeLayout.Curve>
+            <mssgle:Curve
+              StartConnector="{assembly:Null}"
+              EndConnector="0,30"
+              Start="0,0"
+              End="0,22.5">
+              <mssgle:Curve.Segments>
+                <mssgle:SegmentCollection
+                  Capacity="5">
+                  <mssgle:LineSegment
+                    End="0,22.5" />
+                </mssgle:SegmentCollection>
+              </mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels>
+            <EdgeLabelCollection />
+          </EdgeLayout.
+          </EdgeLayout.Labels>
+        </EdgeLayout>
+      </GraphLayout>
+    </LayoutInfo>
+  </Package>
+</Objects>]]></DTS:DesignTimeProperties>
+</DTS:Executable>

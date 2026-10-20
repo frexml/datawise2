@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE POWERMART SYSTEM "powrmart.dtd">
+<POWERMART CREATION_DATE="01/15/2024 10:30:00" REPOSITORY_VERSION="10.5.3">
+  <REPOSITORY NAME="REPO_DATAWISE" VERSION="10.5.3" CODEPAGE="UTF-8" DATABASETYPE="Microsoft SQL Server">
+    <FOLDER NAME="ML_TRANSACTION_FEATURES" OWNER="ETL_ADMIN" SHARED="SHARED"
+            DESCRIPTION="Transaction Feature Engineering for fraud detection ML model - DataWise Bank"
+            PERMISSIONS="rwx---r--" UUID="b2c3d4e5-f6a7-8901-bcde-f12345678901">
+
+      <!-- SOURCE: FACT_TRANSACTION (actual Azure SQL columns) -->
+      <SOURCE BUSINESSNAME="" DATABASETYPE="Microsoft SQL Server" DBDNAME="Datawise_demo"
+              NAME="SQ_FACT_TRANSACTION" OBJECTVERSION="1" OWNERNAME="FACT" VERSIONNUMBER="1"
+              DESCRIPTION="Transaction fact table">
+        <SOURCEFIELD FIELDNUMBER="1"  NAME="TransactionSK"       DATATYPE="integer"  KEYTYPE="PRIMARY KEY" NULLABLE="NOTNULL" LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="2"  NAME="TransactionID"       DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NOTNULL" LENGTH="50" PRECISION="50" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="3"  NAME="CustomerSK"          DATATYPE="integer"  KEYTYPE="FOREIGN KEY" NULLABLE="NULL"    LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="4"  NAME="BranchSK"            DATATYPE="integer"  KEYTYPE="FOREIGN KEY" NULLABLE="NULL"    LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="5"  NAME="TransactionDateSK"   DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="6"  NAME="Amount"              DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="18" PRECISION="18" SCALE="2"/>
+        <SOURCEFIELD FIELDNUMBER="7"  NAME="Currency"            DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="8"  NAME="TransactionType"     DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="50" PRECISION="50" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="9"  NAME="Channel"             DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="50" PRECISION="50" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="10" NAME="MerchantCategory"    DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="100" PRECISION="100" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="11" NAME="FraudFlag"           DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="1"  PRECISION="1"  SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="12" NAME="FraudScore"          DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="8"  PRECISION="8"  SCALE="4"/>
+        <SOURCEFIELD FIELDNUMBER="13" NAME="Status"              DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="20" PRECISION="20" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="14" NAME="BalanceBefore"       DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="18" PRECISION="18" SCALE="2"/>
+        <SOURCEFIELD FIELDNUMBER="15" NAME="BalanceAfter"        DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="18" PRECISION="18" SCALE="2"/>
+        <SOURCEFIELD FIELDNUMBER="16" NAME="BalanceChange"       DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="18" PRECISION="18" SCALE="2"/>
+        <SOURCEFIELD FIELDNUMBER="17" NAME="ML_FraudScore"       DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="8"  PRECISION="8"  SCALE="4"/>
+      </SOURCE>
+
+      <!-- SOURCE: DIM_CUSTOMER -->
+      <SOURCE BUSINESSNAME="" DATABASETYPE="Microsoft SQL Server" DBDNAME="Datawise_demo"
+              NAME="SQ_DIM_CUSTOMER" OBJECTVERSION="1" OWNERNAME="DIM" VERSIONNUMBER="1">
+        <SOURCEFIELD FIELDNUMBER="1"  NAME="CustomerSK"          DATATYPE="integer"  KEYTYPE="PRIMARY KEY" NULLABLE="NOTNULL" LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="2"  NAME="CreditScore"         DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="5"  PRECISION="5"  SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="3"  NAME="ChurnRisk"           DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="20" PRECISION="20" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="4"  NAME="Segment"             DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="50" PRECISION="50" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="5"  NAME="AnnualIncome"        DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="18" PRECISION="18" SCALE="2"/>
+        <SOURCEFIELD FIELDNUMBER="6"  NAME="PreferredChannel"    DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="50" PRECISION="50" SCALE="0"/>
+      </SOURCE>
+
+      <!-- TARGET: ML.TRANSACTION_FEATURES -->
+      <TARGET BUSINESSNAME="" DATABASETYPE="Microsoft SQL Server" DBDNAME="Datawise_demo"
+              NAME="TGT_TRANSACTION_FEATURES" OBJECTVERSION="1" OWNERNAME="ML"
+              TABLEOPTIONS="TRUNCATE_INSERT" VERSIONNUMBER="1"
+              DESCRIPTION="Feature store for fraud detection ML model">
+        <TARGETFIELD FIELDNUMBER="1"  NAME="FeatureID"              DATATYPE="integer"  KEYTYPE="PRIMARY KEY" NULLABLE="NOTNULL" PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="2"  NAME="TransactionSK"          DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NOTNULL" PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="3"  NAME="TransactionID"          DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NOTNULL" PRECISION="50" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="4"  NAME="CustomerSK"             DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="5"  NAME="Amount"                 DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="18" SCALE="2"/>
+        <TARGETFIELD FIELDNUMBER="6"  NAME="TransactionType"        DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="50" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="7"  NAME="Channel"                DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="50" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="8"  NAME="MerchantCategory"       DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="100" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="9"  NAME="BalanceChange"          DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="18" SCALE="2"/>
+        <TARGETFIELD FIELDNUMBER="10" NAME="FraudFlag"              DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="1"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="11" NAME="FraudScore"             DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="4"/>
+        <TARGETFIELD FIELDNUMBER="12" NAME="CustomerCreditScore"    DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="5"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="13" NAME="CustomerChurnRisk"      DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="20" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="14" NAME="CustomerSegment"        DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="50" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="15" NAME="AmountToIncomeRatio"    DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="4"/>
+        <TARGETFIELD FIELDNUMBER="16" NAME="BalanceChangeRatio"     DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="4"/>
+        <TARGETFIELD FIELDNUMBER="17" NAME="IsUnusualChannel"       DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="1"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="18" NAME="FraudLabel"             DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="1"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="19" NAME="FeatureExtractDate"     DATATYPE="date"     KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="20" NAME="BatchID"                DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="50" SCALE="0"/>
+      </TARGET>
+
+      <!-- SOURCE QUALIFIER -->
+      <TRANSFORMATION NAME="SQ_TXN_CUSTOMER" TYPE="Source Qualifier" REUSABLE="NO" OBJECTVERSION="1" VERSIONNUMBER="1">
+        <TABLEATTRIBUTE NAME="Sql Query" VALUE="
+SELECT
+  ft.TransactionID,
+  ft.CustomerSK,
+  ISNULL(ft.Amount, 0)                                               AS Amount,
+  ISNULL(ft.TransactionType, 'Unknown')                              AS TransactionType,
+  ISNULL(ft.Channel, 'Unknown')                                      AS Channel,
+  ISNULL(ft.MerchantCategory, 'Unknown')                             AS MerchantCategory,
+  DATEPART(HOUR, GETDATE())                                          AS TransactionHour,
+  CASE WHEN DATEPART(WEEKDAY, GETDATE()) IN (1,7) THEN 1 ELSE 0 END  AS IsWeekend,
+  ISNULL(vel.TxnCount24h, 1)                                         AS TxnCount24h,
+  ISNULL(vel.TxnAmount24h, ft.Amount)                                AS TxnAmount24h,
+  ISNULL(vel.TxnCount7d, 1)                                          AS TxnCount7d,
+  ISNULL(vel.TxnAmount7d, ft.Amount)                                 AS TxnAmount7d,
+  ISNULL(vel.AvgTxnAmount30d, ft.Amount)                             AS AvgTxnAmount30d,
+  ISNULL(vel.AmountDeviationScore, 0)                                AS AmountDeviationScore,
+  CAST(0 AS BIT)                                                     AS NewMerchantFlag,
+  CAST(0 AS BIT)                                                     AS NewChannelFlag,
+  ISNULL(dc.CreditScore, 600)                                        AS CustomerCreditScore,
+  ISNULL(dc.ChurnRisk, 'Low')                                        AS CustomerChurnRisk,
+  CASE WHEN ft.FraudFlag = 'Y' THEN 1 ELSE 0 END                    AS FraudLabel,
+  CAST(GETDATE() AS DATE)                                            AS FeatureExtractDate,
+  'INFORMATICA'                                                      AS ETL_SOURCE
+FROM FACT.FACT_TRANSACTION ft
+LEFT JOIN DIM.DIM_CUSTOMER dc ON dc.CustomerSK = ft.CustomerSK AND dc.IsCurrent = 1
+LEFT JOIN (
+  SELECT CustomerSK,
+    COUNT(*) AS TxnCount24h,
+    SUM(ISNULL(Amount,0)) AS TxnAmount24h,
+    COUNT(*) AS TxnCount7d,
+    SUM(ISNULL(Amount,0)) AS TxnAmount7d,
+    AVG(ISNULL(Amount,0)) AS AvgTxnAmount30d,
+    (MAX(ISNULL(Amount,0)) - AVG(ISNULL(Amount,0))) / NULLIF(AVG(ISNULL(Amount,0)),0) AS AmountDeviationScore
+  FROM FACT.FACT_TRANSACTION
+  GROUP BY CustomerSK
+) vel ON vel.CustomerSK = ft.CustomerSK"/>
+        <TABLEATTRIBUTE NAME="Source Filter" VALUE=""/>
+      </TRANSFORMATION>
+
+      <!-- EXPRESSION: derive fraud features -->
+      <TRANSFORMATION NAME="EXP_TXN_FEATURES" TYPE="Expression" REUSABLE="NO" OBJECTVERSION="1" VERSIONNUMBER="1">
+        <TRANSFORMFIELD NAME="AmountToIncomeRatio"  DATATYPE="decimal" PORTTYPE="OUTPUT" PRECISION="8" SCALE="4"
+          EXPRESSION="IIF(ISNULL(AnnualIncome) OR AnnualIncome = 0, 0, Amount / (AnnualIncome / 12.0))"/>
+        <TRANSFORMFIELD NAME="BalanceChangeRatio"   DATATYPE="decimal" PORTTYPE="OUTPUT" PRECISION="8" SCALE="4"
+          EXPRESSION="IIF(ISNULL(BalanceBefore) OR BalanceBefore = 0, 0, ABS(BalanceChange) / ABS(BalanceBefore))"/>
+        <TRANSFORMFIELD NAME="IsUnusualChannel"     DATATYPE="integer" PORTTYPE="OUTPUT" PRECISION="1" SCALE="0"
+          EXPRESSION="IIF(Channel != PreferredChannel AND NOT ISNULL(PreferredChannel), 1, 0)"/>
+        <TRANSFORMFIELD NAME="FraudLabel"           DATATYPE="integer" PORTTYPE="OUTPUT" PRECISION="1" SCALE="0"
+          EXPRESSION="IIF(FraudFlag = 'Y', 1, 0)"/>
+        <TRANSFORMFIELD NAME="FeatureExtractDate"   DATATYPE="date"    PORTTYPE="OUTPUT" PRECISION="10" SCALE="0"
+          EXPRESSION="TRUNC(SYSDATE)"/>
+        <TRANSFORMFIELD NAME="BatchID"              DATATYPE="string"  PORTTYPE="OUTPUT" PRECISION="50" SCALE="0"
+          EXPRESSION="TO_CHAR(SYSDATE, 'YYYYMMDDHHMMSS')"/>
+      </TRANSFORMATION>
+
+      <!-- SEQUENCE GENERATOR -->
+      <TRANSFORMATION NAME="SEQ_FEATURE_ID" TYPE="Sequence Generator" REUSABLE="NO" OBJECTVERSION="1" VERSIONNUMBER="1">
+        <TABLEATTRIBUTE NAME="Start Value"   VALUE="1"/>
+        <TABLEATTRIBUTE NAME="Increment By"  VALUE="1"/>
+        <TABLEATTRIBUTE NAME="Reset"         VALUE="NO"/>
+      </TRANSFORMATION>
+
+      <!-- MAPPING -->
+      <MAPPING NAME="M_TRANSACTION_FEATURE_ENGINEERING" OBJECTVERSION="1" VERSIONNUMBER="1"
+               DESCRIPTION="Extract and engineer features from FACT_TRANSACTION + DIM_CUSTOMER for fraud detection ML model">
+        <CONNECTOR FROMFIELD="NEXTVAL"            FROMINSTANCE="SEQ_FEATURE_ID"   FROMINSTANCETYPE="Sequence Generator"
+                   TOFIELD="FeatureID"            TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="TransactionSK"      FROMINSTANCE="SQ_TXN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="TransactionSK"        TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="TransactionID"      FROMINSTANCE="SQ_TXN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="TransactionID"        TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="CustomerSK"         FROMINSTANCE="SQ_TXN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CustomerSK"           TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="Amount"             FROMINSTANCE="SQ_TXN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="Amount"               TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="TransactionType"    FROMINSTANCE="SQ_TXN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="TransactionType"      TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="Channel"            FROMINSTANCE="SQ_TXN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="Channel"              TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="MerchantCategory"   FROMINSTANCE="SQ_TXN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="MerchantCategory"     TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="BalanceChange"      FROMINSTANCE="SQ_TXN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="BalanceChange"        TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="FraudFlag"          FROMINSTANCE="SQ_TXN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="FraudFlag"            TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="FraudScore"         FROMINSTANCE="SQ_TXN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="FraudScore"           TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="CreditScore"        FROMINSTANCE="SQ_TXN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CustomerCreditScore"  TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="ChurnRisk"          FROMINSTANCE="SQ_TXN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CustomerChurnRisk"    TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="Segment"            FROMINSTANCE="SQ_TXN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CustomerSegment"      TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="AmountToIncomeRatio"  FROMINSTANCE="EXP_TXN_FEATURES" FROMINSTANCETYPE="Expression"
+                   TOFIELD="AmountToIncomeRatio"    TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="BalanceChangeRatio"   FROMINSTANCE="EXP_TXN_FEATURES" FROMINSTANCETYPE="Expression"
+                   TOFIELD="BalanceChangeRatio"     TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="IsUnusualChannel"     FROMINSTANCE="EXP_TXN_FEATURES" FROMINSTANCETYPE="Expression"
+                   TOFIELD="IsUnusualChannel"       TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="FraudLabel"           FROMINSTANCE="EXP_TXN_FEATURES" FROMINSTANCETYPE="Expression"
+                   TOFIELD="FraudLabel"             TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="FeatureExtractDate"   FROMINSTANCE="EXP_TXN_FEATURES" FROMINSTANCETYPE="Expression"
+                   TOFIELD="FeatureExtractDate"     TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="BatchID"              FROMINSTANCE="EXP_TXN_FEATURES" FROMINSTANCETYPE="Expression"
+                   TOFIELD="BatchID"               TOINSTANCE="TGT_TRANSACTION_FEATURES" TOINSTANCETYPE="Target Definition"/>
+      </MAPPING>
+
+      <!-- WORKFLOW -->
+      <WORKFLOW NAME="WF_TRANSACTION_FEATURE_ENGINEERING" OBJECTVERSION="1" VERSIONNUMBER="1"
+                DESCRIPTION="Transaction feature engineering workflow for fraud detection">
+        <WORKLET NAME="WL_TXN_FEATURES" OBJECTVERSION="1" VERSIONNUMBER="1">
+          <SESSION NAME="S_M_TRANSACTION_FEATURE_ENGINEERING" OBJECTVERSION="1" VERSIONNUMBER="1"
+                   MAPPINGNAME="M_TRANSACTION_FEATURE_ENGINEERING">
+            <ATTRIBUTE NAME="$Source connection value"  VALUE="Datawise_demo"/>
+            <ATTRIBUTE NAME="$Target connection value"  VALUE="Datawise_demo"/>
+            <ATTRIBUTE NAME="Treat source rows as"      VALUE="Data Driven"/>
+            <ATTRIBUTE NAME="Commit Type"               VALUE="Target"/>
+            <ATTRIBUTE NAME="Commit Interval"           VALUE="10000"/>
+          </SESSION>
+        </WORKLET>
+      </WORKFLOW>
+
+    </FOLDER>
+  </REPOSITORY>
+</POWERMART>

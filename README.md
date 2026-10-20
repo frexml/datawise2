@@ -62,6 +62,14 @@ Existing tools do one slice well — Lakebridge converts (Databricks-locked, fre
 
 Synthetic POC estate under `data/synthetic_estate/` (`seed=42`, `Faker`+`sqlglot`) — **no production data needed**: 50 tables, 24 views, 18 SPs, 14 ETL (DataStage/SSIS/Informatica), 12 schedules, 8 dashboards, 147 lineage edges, 100-Q bench.
 
+**External estate (demo default): `DataWise Platform`.** Pinned, secret-scrubbed snapshot at `data/external_estates/datawise_platform/` (commit `337088f`, 56 files) parsed from `git_upload_etls/` — 67 tables, 13 views (4 truncated), 5 procs (2 truncated), 19 Control-M jobs, 330 lineage edges, 935 column rows across T-SQL DDL, DataStage `.dsx`, SSIS `.dtsx`, Informatica `.xml`, Talend `.item`, ML pipelines (`ML.LOAN_APPROVAL_PIPELINE`, `ML.FRAUD_DETECTION_PIPELINE`) plus runtime evidence (failed steps, rejects) from `run_summary.json`. The 3 synthetic estates remain available. Refresh with:
+
+```bash
+uv run python -m dsxlineage.estate.ingest.snapshot --refresh   # re-clone pinned commit, re-redact
+uv run python -m dsxlineage.estate.ingest.live_dw              # optional: row estimates from Azure SQL
+uv run python -m dsxlineage.estate.ingest.build                 # → EXPECTED_LINEAGE.json (124 declared refs)
+```
+
 ---
 
 ## Architecture — Legacy Intelligence Platform (Composable with Your Existing Tools)
@@ -226,7 +234,7 @@ uv run python -m dsxlineage.synthetic.generator data/synthetic_estate_telco tele
 ```bash
 uv run uvicorn dsxlineage.main:app --reload --port 8000
 # Visit http://localhost:8000/docs
-# New workflow: POST /api/estates {estate_type:"banking"|"telecom", connection:{host,port,user}} → POST /{id}/test-connection → POST /{id}/survey → GET /{id}/survey/todo (live 8-step Todo)
+# New workflow: POST /api/estates {estate_type:"datawise_platform"|"banking"|"telecom", source_type:"git"|"synthetic"} → POST /{id}/test-connection → POST /{id}/survey → GET /{id}/survey/todo (live 8-step Todo)
 # Try: POST /api/estates {"name":"NORTHSTAR","estate_type":"banking","source_type":"synthetic"} → POST /api/estates/1/test-connection → POST /api/estates/1/survey
 ```
 
@@ -412,7 +420,7 @@ localStorage.clear()   # clears mock AuthContext token
 *   **Package manager:** `uv` only (`uv add`, `uv run`) — never `pip`/`poetry` (per `CLAUDE.md`).
 *   **Dates:** Never hardcoded — `date.today()` / `datetime.now(timezone.utc)` / `-var="created_on=$(date -u +%F)"` in Terraform.
 *   **Structured LLM I/O:** Pydantic v2 for all inputs/outputs, `max_tokens` on every call, `OPENROUTER_MODEL` provider-prefixed.
-*   **PII:** Hashed / masked before LLM; never logged raw; no production data in POC — synthetic only.
+*   **PII:** Hashed / masked before LLM; never logged raw; POC data is synthetic plus a public demo snapshot whose secrets are redacted and whose PII fixtures are vendored **header-only** (`tests/test_datawise_security.py` enforces this in CI).
 *   **Observability:** LangSmith/LangFuse traces tagged `run_date/env/agent_id/model`; cost logged per run.
 *   **Security:** Vault for secrets, least-privilege IAM, no wildcard policies.
 

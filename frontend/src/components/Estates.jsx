@@ -37,6 +37,18 @@ const TEMPLATES = {
     db_type: 'oracle',
     icon: '📄',
   },
+  datawise_platform: {
+    name: 'DATAWISE_PLATFORM',
+    display_name: 'DataWise Banking Platform',
+    estate_type: 'datawise_platform',
+    source_type: 'git',
+    description: 'DataWise ADW — SSIS + Talend + DataStage + Informatica + Control-M (19 jobs, 5 schemas)',
+    host: 'datawise.database.windows.net',
+    port: 1433,
+    user: 'datawise_ro',
+    db_type: 'azure_sql',
+    icon: '🏦',
+  },
 };
 
 function TodoList({ todo, currentStage, onApprove, isPendingApproval, preview }) {
@@ -103,8 +115,8 @@ export default function Estates() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [template, setTemplate] = useState('banking');
-  const [conn, setConn] = useState({ host: TEMPLATES.banking.host, port: TEMPLATES.banking.port, user: TEMPLATES.banking.user, db_type: TEMPLATES.banking.db_type });
+  const [template, setTemplate] = useState('datawise_platform');
+  const [conn, setConn] = useState({ host: TEMPLATES.datawise_platform.host, port: TEMPLATES.datawise_platform.port, user: TEMPLATES.datawise_platform.user, db_type: TEMPLATES.datawise_platform.db_type });
   const [creating, setCreating] = useState(false);
   const [surveying, setSurveying] = useState(null); // estate id being surveyed
   const [todo, setTodo] = useState([]);
@@ -140,7 +152,7 @@ export default function Estates() {
       const createRes = await axios.post('/api/estates', {
         name: tpl.name,
         display_name: tpl.display_name,
-        source_type: 'synthetic',
+        source_type: tpl.source_type || 'synthetic',
         estate_type: tpl.estate_type,
         connection: { host: conn.host, port: conn.port, user: conn.user, db_type: conn.db_type, status: 'pending' },
         defer_discovery: true,

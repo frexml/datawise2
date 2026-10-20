@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE POWERMART SYSTEM "powrmart.dtd">
+<POWERMART CREATION_DATE="01/15/2024 09:30:00" REPOSITORY_VERSION="10.5.3">
+  <REPOSITORY NAME="REPO_DATAWISE" VERSION="10.5.3" CODEPAGE="UTF-8" DATABASETYPE="Microsoft SQL Server">
+    <FOLDER NAME="ML_LOAN_FEATURES" OWNER="ETL_ADMIN" SHARED="SHARED"
+            DESCRIPTION="Loan Approval Feature Engineering for ML scoring - DataWise Bank"
+            PERMISSIONS="rwx---r--" UUID="a1b2c3d4-e5f6-7890-abcd-ef1234567890">
+
+      <!-- SOURCE: FACT_LOAN (actual Azure SQL columns) -->
+      <SOURCE BUSINESSNAME="" DATABASETYPE="Microsoft SQL Server" DBDNAME="Datawise_demo"
+              NAME="SQ_FACT_LOAN" OBJECTVERSION="1" OWNERNAME="FACT" VERSIONNUMBER="1"
+              DESCRIPTION="Loan fact table">
+        <SOURCEFIELD FIELDNUMBER="1"  NAME="LoanFactSK"          DATATYPE="integer"  KEYTYPE="PRIMARY KEY" NULLABLE="NOTNULL" LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="2"  NAME="AccountID"           DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="50" PRECISION="50" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="3"  NAME="CustomerSK"          DATATYPE="integer"  KEYTYPE="FOREIGN KEY" NULLABLE="NULL"    LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="4"  NAME="ProductSK"           DATATYPE="integer"  KEYTYPE="FOREIGN KEY" NULLABLE="NULL"    LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="5"  NAME="BranchSK"            DATATYPE="integer"  KEYTYPE="FOREIGN KEY" NULLABLE="NULL"    LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="6"  NAME="ApplicationDateSK"   DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="7"  NAME="LoanAmount"          DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="18" PRECISION="18" SCALE="2"/>
+        <SOURCEFIELD FIELDNUMBER="8"  NAME="OutstandingBalance"  DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="18" PRECISION="18" SCALE="2"/>
+        <SOURCEFIELD FIELDNUMBER="9"  NAME="InterestRate"        DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="8"  PRECISION="8"  SCALE="4"/>
+        <SOURCEFIELD FIELDNUMBER="10" NAME="TermMonths"          DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="5"  PRECISION="5"  SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="11" NAME="MonthlyInstalment"   DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="18" PRECISION="18" SCALE="2"/>
+        <SOURCEFIELD FIELDNUMBER="12" NAME="DTIRatio"            DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="8"  PRECISION="8"  SCALE="4"/>
+        <SOURCEFIELD FIELDNUMBER="13" NAME="LTVRatio"            DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="8"  PRECISION="8"  SCALE="4"/>
+        <SOURCEFIELD FIELDNUMBER="14" NAME="CollateralValue"     DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="18" PRECISION="18" SCALE="2"/>
+        <SOURCEFIELD FIELDNUMBER="15" NAME="DaysPastDue"         DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="5"  PRECISION="5"  SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="16" NAME="PD"                  DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="8"  PRECISION="8"  SCALE="6"/>
+        <SOURCEFIELD FIELDNUMBER="17" NAME="LGD"                 DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="8"  PRECISION="8"  SCALE="6"/>
+        <SOURCEFIELD FIELDNUMBER="18" NAME="EAD"                 DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="18" PRECISION="18" SCALE="2"/>
+        <SOURCEFIELD FIELDNUMBER="19" NAME="ExpectedLoss"        DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="18" PRECISION="18" SCALE="2"/>
+        <SOURCEFIELD FIELDNUMBER="20" NAME="AccountStatus"       DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="20" PRECISION="20" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="21" NAME="ApplicationStatus"   DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="20" PRECISION="20" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="22" NAME="IsNPL"               DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="1"  PRECISION="1"  SCALE="0"/>
+      </SOURCE>
+
+      <!-- SOURCE: DIM_CUSTOMER (actual Azure SQL columns) -->
+      <SOURCE BUSINESSNAME="" DATABASETYPE="Microsoft SQL Server" DBDNAME="Datawise_demo"
+              NAME="SQ_DIM_CUSTOMER" OBJECTVERSION="1" OWNERNAME="DIM" VERSIONNUMBER="1"
+              DESCRIPTION="Customer dimension">
+        <SOURCEFIELD FIELDNUMBER="1"  NAME="CustomerSK"          DATATYPE="integer"  KEYTYPE="PRIMARY KEY" NULLABLE="NOTNULL" LENGTH="10" PRECISION="10" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="2"  NAME="CustomerID"          DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="50" PRECISION="50" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="3"  NAME="AnnualIncome"        DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="18" PRECISION="18" SCALE="2"/>
+        <SOURCEFIELD FIELDNUMBER="4"  NAME="YearsEmployed"       DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="5"  PRECISION="5"  SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="5"  NAME="EmploymentStatus"    DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="30" PRECISION="30" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="6"  NAME="LoyaltyTier"         DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="20" PRECISION="20" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="7"  NAME="RelationshipScore"   DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="5"  PRECISION="5"  SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="8"  NAME="CreditScore"         DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="5"  PRECISION="5"  SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="9"  NAME="CreditBand"          DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="20" PRECISION="20" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="10" NAME="ChurnRisk"           DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="20" PRECISION="20" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="11" NAME="Segment"             DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="50" PRECISION="50" SCALE="0"/>
+        <SOURCEFIELD FIELDNUMBER="12" NAME="LifetimeValue"       DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="18" PRECISION="18" SCALE="2"/>
+        <SOURCEFIELD FIELDNUMBER="13" NAME="Incomeband"          DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    LENGTH="20" PRECISION="20" SCALE="0"/>
+      </SOURCE>
+
+      <!-- TARGET: ML.LOAN_APPROVAL_FEATURES -->
+      <TARGET BUSINESSNAME="" DATABASETYPE="Microsoft SQL Server" DBDNAME="Datawise_demo"
+              NAME="TGT_LOAN_APPROVAL_FEATURES" OBJECTVERSION="1" OWNERNAME="ML"
+              TABLEOPTIONS="TRUNCATE_INSERT" VERSIONNUMBER="1"
+              DESCRIPTION="Feature store for loan approval ML model">
+        <TARGETFIELD FIELDNUMBER="1"  NAME="FeatureID"           DATATYPE="integer"  KEYTYPE="PRIMARY KEY" NULLABLE="NOTNULL" PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="2"  NAME="LoanFactSK"          DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NOTNULL" PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="3"  NAME="CustomerSK"          DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="4"  NAME="LoanAmount"          DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="18" SCALE="2"/>
+        <TARGETFIELD FIELDNUMBER="5"  NAME="TermMonths"          DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="5"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="6"  NAME="InterestRate"        DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="4"/>
+        <TARGETFIELD FIELDNUMBER="7"  NAME="DTIRatio"            DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="4"/>
+        <TARGETFIELD FIELDNUMBER="8"  NAME="LTVRatio"            DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="4"/>
+        <TARGETFIELD FIELDNUMBER="9"  NAME="CollateralValue"     DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="18" SCALE="2"/>
+        <TARGETFIELD FIELDNUMBER="10" NAME="DaysPastDue"         DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="5"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="11" NAME="PD"                  DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="6"/>
+        <TARGETFIELD FIELDNUMBER="12" NAME="LGD"                 DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="6"/>
+        <TARGETFIELD FIELDNUMBER="13" NAME="ExpectedLoss"        DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="18" SCALE="2"/>
+        <TARGETFIELD FIELDNUMBER="14" NAME="IsNPL"               DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="1"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="15" NAME="CreditScore"         DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="5"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="16" NAME="CreditBand"          DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="20" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="17" NAME="AnnualIncome"        DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="18" SCALE="2"/>
+        <TARGETFIELD FIELDNUMBER="18" NAME="YearsEmployed"       DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="5"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="19" NAME="EmploymentStatus"    DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="30" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="20" NAME="LoyaltyTier"         DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="20" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="21" NAME="RelationshipScore"   DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="5"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="22" NAME="ChurnRisk"           DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="20" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="23" NAME="Segment"             DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="50" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="24" NAME="Incomeband"          DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="20" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="25" NAME="DebtToIncomeRatio"   DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="4"/>
+        <TARGETFIELD FIELDNUMBER="26" NAME="LoanToIncomeRatio"   DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="4"/>
+        <TARGETFIELD FIELDNUMBER="27" NAME="RiskScore"           DATATYPE="decimal"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="8"  SCALE="4"/>
+        <TARGETFIELD FIELDNUMBER="28" NAME="ApprovalLabel"       DATATYPE="integer"  KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="1"  SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="29" NAME="FeatureExtractDate"  DATATYPE="date"     KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="10" SCALE="0"/>
+        <TARGETFIELD FIELDNUMBER="30" NAME="BatchID"             DATATYPE="string"   KEYTYPE="NOT A KEY"   NULLABLE="NULL"    PRECISION="50" SCALE="0"/>
+      </TARGET>
+
+      <!-- SOURCE QUALIFIER -->
+      <TRANSFORMATION NAME="SQ_LOAN_CUSTOMER" TYPE="Source Qualifier" REUSABLE="NO" OBJECTVERSION="1" VERSIONNUMBER="1">
+        <TABLEATTRIBUTE NAME="Sql Query" VALUE="
+SELECT
+  fl.AccountID                                                       AS ApplicationID,
+  fl.CustomerSK,
+  dc.CreditScore,
+  dc.CreditBand,
+  ISNULL(fl.DaysPastDue, 0)                                          AS MaxDPD12Months,
+  ISNULL(fl.DaysPastDue, 0)                                          AS MaxDPD24Months,
+  ISNULL(dc.RelationshipScore, 50)                                   AS PaymentHistoryScore,
+  ISNULL(fl.LTVRatio, 0)                                             AS UtilisationRatio,
+  1                                                                  AS TotalFacilities,
+  ISNULL(fl.IsNPL, 0)                                                AS NonPerformingFacilities,
+  0                                                                  AS Bankruptcies,
+  ISNULL(dc.AnnualIncome, 0)                                         AS AnnualIncome,
+  ISNULL(fl.OutstandingBalance, 0)                                   AS ExistingDebt,
+  ISNULL(fl.DTIRatio, 0)                                             AS DTIRatio,
+  ISNULL(dc.YearsEmployed, 0)                                        AS YearsEmployed,
+  ISNULL(dc.EmploymentStatus, 'Unknown')                             AS EmploymentStatus,
+  ISNULL(dc.RelationshipScore, 50)                                   AS IncomeStabilityScore,
+  ISNULL(fl.LoanAmount, 0)                                           AS LoanAmount,
+  ISNULL(fl.TermMonths, 12)                                          AS LoanTermMonths,
+  'General'                                                          AS LoanPurpose,
+  ISNULL(fl.InterestRate, 0)                                         AS RequestedRate,
+  'Real Estate'                                                      AS CollateralType,
+  ISNULL(fl.CollateralValue, 0)                                      AS CollateralValue,
+  ISNULL(fl.LTVRatio, 0)                                             AS LTVRatio,
+  50                                                                 AS CollateralQualityScore,
+  ISNULL(ta.TxnCount, 0)                                             AS TotalTransactions,
+  ISNULL(ta.AvgBalance, 0)                                           AS AvgMonthlyBalance,
+  ISNULL(ta.FraudCount, 0)                                           AS FraudAlerts,
+  ISNULL(dc.RelationshipScore, 50)                                   AS RelationshipScore,
+  ISNULL(dc.LoyaltyTier, 'Bronze')                                   AS LoyaltyTier,
+  ISNULL(dc.ChurnRisk, 'Low')                                        AS ChurnRisk,
+  10.0                                                               AS BaseRate,
+  75                                                                 AS ProductRiskWeight,
+  CASE WHEN fl.AccountStatus = 'Active' THEN 1 ELSE 0 END            AS ApprovalDecision,
+  CAST(GETDATE() AS DATE)                                            AS FeatureExtractDate,
+  'INFORMATICA'                                                      AS ETL_SOURCE
+FROM FACT.FACT_LOAN fl
+LEFT JOIN DIM.DIM_CUSTOMER dc ON dc.CustomerSK = fl.CustomerSK AND dc.IsCurrent = 1
+LEFT JOIN (
+  SELECT CustomerSK,
+    COUNT(*) AS TxnCount,
+    AVG(ISNULL(BalanceBefore, 0)) AS AvgBalance,
+    SUM(CASE WHEN FraudFlag = 'Y' THEN 1 ELSE 0 END) AS FraudCount
+  FROM FACT.FACT_TRANSACTION
+  GROUP BY CustomerSK
+) ta ON ta.CustomerSK = fl.CustomerSK"/>
+        <TABLEATTRIBUTE NAME="Source Filter" VALUE=""/>
+      </TRANSFORMATION>
+
+      <!-- EXPRESSION: derive ML features -->
+      <TRANSFORMATION NAME="EXP_LOAN_FEATURES" TYPE="Expression" REUSABLE="NO" OBJECTVERSION="1" VERSIONNUMBER="1">
+        <TRANSFORMFIELD NAME="DebtToIncomeRatio"  DATATYPE="decimal" PORTTYPE="OUTPUT" PRECISION="8" SCALE="4"
+          EXPRESSION="IIF(ISNULL(AnnualIncome) OR AnnualIncome = 0, 0, (MonthlyInstalment * 12) / AnnualIncome)"/>
+        <TRANSFORMFIELD NAME="LoanToIncomeRatio"  DATATYPE="decimal" PORTTYPE="OUTPUT" PRECISION="8" SCALE="4"
+          EXPRESSION="IIF(ISNULL(AnnualIncome) OR AnnualIncome = 0, 0, LoanAmount / AnnualIncome)"/>
+        <TRANSFORMFIELD NAME="RiskScore"          DATATYPE="decimal" PORTTYPE="OUTPUT" PRECISION="8" SCALE="4"
+          EXPRESSION="(PD * LGD * 0.4) + (IIF(DaysPastDue > 90, 0.3, DaysPastDue / 300.0)) + (IIF(CreditScore = 0, 0.3, (850 - CreditScore) / 850.0) * 0.3)"/>
+        <TRANSFORMFIELD NAME="ApprovalLabel"      DATATYPE="integer" PORTTYPE="OUTPUT" PRECISION="1" SCALE="0"
+          EXPRESSION="IIF(ApplicationStatus = 'Approved' OR AccountStatus = 'Active', 1, 0)"/>
+        <TRANSFORMFIELD NAME="FeatureExtractDate" DATATYPE="date"    PORTTYPE="OUTPUT" PRECISION="10" SCALE="0"
+          EXPRESSION="TRUNC(SYSDATE)"/>
+        <TRANSFORMFIELD NAME="BatchID"            DATATYPE="string"  PORTTYPE="OUTPUT" PRECISION="50" SCALE="0"
+          EXPRESSION="TO_CHAR(SYSDATE, 'YYYYMMDDHHMMSS')"/>
+      </TRANSFORMATION>
+
+      <!-- SEQUENCE GENERATOR for FeatureID -->
+      <TRANSFORMATION NAME="SEQ_FEATURE_ID" TYPE="Sequence Generator" REUSABLE="NO" OBJECTVERSION="1" VERSIONNUMBER="1">
+        <TABLEATTRIBUTE NAME="Start Value"    VALUE="1"/>
+        <TABLEATTRIBUTE NAME="Increment By"  VALUE="1"/>
+        <TABLEATTRIBUTE NAME="Reset"         VALUE="NO"/>
+      </TRANSFORMATION>
+
+      <!-- MAPPING -->
+      <MAPPING NAME="M_LOAN_APPROVAL_FEATURE_ENGINEERING" OBJECTVERSION="1" VERSIONNUMBER="1"
+               DESCRIPTION="Extract and engineer features from FACT_LOAN + DIM_CUSTOMER for loan approval ML model">
+        <CONNECTOR FROMFIELD="NEXTVAL"           FROMINSTANCE="SEQ_FEATURE_ID"    FROMINSTANCETYPE="Sequence Generator"
+                   TOFIELD="FeatureID"           TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="LoanFactSK"        FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="LoanFactSK"          TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="CustomerSK"        FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CustomerSK"          TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="LoanAmount"        FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="LoanAmount"          TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="TermMonths"        FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="TermMonths"          TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="InterestRate"      FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="InterestRate"        TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="DTIRatio"          FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="DTIRatio"            TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="LTVRatio"          FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="LTVRatio"            TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="CollateralValue"   FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CollateralValue"     TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="DaysPastDue"       FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="DaysPastDue"         TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="PD"                FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="PD"                  TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="LGD"               FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="LGD"                 TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="ExpectedLoss"      FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="ExpectedLoss"        TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="IsNPL"             FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="IsNPL"               TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="CreditScore"       FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CreditScore"         TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="CreditBand"        FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="CreditBand"          TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="AnnualIncome"      FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="AnnualIncome"        TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="YearsEmployed"     FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="YearsEmployed"       TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="EmploymentStatus"  FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="EmploymentStatus"    TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="LoyaltyTier"       FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="LoyaltyTier"         TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="RelationshipScore" FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="RelationshipScore"   TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="ChurnRisk"         FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="ChurnRisk"           TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="Segment"           FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="Segment"             TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="Incomeband"        FROMINSTANCE="SQ_LOAN_CUSTOMER"  FROMINSTANCETYPE="Source Qualifier"
+                   TOFIELD="Incomeband"          TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="DebtToIncomeRatio" FROMINSTANCE="EXP_LOAN_FEATURES" FROMINSTANCETYPE="Expression"
+                   TOFIELD="DebtToIncomeRatio"   TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="LoanToIncomeRatio" FROMINSTANCE="EXP_LOAN_FEATURES" FROMINSTANCETYPE="Expression"
+                   TOFIELD="LoanToIncomeRatio"   TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="RiskScore"         FROMINSTANCE="EXP_LOAN_FEATURES" FROMINSTANCETYPE="Expression"
+                   TOFIELD="RiskScore"           TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="ApprovalLabel"     FROMINSTANCE="EXP_LOAN_FEATURES" FROMINSTANCETYPE="Expression"
+                   TOFIELD="ApprovalLabel"       TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="FeatureExtractDate" FROMINSTANCE="EXP_LOAN_FEATURES" FROMINSTANCETYPE="Expression"
+                   TOFIELD="FeatureExtractDate"  TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+        <CONNECTOR FROMFIELD="BatchID"           FROMINSTANCE="EXP_LOAN_FEATURES" FROMINSTANCETYPE="Expression"
+                   TOFIELD="BatchID"             TOINSTANCE="TGT_LOAN_APPROVAL_FEATURES" TOINSTANCETYPE="Target Definition"/>
+      </MAPPING>
+
+      <!-- WORKFLOW -->
+      <WORKFLOW NAME="WF_LOAN_APPROVAL_FEATURE_ENGINEERING" OBJECTVERSION="1" VERSIONNUMBER="1"
+                DESCRIPTION="Loan approval feature engineering workflow">
+        <WORKLET NAME="WL_LOAN_FEATURES" OBJECTVERSION="1" VERSIONNUMBER="1">
+          <SESSION NAME="S_M_LOAN_APPROVAL_FEATURE_ENGINEERING" OBJECTVERSION="1" VERSIONNUMBER="1"
+                   MAPPINGNAME="M_LOAN_APPROVAL_FEATURE_ENGINEERING">
+            <ATTRIBUTE NAME="$Source connection value"  VALUE="Datawise_demo"/>
+            <ATTRIBUTE NAME="$Target connection value"  VALUE="Datawise_demo"/>
+            <ATTRIBUTE NAME="Treat source rows as"      VALUE="Data Driven"/>
+            <ATTRIBUTE NAME="Commit Type"               VALUE="Target"/>
+            <ATTRIBUTE NAME="Commit Interval"           VALUE="10000"/>
+          </SESSION>
+        </WORKLET>
+      </WORKFLOW>
+
+    </FOLDER>
+  </REPOSITORY>
+</POWERMART>

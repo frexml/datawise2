@@ -2,10 +2,45 @@ import React, { useState } from 'react';
 import ReactFlow, { Background, Controls, MiniMap } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-export default function GraphPanel({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, onNodeMouseEnter, onNodeMouseLeave, selected, blast, unresolvedCount, hoverPreview, highlightCol, onClearHighlight }) {
+const SELECTED_STYLE = { background: '#4F46E5', color: '#fff', border: '2px solid #4338CA', opacity: 1 };
+const NEIGHBOR_STYLE = { background: '#A7F3D0', color: '#065F46', border: '2px solid #059669', opacity: 1 };
+
+export default function GraphPanel({ nodes, edges, onNodesChange, onEdgesChange, onNodeClick, onNodeMouseEnter, onNodeMouseLeave, selected, blast, unresolvedCount, hoverPreview, highlightCol, onClearHighlight, onPaneClick }) {
   const [expanded, setExpanded] = useState(false);
 
   React.useEffect(() => { setExpanded(false); }, [selected]);
+
+  // Direct neighbors of the clicked node (1-hop, undirected). Transitive
+  // connectivity would light up almost the whole estate (140/151 nodes form a
+  // single component), which defeats the point of dimming the rest.
+  const highlight = React.useMemo(() => {
+    if (!selected) return null;
+    const connected = new Set([selected]);
+    for (const e of edges) {
+      if (e.source === selected) connected.add(e.target);
+      else if (e.target === selected) connected.add(e.source);
+    }
+    return connected;
+  }, [selected, edges]);
+
+  const viewNodes = React.useMemo(() => {
+    if (!highlight) return nodes;
+    return nodes.map((n) => {
+      if (n.id === selected) return { ...n, style: { ...n.style, ...SELECTED_STYLE } };
+      if (highlight.has(n.id)) return { ...n, style: { ...n.style, ...NEIGHBOR_STYLE } };
+      return { ...n, style: { ...n.style, opacity: 0.15 } };
+    });
+  }, [nodes, highlight, selected]);
+
+  const viewEdges = React.useMemo(() => {
+    if (!highlight) return edges;
+    return edges.map((e) => {
+      const lit = highlight.has(e.source) && highlight.has(e.target);
+      return lit
+        ? { ...e, animated: true, style: { ...e.style, stroke: '#059669', strokeWidth: 2, opacity: 1 } }
+        : { ...e, style: { ...e.style, opacity: 0.08 } };
+    });
+  }, [edges, highlight]);
 
   const blastList = blast?.blast_radius || [];
   const count = blast?.count ?? blastList.length;
@@ -16,7 +51,17 @@ export default function GraphPanel({ nodes, edges, onNodesChange, onEdgesChange,
   return (
     <div className="bg-white dark:bg-gray-800 border rounded-lg">
       <div style={{ height: 650 }} className="relative">
-        <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onNodeClick={onNodeClick} onNodeMouseEnter={onNodeMouseEnter} onNodeMouseLeave={onNodeMouseLeave} fitView>
+        <ReactFlow
+          nodes={viewNodes}
+          edges={viewEdges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={onNodeClick}
+          onNodeMouseEnter={onNodeMouseEnter}
+          onNodeMouseLeave={onNodeMouseLeave}
+          onPaneClick={onPaneClick}
+          fitView
+        >
           <Background />
           <Controls />
           <MiniMap />
@@ -61,6 +106,7 @@ export default function GraphPanel({ nodes, edges, onNodesChange, onEdgesChange,
                 )}
               </span>
             )}
+            <span className="text-gray-400">· {Math.max((highlight?.size || 1) - 1, 0)} connected highlighted — click background to clear</span>
           </div>
         </div>
       )}

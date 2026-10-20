@@ -1,0 +1,575 @@
+<?xml version="1.0"?>
+<DTS:Executable xmlns:DTS="www.microsoft.com/SqlServer/Dts"
+  DTS:refId="Package"
+  DTS:CreationDate="10/17/2026 3:24:11 PM"
+  DTS:CreationName="Microsoft.Package"
+  DTS:CreatorComputerName="KUNAL"
+  DTS:CreatorName="KUNAL\jangr"
+  DTS:DTSID="{EE6FBD10-6AE4-42B0-9298-80D9379DCF5A}"
+  DTS:ExecutableType="Microsoft.Package"
+  DTS:LastModifiedProductVersion="17.0.1016.0"
+  DTS:LocaleID="16393"
+  DTS:ObjectName="RETAIL_DB_EXTRACT"
+  DTS:VersionBuild="2"
+  DTS:VersionGUID="{94B4481F-33E1-4703-869A-1D485F1FC610}">
+  <DTS:Property
+    DTS:Name="PackageFormatVersion">8</DTS:Property>
+  <DTS:ConnectionManagers>
+    <DTS:ConnectionManager
+      DTS:refId="Package.ConnectionManagers[ADW_CONN]"
+      DTS:CreationName="OLEDB"
+      DTS:DTSID="{B1867C8E-6377-4D98-B643-0D05D55EB8E5}"
+      DTS:ObjectName="ADW_CONN">
+      <DTS:ObjectData>
+        <DTS:ConnectionManager
+          DTS:ConnectRetryCount="1"
+          DTS:ConnectRetryInterval="5"
+          DTS:ConnectionString="Data Source=datawise.database.windows.net;User ID=datawise;Initial Catalog=Datawise_demo;Provider=MSOLEDBSQL.1;Application Name=SSIS-RETAIL_DB_EXTRACT-{B1867C8E-6377-4D98-B643-0D05D55EB8E5}ADW_CONN;">
+          <DTS:Password
+            DTS:Name="Password"
+            Sensitive="1"
+            Encrypted="1">***REDACTED***</DTS:Password>
+        </DTS:ConnectionManager>
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+  </DTS:ConnectionManagers>
+  <DTS:PackageParameters>
+    <DTS:PackageParameter
+      DTS:CreationName=""
+      DTS:DataType="8"
+      DTS:DTSID="{B9FF5B2D-8553-4B66-AFF8-CB2556409A36}"
+      DTS:ObjectName="ADW_DATABASE">
+      <DTS:Property
+        DTS:DataType="8"
+        DTS:Name="ParameterValue"
+        xml:space="preserve"></DTS:Property>
+    </DTS:PackageParameter>
+    <DTS:PackageParameter
+      DTS:CreationName=""
+      DTS:DataType="8"
+      DTS:DTSID="{94E8365C-3770-4DB3-9986-08BA7DA92AC5}"
+      DTS:ObjectName="ADW_PASSWORD"
+      DTS:Sensitive="True">
+      <DTS:Property
+        DTS:Name="ParameterValue">
+        <DTS:Property
+          DTS:DataType="8"
+          DTS:Name="ParameterValue"
+          Encrypted="1">***REDACTED***</DTS:Property>
+      </DTS:Property>
+    </DTS:PackageParameter>
+    <DTS:PackageParameter
+      DTS:CreationName=""
+      DTS:DataType="8"
+      DTS:DTSID="{6DCC861B-6EAF-44D9-AD2C-597DFAC5F6E5}"
+      DTS:ObjectName="ADW_SERVER">
+      <DTS:Property
+        DTS:DataType="8"
+        DTS:Name="ParameterValue"
+        xml:space="preserve"></DTS:Property>
+    </DTS:PackageParameter>
+    <DTS:PackageParameter
+      DTS:CreationName=""
+      DTS:DataType="8"
+      DTS:DTSID="{55683F0B-9F17-465E-A366-BC612B34F3FB}"
+      DTS:ObjectName="ADW_USER">
+      <DTS:Property
+        DTS:DataType="8"
+        DTS:Name="ParameterValue"
+        xml:space="preserve"></DTS:Property>
+    </DTS:PackageParameter>
+    <DTS:PackageParameter
+      DTS:CreationName=""
+      DTS:DataType="8"
+      DTS:DTSID="{EC5D28E6-2B81-4D7C-9871-22317C353468}"
+      DTS:ObjectName="RETAIL_DB_PASSWORD"
+      DTS:Sensitive="True">
+      <DTS:Property
+        DTS:Name="ParameterValue">
+        <DTS:Property
+          DTS:DataType="8"
+          DTS:Name="ParameterValue"
+          Encrypted="1">***REDACTED***</DTS:Property>
+      </DTS:Property>
+    </DTS:PackageParameter>
+    <DTS:PackageParameter
+      DTS:CreationName=""
+      DTS:DataType="8"
+      DTS:DTSID="{F1ACC012-6814-40BE-A9A1-9C04134F9BDD}"
+      DTS:ObjectName="RETAIL_DB_USER">
+      <DTS:Property
+        DTS:DataType="8"
+        DTS:Name="ParameterValue"
+        xml:space="preserve"></DTS:Property>
+    </DTS:PackageParameter>
+  </DTS:PackageParameters>
+  <DTS:Variables />
+  <DTS:Executables>
+    <DTS:Executable
+      DTS:refId="Package\AUDIT_START"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="AUDIT_START"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{B1867C8E-6377-4D98-B643-0D05D55EB8E5}"
+          SQLTask:SqlStatementSource="IF OBJECT_ID(&apos;DW_AUDIT.ETL_BATCH_LOG&apos;,&apos;U&apos;) IS NOT NULL INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID,PackageName,StepName,StartTime,Status) VALUES (CONVERT(VARCHAR,GETDATE(),112)+REPLACE(CONVERT(VARCHAR,GETDATE(),108),&apos;:&apos;,&apos;&apos;),&apos;RETAIL_DB_EXTRACT&apos;,&apos;PACKAGE_START&apos;,GETDATE(),&apos;RUNNING&apos;);" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\RETAIL_CUSTOMER"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{6B8CEC32-2510-4192-821C-41A3410B2C07}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="RETAIL_CUSTOMER"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{B1867C8E-6377-4D98-B643-0D05D55EB8E5}"
+          SQLTask:SqlStatementSource="IF OBJECT_ID('RETAIL_SRC.RETAIL_DB_RAW','U') IS NULL CREATE TABLE RETAIL_SRC.RETAIL_DB_RAW (TransactionID VARCHAR(30),TransactionDate VARCHAR(20),TransactionTime VARCHAR(20),TransactionType VARCHAR(20),Channel VARCHAR(30),Amount VARCHAR(30),Currency VARCHAR(5),Status VARCHAR(20),ReferenceNo VARCHAR(50),Description VARCHAR(500),AccountNo VARCHAR(30),AccountType VARCHAR(50),AccountOpenDate VARCHAR(20),BalanceBefore VARCHAR(30),BalanceAfter VARCHAR(30),AvailableBalance VARCHAR(30),AccountStatus VARCHAR(20),OverdraftLimit VARCHAR(30),CustomerID VARCHAR(20),FirstName VARCHAR(100),LastName VARCHAR(100),DateOfBirth VARCHAR(20),Email VARCHAR(200),Phone VARCHAR(30),Segment VARCHAR(50),LoyaltyTier VARCHAR(20),Region VARCHAR(100),City VARCHAR(100),Country VARCHAR(100),AnnualIncome VARCHAR(30),CustomerSince VARCHAR(20),LastLoginDate VARCHAR(20),PreferredChannel VARCHAR(50),ChurnRiskScore VARCHAR(20),TotalLifetimeTransactions VARCHAR(10),TotalLifetimeValue VARCHAR(30),MerchantID VARCHAR(30),MerchantName VARCHAR(200),MerchantCategory VARCHAR(100),MerchantCity VARCHAR(100),FraudFlag VARCHAR(1),FraudScore VARCHAR(20),FraudRuleTriggered VARCHAR(200),FraudAlertLevel VARCHAR(20),IsNewMerchant VARCHAR(5),IsNewChannel VARCHAR(5),VelocityFlag VARCHAR(5),BranchID VARCHAR(20),BranchName VARCHAR(200),SourceSystem VARCHAR(30),ExtractTimestamp VARCHAR(30),BatchID VARCHAR(30)); DELETE FROM RETAIL_SRC.RETAIL_DB_RAW; BULK INSERT RETAIL_SRC.RETAIL_DB_RAW FROM 'retaildb/RETAIL_DB_RAW.csv' WITH (DATA_SOURCE='AzureBlobStorage',FORMAT='CSV',FIRSTROW=2,FIELDTERMINATOR=',',ROWTERMINATOR='0x0a',TABLOCK); INSERT INTO RETAIL_SRC.RETAIL_CUSTOMER (CustomerID,FirstName,LastName,DateOfBirth,Email,Phone,Segment,AccountType,AccountOpenDate,BranchID,Region,City,Country,AnnualIncome,LifetimeValue,ChurnRisk,LastTransactionDate,TotalTransactions,TotalSpend,PreferredChannel,LoyaltyTier) SELECT CustomerID,MAX(FirstName),MAX(LastName),MAX(TRY_CAST(DateOfBirth AS DATE)),MAX(Email),MAX(Phone),MAX(Segment),MAX(AccountType),MAX(TRY_CAST(AccountOpenDate AS DATE)),MAX(BranchID),MAX(Region),MAX(City),MAX(Country),MAX(TRY_CAST(AnnualIncome AS DECIMAL(18,2))),MAX(TRY_CAST(TotalLifetimeValue AS DECIMAL(18,2))),MAX(CASE WHEN TRY_CAST(ChurnRiskScore AS DECIMAL(5,4))&gt;=0.7 THEN &apos;High&apos; WHEN TRY_CAST(ChurnRiskScore AS DECIMAL(5,4))&gt;=0.4 THEN &apos;Medium&apos; ELSE &apos;Low&apos; END),MAX(TRY_CAST(TransactionDate AS DATE)),MAX(TRY_CAST(TotalLifetimeTransactions AS INT)),MAX(TRY_CAST(TotalLifetimeValue AS DECIMAL(18,2))),MAX(PreferredChannel),MAX(LoyaltyTier) FROM RETAIL_SRC.RETAIL_DB_RAW r WHERE r.CustomerID IS NOT NULL AND r.CustomerID&lt;&gt;&apos;&apos; AND NOT EXISTS (SELECT 1 FROM RETAIL_SRC.RETAIL_CUSTOMER t WHERE t.CustomerID=r.CustomerID) GROUP BY CustomerID;" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\PROFILE_TRANSACTIONS"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{B2C3D4E5-F6A7-4B5C-9D8E-2F3A4B5C6D7E}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="PROFILE_TRANSACTIONS"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{B1867C8E-6377-4D98-B643-0D05D55EB8E5}"
+          SQLTask:SqlStatementSource="IF OBJECT_ID(&apos;DW_AUDIT.ETL_BATCH_LOG&apos;,&apos;U&apos;) IS NOT NULL INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID,PackageName,StepName,StartTime,RowsProcessed,Status) SELECT CONVERT(VARCHAR,GETDATE(),112)+REPLACE(CONVERT(VARCHAR,GETDATE(),108),&apos;:&apos;,&apos;&apos;),&apos;RETAIL_DB_EXTRACT&apos;,&apos;PROFILE_TRANSACTIONS&apos;,GETDATE(),COUNT(*),CASE WHEN COUNT(*)&gt;0 THEN &apos;OK&apos; ELSE &apos;WARN_EMPTY&apos; END FROM RETAIL_SRC.RETAIL_DB_RAW;" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\LOAD_RETAIL_BRANCH"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{C3D4E5F6-A7B8-4C5D-9E8F-3A4B5C6D7E8F}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="LOAD_RETAIL_BRANCH"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{B1867C8E-6377-4D98-B643-0D05D55EB8E5}"
+          SQLTask:SqlStatementSource="IF OBJECT_ID(&apos;LOAN_SRC.BRANCH&apos;,&apos;U&apos;) IS NOT NULL BEGIN TRY INSERT INTO LOAN_SRC.BRANCH (BranchID,BranchName,BranchCode,Region,City,State,Country,BranchManager,StaffCount,OpenDate,BranchType,ATMCount,Status) SELECT DISTINCT BranchID,BranchName,BranchID,Region,City,NULL,&apos;Nigeria&apos;,NULL,NULL,NULL,&apos;Full Service&apos;,NULL,&apos;Active&apos; FROM RETAIL_SRC.RETAIL_DB_RAW r WHERE r.BranchID IS NOT NULL AND r.BranchID &lt;&gt; &apos;&apos; AND NOT EXISTS (SELECT 1 FROM LOAN_SRC.BRANCH t WHERE t.BranchID=r.BranchID); END TRY BEGIN CATCH END CATCH;" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\RETAIL_TRANSACTION"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{B3CFAE57-0559-4033-ADFB-60C895F1D4B7}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="RETAIL_TRANSACTION"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{B1867C8E-6377-4D98-B643-0D05D55EB8E5}"
+          SQLTask:SqlStatementSource="INSERT INTO RETAIL_SRC.RETAIL_TRANSACTION (TransactionID,CustomerID,AccountNo,TransactionDate,TransactionTime,TransactionType,Channel,Amount,Currency,MerchantID,MerchantCategory,BranchID,Description,BalanceBefore,BalanceAfter,FraudFlag,FraudScore,Status,ReferenceNo) SELECT DISTINCT TransactionID,CustomerID,AccountNo,TRY_CAST(TransactionDate AS DATE),TRY_CAST(TransactionTime AS TIME),TransactionType,Channel,TRY_CAST(Amount AS DECIMAL(18,2)),Currency,MerchantID,MerchantCategory,BranchID,Description,TRY_CAST(BalanceBefore AS DECIMAL(18,2)),TRY_CAST(BalanceAfter AS DECIMAL(18,2)),FraudFlag,TRY_CAST(FraudScore AS DECIMAL(5,4)),Status,ReferenceNo FROM RETAIL_SRC.RETAIL_DB_RAW r WHERE r.TransactionID IS NOT NULL AND r.TransactionID&lt;&gt;&apos;&apos; AND NOT EXISTS (SELECT 1 FROM RETAIL_SRC.RETAIL_TRANSACTION t WHERE t.TransactionID=r.TransactionID);" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\FLAG_FRAUD_CANDIDATES"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{D4E5F6A7-B8C9-4D5E-9F8A-4B5C6D7E8F9A}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="FLAG_FRAUD_CANDIDATES"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{B1867C8E-6377-4D98-B643-0D05D55EB8E5}"
+          SQLTask:SqlStatementSource="IF OBJECT_ID(&apos;DW_AUDIT.ETL_BATCH_LOG&apos;,&apos;U&apos;) IS NOT NULL INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID,PackageName,StepName,StartTime,RowsProcessed,Status) SELECT CONVERT(VARCHAR,GETDATE(),112)+REPLACE(CONVERT(VARCHAR,GETDATE(),108),&apos;:&apos;,&apos;&apos;),&apos;RETAIL_DB_EXTRACT&apos;,&apos;FLAG_FRAUD_CANDIDATES&apos;,GETDATE(),COUNT(*),CASE WHEN COUNT(*)&gt;0 THEN &apos;WARN_FRAUD_DETECTED&apos; ELSE &apos;OK&apos; END FROM RETAIL_SRC.RETAIL_TRANSACTION WHERE FraudScore &gt;= 0.7 OR FraudFlag=&apos;Y&apos;;" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\ROWCOUNT_METADATA"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{E5F6A7B8-C9D0-4E5F-9A8B-5C6D7E8F9A0B}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="ROWCOUNT_METADATA"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{B1867C8E-6377-4D98-B643-0D05D55EB8E5}"
+          SQLTask:SqlStatementSource="IF OBJECT_ID(&apos;DW_AUDIT.ETL_BATCH_LOG&apos;,&apos;U&apos;) IS NOT NULL INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID,PackageName,StepName,StartTime,RowsProcessed,Status) SELECT CONVERT(VARCHAR,GETDATE(),112)+REPLACE(CONVERT(VARCHAR,GETDATE(),108),&apos;:&apos;,&apos;&apos;),&apos;RETAIL_DB_EXTRACT&apos;,tbl,GETDATE(),cnt,&apos;OK&apos; FROM ( SELECT &apos;RETAIL_CUSTOMER&apos; tbl,COUNT(*) cnt FROM RETAIL_SRC.RETAIL_CUSTOMER UNION ALL SELECT &apos;RETAIL_TRANSACTION&apos;,COUNT(*) FROM RETAIL_SRC.RETAIL_TRANSACTION ) x;" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\AUDIT_END"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{F6A7B8C9-D0E1-4F5A-9B8C-6D7E8F9A0B1C}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="AUDIT_END"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{B1867C8E-6377-4D98-B643-0D05D55EB8E5}"
+          SQLTask:SqlStatementSource="IF OBJECT_ID(&apos;DW_AUDIT.ETL_BATCH_LOG&apos;,&apos;U&apos;) IS NOT NULL INSERT INTO DW_AUDIT.ETL_BATCH_LOG (BatchID,PackageName,StepName,StartTime,EndTime,Status) VALUES (CONVERT(VARCHAR,GETDATE(),112)+REPLACE(CONVERT(VARCHAR,GETDATE(),108),&apos;:&apos;,&apos;&apos;),&apos;RETAIL_DB_EXTRACT&apos;,&apos;PACKAGE_END&apos;,GETDATE(),GETDATE(),&apos;COMPLETED&apos;);" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+  </DTS:Executables>
+  <DTS:PrecedenceConstraints>
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{4E19B7AC-CE9C-44E9-91D0-63DFA8C3074C\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{4E19B7AC-CE9C-44E9-91D0-63DFA8C3074C}"
+      DTS:From="Package\RETAIL_CUSTOMER"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{4E19B7AC-CE9C-44E9-91D0-63DFA8C3074C}"
+      DTS:To="Package\RETAIL_TRANSACTION" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{A1A2A3A4-A5A6-4A7A-8A9A-0A1A2A3A4A5A\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{A1A2A3A4-A5A6-4A7A-8A9A-0A1A2A3A4A5A}"
+      DTS:From="Package\AUDIT_START"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{A1A2A3A4-A5A6-4A7A-8A9A-0A1A2A3A4A5A}"
+      DTS:To="Package\RETAIL_CUSTOMER" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{B1B2B3B4-B5B6-4B7B-8B9B-0B1B2B3B4B5B\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{B1B2B3B4-B5B6-4B7B-8B9B-0B1B2B3B4B5B}"
+      DTS:From="Package\RETAIL_CUSTOMER"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{B1B2B3B4-B5B6-4B7B-8B9B-0B1B2B3B4B5B}"
+      DTS:To="Package\PROFILE_TRANSACTIONS" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{C1C2C3C4-C5C6-4C7C-8C9C-0C1C2C3C4C5C\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{C1C2C3C4-C5C6-4C7C-8C9C-0C1C2C3C4C5C}"
+      DTS:From="Package\PROFILE_TRANSACTIONS"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{C1C2C3C4-C5C6-4C7C-8C9C-0C1C2C3C4C5C}"
+      DTS:To="Package\LOAD_RETAIL_BRANCH" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{D1D2D3D4-D5D6-4D7D-8D9D-0D1D2D3D4D5D\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{D1D2D3D4-D5D6-4D7D-8D9D-0D1D2D3D4D5D}"
+      DTS:From="Package\LOAD_RETAIL_BRANCH"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{D1D2D3D4-D5D6-4D7D-8D9D-0D1D2D3D4D5D}"
+      DTS:To="Package\RETAIL_TRANSACTION" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{E1E2E3E4-E5E6-4E7E-8E9E-0E1E2E3E4E5E\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{E1E2E3E4-E5E6-4E7E-8E9E-0E1E2E3E4E5E}"
+      DTS:From="Package\RETAIL_TRANSACTION"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{E1E2E3E4-E5E6-4E7E-8E9E-0E1E2E3E4E5E}"
+      DTS:To="Package\FLAG_FRAUD_CANDIDATES" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{F1F2F3F4-F5F6-4F7F-8F9F-0F1F2F3F4F5F\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{F1F2F3F4-F5F6-4F7F-8F9F-0F1F2F3F4F5F}"
+      DTS:From="Package\FLAG_FRAUD_CANDIDATES"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{F1F2F3F4-F5F6-4F7F-8F9F-0F1F2F3F4F5F}"
+      DTS:To="Package\ROWCOUNT_METADATA" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[{A2A3A4A5-A6A7-4A8A-9A0A-1A2A3A4A5A6A\}]"
+      DTS:CreationName=""
+      DTS:DTSID="{A2A3A4A5-A6A7-4A8A-9A0A-1A2A3A4A5A6A}"
+      DTS:From="Package\ROWCOUNT_METADATA"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="{A2A3A4A5-A6A7-4A8A-9A0A-1A2A3A4A5A6A}"
+      DTS:To="Package\AUDIT_END" />
+  </DTS:PrecedenceConstraints>
+  <DTS:DesignTimeProperties><![CDATA[<?xml version="1.0"?>
+<!--This CDATA section contains the layout information of the package. The section includes information such as (x,y) coordinates, width, and height.-->
+<!--If you manually edit this section and make a mistake, you can delete it. -->
+<!--The package will still be able to load normally but the previous layout information will be lost and the designer will automatically re-arrange the elements on the design surface.-->
+<Objects
+  Version="8">
+  <!--Each node below will contain properties that do not affect runtime behavior.-->
+  <Package
+    design-time-name="Package">
+    <LayoutInfo>
+      <GraphLayout
+        Capacity="16" xmlns="clr-namespace:Microsoft.SqlServer.IntegrationServices.Designer.Model.Serialization;assembly=Microsoft.SqlServer.IntegrationServices.Graph" xmlns:mssgle="clr-namespace:Microsoft.SqlServer.Graph.LayoutEngine;assembly=Microsoft.SqlServer.Graph" xmlns:assembly="http://schemas.microsoft.com/winfx/2006/xaml">
+        <NodeLayout
+          Size="160,42"
+          Id="Package\AUDIT_START"
+          TopLeft="345,30" />
+        <NodeLayout
+          Size="187,42"
+          Id="Package\RETAIL_CUSTOMER"
+          TopLeft="345,128.5" />
+        <NodeLayout
+          Size="212,42"
+          Id="Package\PROFILE_TRANSACTIONS"
+          TopLeft="320,227" />
+        <NodeLayout
+          Size="205,42"
+          Id="Package\LOAD_RETAIL_BRANCH"
+          TopLeft="323,325.5" />
+        <NodeLayout
+          Size="202,42"
+          Id="Package\RETAIL_TRANSACTION"
+          TopLeft="312.5,424" />
+        <NodeLayout
+          Size="220,42"
+          Id="Package\FLAG_FRAUD_CANDIDATES"
+          TopLeft="310,522.5" />
+        <NodeLayout
+          Size="210,42"
+          Id="Package\ROWCOUNT_METADATA"
+          TopLeft="315,621" />
+        <NodeLayout
+          Size="155,42"
+          Id="Package\AUDIT_END"
+          TopLeft="347.5,719.5" />
+        <EdgeLayout
+          Id="Package.PrecedenceConstraints[{4E19B7AC-CE9C-44E9-91D0-63DFA8C3074C\}]"
+          TopLeft="413.5,466">
+          <EdgeLayout.Curve>
+            <mssgle:Curve
+              StartConnector="{assembly:Null}"
+              EndConnector="0,56.5"
+              Start="0,0"
+              End="0,49">
+              <mssgle:Curve.Segments>
+                <mssgle:SegmentCollection
+                  Capacity="5">
+                  <mssgle:LineSegment
+                    End="0,49" />
+                </mssgle:SegmentCollection>
+              </mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels>
+            <EdgeLabelCollection />
+          </EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout
+          Id="Package.PrecedenceConstraints[{A1A2A3A4-A5A6-4A7A-8A9A-0A1A2A3A4A5A\}]"
+          TopLeft="425,72">
+          <EdgeLayout.Curve>
+            <mssgle:Curve
+              StartConnector="{assembly:Null}"
+              EndConnector="13.5,56.5"
+              Start="0,0"
+              End="13.5,49">
+              <mssgle:Curve.Segments>
+                <mssgle:SegmentCollection
+                  Capacity="5">
+                  <mssgle:LineSegment
+                    End="0,24.25" />
+                  <mssgle:CubicBezierSegment
+                    Point1="0,24.25"
+                    Point2="0,28.25"
+                    Point3="4,28.25" />
+                  <mssgle:LineSegment
+                    End="9.5,28.25" />
+                  <mssgle:CubicBezierSegment
+                    Point1="9.5,28.25"
+                    Point2="13.5,28.25"
+                    Point3="13.5,32.25" />
+                  <mssgle:LineSegment
+                    End="13.5,49" />
+                </mssgle:SegmentCollection>
+              </mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels>
+            <EdgeLabelCollection />
+          </EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout
+          Id="Package.PrecedenceConstraints[{B1B2B3B4-B5B6-4B7B-8B9B-0B1B2B3B4B5B\}]"
+          TopLeft="426,170.5">
+          <EdgeLayout.Curve>
+            <mssgle:Curve
+              StartConnector="{assembly:Null}"
+              EndConnector="0,56.5"
+              Start="0,0"
+              End="0,49">
+              <mssgle:Curve.Segments>
+                <mssgle:SegmentCollection
+                  Capacity="5">
+                  <mssgle:LineSegment
+                    End="0,49" />
+                </mssgle:SegmentCollection>
+              </mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels>
+            <EdgeLabelCollection />
+          </EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout
+          Id="Package.PrecedenceConstraints[{C1C2C3C4-C5C6-4C7C-8C9C-0C1C2C3C4C5C\}]"
+          TopLeft="425.5,269">
+          <EdgeLayout.Curve>
+            <mssgle:Curve
+              StartConnector="{assembly:Null}"
+              EndConnector="0,56.5"
+              Start="0,0"
+              End="0,49">
+              <mssgle:Curve.Segments>
+                <mssgle:SegmentCollection
+                  Capacity="5">
+                  <mssgle:LineSegment
+                    End="0,49" />
+                </mssgle:SegmentCollection>
+              </mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels>
+            <EdgeLabelCollection />
+          </EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout
+          Id="Package.PrecedenceConstraints[{D1D2D3D4-D5D6-4D7D-8D9D-0D1D2D3D4D5D\}]"
+          TopLeft="414.25,367.5">
+          <EdgeLayout.Curve>
+            <mssgle:Curve
+              StartConnector="{assembly:Null}"
+              EndConnector="-0.75,56.5"
+              Start="0,0"
+              End="-0.75,49">
+              <mssgle:Curve.Segments>
+                <mssgle:SegmentCollection
+                  Capacity="5">
+                  <mssgle:LineSegment
+                    End="0,24.25" />
+                  <mssgle:CubicBezierSegment
+                    Point1="0,24.25"
+                    Point2="0,28.25"
+                    Point3="-4,28.25" />
+                  <mssgle:LineSegment
+                    End="-0.75,28.25" />
+                  <mssgle:CubicBezierSegment
+                    Point1="-0.75,28.25"
+                    Point2="-0.75,32.25"
+                    Point3="-0.75,32.25" />
+                  <mssgle:LineSegment
+                    End="-0.75,49" />
+                </mssgle:SegmentCollection>
+              </mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels>
+            <EdgeLabelCollection />
+          </EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout
+          Id="Package.PrecedenceConstraints[{E1E2E3E4-E5E6-4E7E-8E9E-0E1E2E3E4E5E\}]"
+          TopLeft="413.5,466">
+          <EdgeLayout.Curve>
+            <mssgle:Curve
+              StartConnector="{assembly:Null}"
+              EndConnector="6.5,56.5"
+              Start="0,0"
+              End="6.5,49">
+              <mssgle:Curve.Segments>
+                <mssgle:SegmentCollection
+                  Capacity="5">
+                  <mssgle:LineSegment
+                    End="0,24.25" />
+                  <mssgle:CubicBezierSegment
+                    Point1="0,24.25"
+                    Point2="0,28.25"
+                    Point3="4,28.25" />
+                  <mssgle:LineSegment
+                    End="2.5,28.25" />
+                  <mssgle:CubicBezierSegment
+                    Point1="2.5,28.25"
+                    Point2="6.5,28.25"
+                    Point3="6.5,32.25" />
+                  <mssgle:LineSegment
+                    End="6.5,49" />
+                </mssgle:SegmentCollection>
+              </mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels>
+            <EdgeLabelCollection />
+          </EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout
+          Id="Package.PrecedenceConstraints[{F1F2F3F4-F5F6-4F7F-8F9F-0F1F2F3F4F5F\}]"
+          TopLeft="420,564.5">
+          <EdgeLayout.Curve>
+            <mssgle:Curve
+              StartConnector="{assembly:Null}"
+              EndConnector="0,56.5"
+              Start="0,0"
+              End="0,49">
+              <mssgle:Curve.Segments>
+                <mssgle:SegmentCollection
+                  Capacity="5">
+                  <mssgle:LineSegment
+                    End="0,49" />
+                </mssgle:SegmentCollection>
+              </mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels>
+            <EdgeLabelCollection />
+          </EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout
+          Id="Package.PrecedenceConstraints[{A2A3A4A5-A6A7-4A8A-9A0A-1A2A3A4A5A6A\}]"
+          TopLeft="422.5,663">
+          <EdgeLayout.Curve>
+            <mssgle:Curve
+              StartConnector="{assembly:Null}"
+              EndConnector="2.5,56.5"
+              Start="0,0"
+              End="2.5,49">
+              <mssgle:Curve.Segments>
+                <mssgle:SegmentCollection
+                  Capacity="5">
+                  <mssgle:LineSegment
+                    End="0,24.25" />
+                  <mssgle:CubicBezierSegment
+                    Point1="0,24.25"
+                    Point2="0,28.25"
+                    Point3="4,28.25" />
+                  <mssgle:LineSegment
+                    End="2.5,28.25" />
+                  <mssgle:CubicBezierSegment
+                    Point1="2.5,28.25"
+                    Point2="2.5,32.25"
+                    Point3="2.5,32.25" />
+                  <mssgle:LineSegment
+                    End="2.5,49" />
+                </mssgle:SegmentCollection>
+              </mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels>
+            <EdgeLabelCollection />
+          </EdgeLayout.Labels>
+        </EdgeLayout>
+      </GraphLayout>
+    </LayoutInfo>
+  </Package>
+</Objects>]]></DTS:DesignTimeProperties>
+</DTS:Executable>

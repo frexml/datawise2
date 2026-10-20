@@ -63,14 +63,17 @@ router = APIRouter()
 SYNTHETIC_ROOT = Path("data/synthetic_estate")
 TELCO_ROOT = Path("data/synthetic_estate_telco")
 LOAN_ROOT = Path("data/synthetic_estate_loan")
+DATAWISE_ROOT = Path("data/external_estates/datawise_platform")
 
 def _synthetic_root_for_estate(estate: Estate) -> Path:
-    """Pick synthetic dir per estate_type — banking vs telecom vs loan_onboarding."""
+    """Pick estate dir per estate_type — banking/telecom/loan/datawise."""
     et = getattr(estate, "estate_type", "banking")
     if et == "telecom":
         return TELCO_ROOT if TELCO_ROOT.exists() else SYNTHETIC_ROOT
     if et == "loan_onboarding":
         return LOAN_ROOT if LOAN_ROOT.exists() else SYNTHETIC_ROOT
+    if et == "datawise_platform":
+        return DATAWISE_ROOT
     return SYNTHETIC_ROOT
 
 
@@ -100,8 +103,8 @@ def _get_ir(estate: Estate) -> EstateIR:
 class EstateCreate(BaseModel):
     name: str = "NORTHSTAR"
     display_name: str = "NorthStar Synthetic Estate"
-    source_type: str = "synthetic"  # synthetic | catalog_dump
-    estate_type: str = "banking"  # banking | telecom | loan_onboarding
+    source_type: str = "synthetic"  # synthetic | catalog_dump | git
+    estate_type: str = "banking"  # banking | telecom | loan_onboarding | datawise_platform
     synthetic_path: str | None = None  # override path if needed
     connection: dict | None = None  # {host, port, user, db_type} - mock for demo
     defer_discovery: bool = False  # True: skip auto-extract, leave PENDING for a real survey/approve flow
@@ -236,12 +239,17 @@ def create_estate(payload: EstateCreate, db: Session = Depends(get_db)):
     # Skipped when defer_discovery=True so the interactive demo flow goes through a real
     # pending_approval -> approve -> staged survey instead of landing on ACTIVE/done instantly.
     if not payload.defer_discovery:
-        synth_path = Path(payload.synthetic_path) if payload.synthetic_path else (Path("data/synthetic_estate_telco") if payload.estate_type == "telecom" else (Path("data/synthetic_estate_loan") if payload.estate_type == "loan_onboarding" else SYNTHETIC_ROOT))
-        if payload.estate_type == "telecom" and not synth_path.exists():
-            synth_path = Path("data/synthetic_estate_telco")
-        if payload.estate_type == "loan_onboarding" and not synth_path.exists():
-            synth_path = Path("data/synthetic_estate_loan")
-        if payload.source_type == "synthetic" and synth_path.exists():
+        if payload.synthetic_path:
+            synth_path = Path(payload.synthetic_path)
+        elif payload.estate_type == "telecom":
+            synth_path = TELCO_ROOT
+        elif payload.estate_type == "loan_onboarding":
+            synth_path = LOAN_ROOT
+        elif payload.estate_type == "datawise_platform":
+            synth_path = DATAWISE_ROOT
+        else:
+            synth_path = SYNTHETIC_ROOT
+        if payload.source_type in ("synthetic", "git") and synth_path.exists():
             try:
                 ir = extract_estate_ir(synth_path, estate_name=estate.name)
                 estate.ir_version = "1.0.0"
@@ -308,7 +316,7 @@ def start_survey(estate_id: int, payload: SurveyRequest = SurveyRequest(), db: S
     if not estate:
         raise HTTPException(status_code=404, detail="Estate not found")
     if not estate.connection or estate.connection.get("status") != "connected":
-        if estate.source_type != "synthetic":
+        if estate.source_type not in ("synthetic", "git"):
             raise HTTPException(status_code=409, detail="Test connection first - POST /test-connection")
     if estate.survey_todo and all(t.get("status") == "done" for t in estate.survey_todo):
         return {"estate_id": estate_id, "status": "done", "todo": estate.survey_todo}
@@ -377,7 +385,15 @@ def approve_survey(estate_id: int, payload: SurveyApprove, db: Session = Depends
     estate_type = estate.estate_type
     bind_engine = db.get_bind()
     # Use file-based path for synthetic per estate_type
-    synth = str(Path("data/synthetic_estate_telco") if estate_type == "telecom" else (Path("data/synthetic_estate_loan") if estate_type == "loan_onboarding" else SYNTHETIC_ROOT))
+    synth = str(
+        TELCO_ROOT
+        if estate_type == "telecom"
+        else LOAN_ROOT
+        if estate_type == "loan_onboarding"
+        else DATAWISE_ROOT
+        if estate_type == "datawise_platform"
+        else SYNTHETIC_ROOT
+    )
 
     import threading
 
@@ -558,9 +574,9 @@ def get_estate_graph(estate_id: int, db: Session = Depends(get_db)):
     edges = []
     # Lay out nodes in a readable grid - 6 columns, 80px row height, grouped by layer then grid
     # Previously every node in a layer shared x=0, so 126 nodes collapsed to 5 visible stacks.
-    layer_order = {"source": 0, "warehouse": 1, "etl": 2, "orchestration": 3, "bi": 4}
+    layer_order = {"source": 0, "warehouse": 1, "etl": 2, "ml": 2.5, "orchestration": 3, "bi": 4}
     # Sort tables so warehouse tables are together, source tables together, etc., then grid
-    _SOURCE_SYSTEMS = ("SAP_ECC", "SALESFORCE", "FLAT_FILES", "RETAIL_CUSTOMER", "BSCS", "CDR", "NMS", "FLAT_TELCO", "CRM_TELCO")
+    _SOURCE_SYSTEMS = ("SAP_ECC", "SALESFORCE", "FLAT_FILES", "RETAIL_CUSTOMER", "BSCS", "CDR", "NMS", "FLAT_TELCO", "CRM_TELCO", "LOAN_SRC", "RETAIL_SRC")
     def _layer_of(node_type: str, system: str = "") -> str:
         if node_type == "table":
             return "source" if system in _SOURCE_SYSTEMS else "warehouse"
@@ -586,6 +602,12 @@ def get_estate_graph(estate_id: int, db: Session = Depends(get_db)):
         all_items.append((layer_order["orchestration"], s.fqn, "schedule", s))
     for d in ir.dashboards:
         all_items.append((layer_order["bi"], d.fqn, "dashboard", d))
+    for r in getattr(ir, "routines", []):
+        all_items.append((layer_order["ml"], r.fqn, "routine", r))
+    known_node_ids = {fqn for _, fqn, _, _ in all_items}
+    for ref in ir.unresolved_refs:
+        if ref.fqn not in known_node_ids:
+            all_items.append((layer_order["warehouse"], ref.fqn, "missing", ref))
     all_items.sort(key=lambda x: (x[0], x[1]))
 
     nodes: list[dict] = []
@@ -607,16 +629,53 @@ def get_estate_graph(estate_id: int, db: Session = Depends(get_db)):
         elif kind == "schedule":
             s = obj
             nodes.append({"id": s.fqn, "label": s.fqn, "type": "schedule", "data": {"label": s.fqn, "fqn": s.fqn, "kind": "schedule"}, "position": {"x": x, "y": y}})
+        elif kind == "missing":
+            ref = obj
+            nodes.append({"id": ref.fqn, "label": f"{ref.fqn} (missing)", "type": "table", "system": ref.fqn.split(".")[0] if "." in ref.fqn else "", "layer": "warehouse", "unresolved": True, "data": {"label": f"{ref.fqn} (missing)", "fqn": ref.fqn, "kind": "missing", "unresolved": True, "reason": ref.reason}, "position": {"x": x, "y": y}})
+        elif kind == "routine":
+            r = obj
+            nodes.append({"id": r.fqn, "label": r.fqn, "type": "routine", "data": {"label": r.fqn, "fqn": r.fqn, "kind": "routine", "routine_kind": r.kind, "features": len(r.features), "model_files": r.model_files}, "position": {"x": x, "y": y}})
         else:
             d = obj
             nodes.append({"id": d.fqn, "label": d.fqn, "type": "dashboard", "tool": d.tool, "data": {"label": d.fqn, "fqn": d.fqn, "kind": "dashboard"}, "position": {"x": x, "y": y}})
 
+    # Every drawn edge must be evidenced: Control-M references that never appear
+    # in the job's own artifact are excluded from the graph (kept in the IR with
+    # via=UNVERIFIED_DECLARATION_VIA, counted below).
+    from dsxlineage.estate.ingest.build import UNVERIFIED_DECLARATION_VIA
+
+    declared_unverified = 0
     for e in ir.edges:
         if e.edge_type.value == "UNRESOLVED":
             continue
+        if e.via == UNVERIFIED_DECLARATION_VIA:
+            declared_unverified += 1
+            continue
         edges.append({"id": f"{e.source_fqn}->{e.target_fqn}:{e.edge_type.value}", "source": e.source_fqn, "target": e.target_fqn, "type": e.edge_type.value, "unresolved": e.unresolved, "label": e.edge_type.value})
 
-    return {"nodes": nodes, "edges": edges, "estate": {"id": estate.id, "name": estate.name, "ir_version": ir.version, "counts": {"nodes": ir.total_nodes, "edges": ir.total_edges, "unresolved": ir.unresolved_count}}}
+    # Counts describe what the graph actually draws: object nodes + missing-ref
+    # nodes, and edges after UNRESOLVED-type and unverified-declaration edges are
+    # excluded. `unresolved` matches the amber "(missing)" nodes;
+    # `unresolved_edges` keeps the IR-level flagged-edge count used by the
+    # evidence gate banner; `declared_unverified` counts hidden declaration-only
+    # references (scheduled job names a table its artifact never mentions).
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "estate": {
+            "id": estate.id,
+            "name": estate.name,
+            "ir_version": ir.version,
+            "counts": {
+                "nodes": len(nodes),
+                "edges": len(edges),
+                "unresolved": len(ir.unresolved_refs),
+                "unresolved_edges": ir.unresolved_count,
+                "column_rows": len(ir.column_lineage),
+                "declared_unverified": declared_unverified,
+            },
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
