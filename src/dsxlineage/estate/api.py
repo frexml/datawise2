@@ -5,6 +5,7 @@ All new estate endpoints. Mounted at /api/estates by main.py.
 
 Design:
   POST   /api/estates                  - create estate from synthetic (or catalog dump)
+  POST   /api/estates/reset-demo       - wipe all demo estate data (confirm=true)
   GET    /api/estates                  - list estates
   GET    /api/estates/{id}             - estate detail + IR summary
   POST   /api/estates/{id}/extract     - run extractor -> IR -> KG sync -> ledger
@@ -39,7 +40,7 @@ from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from dsxlineage.db.database import get_db
@@ -52,11 +53,27 @@ from dsxlineage.estate.bridge import (
     run_diff_harness,
 )
 from dsxlineage.estate.chat import answer_question
+from dsxlineage.estate.drift import bump_version, diff_fingerprints, fingerprint_ir
 from dsxlineage.estate.extractor import extract_estate_ir
-from dsxlineage.estate.graph import blast_radius as graph_blast_radius
+from dsxlineage.estate.graph import blast_radius as graph_blast_radius, delete_estate_from_graph
 from dsxlineage.estate.ir import EstateIR
 from dsxlineage.estate.ledger import append_ledger_event, can_promote, verify_ledger_chain
-from dsxlineage.estate.models import ChatMessage, ChatSession, DiffRun, Estate, MigrationPlan
+from dsxlineage.estate.models import (
+    ChatMessage,
+    ChatSession,
+    DiffRun,
+    Estate,
+    EstateArtifact,
+    LedgerEvent,
+    LineageOverride,
+    MigrationPlan,
+)
+from dsxlineage.estate.overrides import apply_overrides, known_fqns
+from dsxlineage.estate.remediation import (
+    DETERMINISTIC_MODEL,
+    propose_remediations,
+    unresolved_items,
+)
 
 router = APIRouter()
 
@@ -87,11 +104,47 @@ def _synthetic_root_for_estate(estate: Estate) -> Path:
 _IR_CACHE: dict[tuple, EstateIR] = {}
 
 
-def _get_ir(estate: Estate) -> EstateIR:
-    key = (estate.id, getattr(estate, "name", ""), getattr(estate, "estate_type", ""), estate.ir_version or "")
+def _override_dicts(db: Session, estate_id: int) -> list[dict]:
+    """Serialize persistent lineage overrides for the pure apply function."""
+    rows = (
+        db.query(LineageOverride)
+        .filter(LineageOverride.estate_id == estate_id)
+        .order_by(LineageOverride.id.asc())
+        .all()
+    )
+    return [
+        {
+            "proposal_id": row.proposal_id,
+            "action": row.action,
+            "subject_fqn": row.subject_fqn,
+            "target_fqn": row.target_fqn,
+            "sources": list(row.sources or []),
+            "status": row.status,
+        }
+        for row in rows
+    ]
+
+
+def _get_ir(estate: Estate, db: Session) -> EstateIR:
+    """Extract once per (estate, version, override revision), then apply overrides."""
+    revision = (
+        db.query(LineageOverride.id)
+        .filter(LineageOverride.estate_id == estate.id)
+        .order_by(LineageOverride.id.desc())
+        .first()
+    )
+    revision_id = revision[0] if revision else 0
+    key = (
+        estate.id,
+        getattr(estate, "name", ""),
+        getattr(estate, "estate_type", ""),
+        estate.ir_version or "",
+        revision_id,
+    )
     cached = _IR_CACHE.get(key)
     if cached is None:
-        cached = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+        base_ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+        cached, _ = apply_overrides(base_ir, _override_dicts(db, estate.id))
         _IR_CACHE[key] = cached
     return cached
 
@@ -108,6 +161,10 @@ class EstateCreate(BaseModel):
     synthetic_path: str | None = None  # override path if needed
     connection: dict | None = None  # {host, port, user, db_type} - mock for demo
     defer_discovery: bool = False  # True: skip auto-extract, leave PENDING for a real survey/approve flow
+
+
+class ResetDemoRequest(BaseModel):
+    confirm: bool = False  # destructive: must be explicitly true
 
 
 class ConnectionTestRequest(BaseModel):
@@ -215,11 +272,125 @@ def _build_survey_todo(ir: EstateIR) -> list[dict]:
     ]
 
 
+def _latest_run_fingerprint(db: Session, estate_id: int) -> dict[str, object] | None:
+    """Most recent IR fingerprint recorded in the ledger for this estate."""
+    from dsxlineage.estate.models import LedgerEvent
+
+    events = (
+        db.query(LedgerEvent)
+        .filter(
+            LedgerEvent.estate_id == estate_id,
+            LedgerEvent.event_type.in_(
+                ("ir_generated", "survey_completed", "estate_rerun", "remediation_applied")
+            ),
+        )
+        .order_by(LedgerEvent.id.desc())
+        .limit(20)
+        .all()
+    )
+    for event in events:
+        fingerprint = (event.payload or {}).get("fingerprint")
+        if isinstance(fingerprint, dict):
+            return fingerprint
+    return None
+
+
+def _rerun_estate(
+    db: Session,
+    estate: Estate,
+    actor: str = "system",
+    actor_email: str | None = None,
+) -> dict[str, object]:
+    """Re-ingest an existing estate, diff against the last recorded run, log it.
+
+    The new IR fingerprint and the full added/removed object/edge lists are
+    appended to the ledger as an ``estate_rerun`` event (hash-chained).
+    """
+    root = _synthetic_root_for_estate(estate)
+    if not root.exists():
+        raise HTTPException(status_code=404, detail="Estate source not found on disk")
+
+    base_ir = extract_estate_ir(root, estate_name=estate.name)
+    override_rows = _override_dicts(db, estate.id)
+    ir, override_notes = apply_overrides(base_ir, override_rows)
+    current = fingerprint_ir(ir)
+    previous = _latest_run_fingerprint(db, estate.id)
+    changes = diff_fingerprints(previous, current)
+    previous_version = estate.ir_version or "0.0.0"
+    version = bump_version(previous_version, bool(changes["changed"]))
+
+    estate.ir_version = version
+    estate.ir_generated_at = datetime.now(timezone.utc)
+    estate.node_count = ir.total_nodes
+    estate.edge_count = ir.total_edges
+    estate.unresolved_count = ir.unresolved_count
+    estate.survey_todo = _build_survey_todo(ir)
+    estate.current_stage = "done"
+    estate.last_survey_at = datetime.now(timezone.utc)
+    estate.status = "ACTIVE"
+    db.commit()
+
+    event = append_ledger_event(
+        db,
+        estate.id,
+        "estate_rerun",
+        {
+            "previous_version": previous_version,
+            "version": version,
+            "nodes": ir.total_nodes,
+            "edges": ir.total_edges,
+            "unresolved": ir.unresolved_count,
+            "changes": changes,
+            "fingerprint": current,
+            "overrides_applied": sum(1 for note in override_notes if note.get("applied")),
+            "overrides_stale": sum(1 for note in override_notes if note.get("reason") and not note.get("applied")),
+        },
+        actor=actor,
+        actor_email=actor_email,
+    )
+    db.commit()
+
+    try:
+        from dsxlineage.estate.graph import sync_estate_to_graph
+
+        sync_estate_to_graph(estate.id, estate.name, ir)
+        append_ledger_event(
+            db,
+            estate.id,
+            "graph_synced",
+            {"estate_id": estate.id, "rerun": True},
+            actor=actor,
+            actor_email=actor_email,
+        )
+        db.commit()
+    except Exception as exc:
+        print(f"Warning: graph sync failed for estate {estate.id}: {exc}")
+
+    return {
+        "estate_id": estate.id,
+        "rerun": True,
+        "ir_version": version,
+        "previous_version": previous_version,
+        "changes": changes,
+        "ledger_event_id": event.id,
+    }
+
+
 @router.post("")
 def create_estate(payload: EstateCreate, db: Session = Depends(get_db)):
     existing = db.query(Estate).filter(Estate.name == payload.name).first()
     if existing:
-        raise HTTPException(status_code=409, detail=f"Estate {payload.name} already exists (id={existing.id})")
+        summary = _rerun_estate(db, existing)
+        result = _estate_to_dict(existing)
+        result.update(
+            {
+                "rerun": True,
+                "previous_version": summary["previous_version"],
+                "changes": summary["changes"],
+                "ledger_event_id": summary["ledger_event_id"],
+            }
+        )
+        return result
     estate = Estate(
         name=payload.name,
         display_name=payload.display_name,
@@ -262,7 +433,7 @@ def create_estate(payload: EstateCreate, db: Session = Depends(get_db)):
                 estate.last_survey_at = datetime.now(timezone.utc)
                 estate.status = "ACTIVE"
                 db.commit()
-                append_ledger_event(db, estate.id, "ir_generated", {"version": ir.version, "nodes": ir.total_nodes, "edges": ir.total_edges, "unresolved": ir.unresolved_count, "estate_type": payload.estate_type})
+                append_ledger_event(db, estate.id, "ir_generated", {"version": ir.version, "nodes": ir.total_nodes, "edges": ir.total_edges, "unresolved": ir.unresolved_count, "estate_type": payload.estate_type, "fingerprint": fingerprint_ir(ir)})
                 try:
                     from dsxlineage.estate.graph import sync_estate_to_graph
                     sync_estate_to_graph(estate.id, estate.name, ir)
@@ -277,6 +448,46 @@ def create_estate(payload: EstateCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(estate)
     return _estate_to_dict(estate)
+
+
+@router.post("/reset-demo")
+def reset_demo(payload: ResetDemoRequest, db: Session = Depends(get_db)):
+    """Wipe every estate and its evidence so the demo can start from scratch.
+
+    Deletes estates + ledger, artifacts, plans, diff runs, chat sessions and
+    messages. Graph mirrors are removed best-effort. Schema is preserved.
+    Requires ``{"confirm": true}`` - this is irreversible.
+    """
+    if not payload.confirm:
+        raise HTTPException(status_code=400, detail="Reset requires confirm=true")
+
+    estates = db.query(Estate).all()
+    estate_ids = [e.id for e in estates]
+    for estate_id in estate_ids:
+        delete_estate_from_graph(estate_id)
+
+    chat_messages_removed = db.query(ChatMessage).delete(synchronize_session=False)
+    chat_sessions_removed = db.query(ChatSession).delete(synchronize_session=False)
+    diff_runs_removed = db.query(DiffRun).delete(synchronize_session=False)
+    plans_removed = db.query(MigrationPlan).delete(synchronize_session=False)
+    overrides_removed = db.query(LineageOverride).delete(synchronize_session=False)
+    ledger_removed = db.query(LedgerEvent).delete(synchronize_session=False)
+    artifacts_removed = db.query(EstateArtifact).delete(synchronize_session=False)
+    estates_removed = db.query(Estate).delete(synchronize_session=False)
+    db.commit()
+    _IR_CACHE.clear()
+
+    return {
+        "reset": True,
+        "estates_removed": estates_removed,
+        "ledger_events_removed": ledger_removed,
+        "artifacts_removed": artifacts_removed,
+        "plans_removed": plans_removed,
+        "overrides_removed": overrides_removed,
+        "diff_runs_removed": diff_runs_removed,
+        "chat_sessions_removed": chat_sessions_removed,
+        "chat_messages_removed": chat_messages_removed,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -482,7 +693,7 @@ def approve_survey(estate_id: int, payload: SurveyApprove, db: Session = Depends
                 est.status = "ACTIVE"
                 db2.commit()
                 append_ledger_event(
-                    db2, eid, "survey_completed", {"nodes": ir.total_nodes, "edges": ir.total_edges, "estate_type": etype, "approver": actor},
+                    db2, eid, "survey_completed", {"nodes": ir.total_nodes, "edges": ir.total_edges, "estate_type": etype, "approver": actor, "fingerprint": fingerprint_ir(ir)},
                     actor=actor, actor_email=actor_email,
                 )
                 try:
@@ -530,14 +741,14 @@ def extract_estate(estate_id: int, db: Session = Depends(get_db)):
     if not _synthetic_root_for_estate(estate).exists():
         raise HTTPException(status_code=404, detail="Synthetic estate not found on disk")
 
-    ir = _get_ir(estate)
+    ir = _get_ir(estate, db)
     estate.ir_version = ir.version
     estate.ir_generated_at = datetime.now(timezone.utc)
     estate.node_count = ir.total_nodes
     estate.edge_count = ir.total_edges
     estate.unresolved_count = ir.unresolved_count
     db.commit()
-    ev = append_ledger_event(db, estate_id, "ir_generated", {"version": ir.version, "nodes": ir.total_nodes, "edges": ir.total_edges, "unresolved": ir.unresolved_count})
+    ev = append_ledger_event(db, estate_id, "ir_generated", {"version": ir.version, "nodes": ir.total_nodes, "edges": ir.total_edges, "unresolved": ir.unresolved_count, "fingerprint": fingerprint_ir(ir)})
     db.commit()
 
     # Graph sync best-effort
@@ -552,6 +763,344 @@ def extract_estate(estate_id: int, db: Session = Depends(get_db)):
     return {"estate_id": estate_id, "ir_version": ir.version, "nodes": ir.total_nodes, "edges": ir.total_edges, "unresolved": ir.unresolved_count, "ledger_event_id": ev.id}
 
 
+@router.post("/{estate_id}/rerun")
+def rerun_estate(estate_id: int, db: Session = Depends(get_db)):
+    """Re-ingest an existing estate and log the delta vs the last run."""
+    estate = db.query(Estate).filter(Estate.id == estate_id).first()
+    if not estate:
+        raise HTTPException(status_code=404, detail="Estate not found")
+    summary = _rerun_estate(db, estate)
+    return {**summary, "estate": _estate_to_dict(estate)}
+
+
+# ---------------------------------------------------------------------------
+# Unresolved references - AI remediation proposals (human approval required)
+# ---------------------------------------------------------------------------
+
+class RemediationRecommendRequest(BaseModel):
+    use_ai: bool | None = None  # None = auto (LLM when OPENROUTER_API_KEY is set)
+
+
+class RemediationOverride(BaseModel):
+    target_fqn: str | None = None
+    sources: list[str] = Field(default_factory=list)
+    note: str | None = None
+
+
+class RemediationDecisionItem(BaseModel):
+    proposal_id: str
+    decision: Literal["approved", "rejected", "overridden"]
+    override: RemediationOverride | None = None
+    note: str | None = None
+
+
+class RemediationDecideRequest(BaseModel):
+    approver: str
+    decisions: list[RemediationDecisionItem]
+    actor_email: str | None = None
+
+
+def _unresolved_state(db: Session, estate: Estate) -> dict:
+    """Unresolved items + latest proposals with their human decisions applied."""
+    from dsxlineage.estate.models import LedgerEvent
+
+    ir = _get_ir(estate, db)
+    items = unresolved_items(ir)
+    events = (
+        db.query(LedgerEvent)
+        .filter(
+            LedgerEvent.estate_id == estate.id,
+            LedgerEvent.event_type.in_(("remediation_proposed", "remediation_decided")),
+        )
+        .order_by(LedgerEvent.id.asc())
+        .all()
+    )
+
+    latest_proposed = None
+    decisions: dict[str, dict] = {}
+    for event in events:
+        payload = event.payload or {}
+        if event.event_type == "remediation_proposed":
+            latest_proposed = event
+        else:
+            for decision in payload.get("decisions", []):
+                decisions[str(decision.get("proposal_id", ""))] = {
+                    "status": decision.get("decision"),
+                    "decided_by": payload.get("approver"),
+                    "decided_at": event.created_at.isoformat() if event.created_at else None,
+                    "note": decision.get("note"),
+                }
+
+    proposals: list[dict] = []
+    model = None
+    proposed_at = None
+    if latest_proposed:
+        payload = latest_proposed.payload or {}
+        proposals = [dict(proposal) for proposal in payload.get("proposals", [])]
+        model = payload.get("model")
+        proposed_at = latest_proposed.created_at.isoformat() if latest_proposed.created_at else None
+        for proposal in proposals:
+            proposal.update(decisions.get(str(proposal.get("id", "")), {"status": "pending"}))
+            proposal.setdefault("status", "pending")
+
+    applied = [
+        {
+            "proposal_id": row.proposal_id,
+            "action": row.action,
+            "subject_fqn": row.subject_fqn,
+            "target_fqn": row.target_fqn,
+            "sources": list(row.sources or []),
+            "status": row.status,
+            "approver": row.approver,
+            "applied_at": row.created_at.isoformat() if row.created_at else None,
+        }
+        for row in db.query(LineageOverride)
+        .filter(LineageOverride.estate_id == estate.id)
+        .order_by(LineageOverride.id.asc())
+        .all()
+    ]
+
+    current_fqns = {item["fqn"] for item in items}
+    covered_fqns = {str(proposal.get("fqn")) for proposal in proposals}
+    pending_fqns = {
+        str(proposal.get("fqn"))
+        for proposal in proposals
+        if proposal.get("status") == "pending"
+    }
+    stale = bool(pending_fqns - current_fqns) or bool(current_fqns - covered_fqns)
+
+    return {
+        "estate_id": estate.id,
+        "counts": {
+            "total": len(items),
+            "missing_objects": sum(1 for item in items if item["kind"] == "missing_object"),
+            "unresolved_views": sum(1 for item in items if item["kind"] == "unresolved_view"),
+            "unresolved_procedures": sum(1 for item in items if item["kind"] == "unresolved_procedure"),
+            "unresolved_routines": sum(1 for item in items if item["kind"] == "unresolved_routine"),
+            "applied_overrides": len(applied),
+        },
+        "items": items,
+        "proposals": proposals,
+        "applied": applied,
+        "stale": stale,
+        "model": model,
+        "proposed_at": proposed_at,
+        "requires_approval": True,
+    }
+
+
+@router.get("/{estate_id}/unresolved")
+def get_unresolved(estate_id: int, db: Session = Depends(get_db)):
+    estate = db.query(Estate).filter(Estate.id == estate_id).first()
+    if not estate:
+        raise HTTPException(status_code=404, detail="Estate not found")
+    return _unresolved_state(db, estate)
+
+
+@router.post("/{estate_id}/unresolved/recommend")
+def recommend_unresolved(
+    estate_id: int,
+    payload: RemediationRecommendRequest = RemediationRecommendRequest(),
+    db: Session = Depends(get_db),
+):
+    """Generate AI remediation proposals and record them in the ledger."""
+    estate = db.query(Estate).filter(Estate.id == estate_id).first()
+    if not estate:
+        raise HTTPException(status_code=404, detail="Estate not found")
+    ir = _get_ir(estate, db)
+    proposals = propose_remediations(ir, use_ai=payload.use_ai)
+    model = proposals[0].model_used if proposals else DETERMINISTIC_MODEL
+    append_ledger_event(
+        db,
+        estate_id,
+        "remediation_proposed",
+        {
+            "proposals": [proposal.model_dump(mode="json") for proposal in proposals],
+            "model": model,
+            "generated_on": date.today().isoformat(),
+            "item_count": len(proposals),
+        },
+    )
+    db.commit()
+    return _unresolved_state(db, estate)
+
+
+@router.post("/{estate_id}/unresolved/decide")
+def decide_unresolved(
+    estate_id: int,
+    payload: RemediationDecideRequest,
+    db: Session = Depends(get_db),
+):
+    """Record a named human decision and apply approved/overridden lineage fixes.
+
+    Rejections are recorded only. Approved proposals become persistent
+    ``LineageOverride`` patches: aliases are re-pointed, missing objects are
+    confirmed/defined, runtime sources are attached. The effective IR, graph,
+    estate counts and ledger are updated end to end.
+    """
+    estate = db.query(Estate).filter(Estate.id == estate_id).first()
+    if not estate:
+        raise HTTPException(status_code=404, detail="Estate not found")
+    approver = (payload.approver or "").strip()
+    if len(approver) < 2:
+        raise HTTPException(status_code=400, detail="Approver name is required (min 2 characters)")
+    if not payload.decisions:
+        raise HTTPException(status_code=400, detail="At least one decision is required")
+
+    from dsxlineage.estate.models import LedgerEvent
+
+    latest = (
+        db.query(LedgerEvent)
+        .filter(
+            LedgerEvent.estate_id == estate_id,
+            LedgerEvent.event_type == "remediation_proposed",
+        )
+        .order_by(LedgerEvent.id.desc())
+        .first()
+    )
+    if not latest:
+        raise HTTPException(status_code=409, detail="Generate remediation proposals first")
+    proposals_by_id = {
+        str(proposal.get("id")): proposal
+        for proposal in (latest.payload or {}).get("proposals", [])
+    }
+    known_ids = set(proposals_by_id)
+    unknown = [item.proposal_id for item in payload.decisions if item.proposal_id not in known_ids]
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unknown proposal ids: {', '.join(unknown)}")
+
+    base_ir = extract_estate_ir(_synthetic_root_for_estate(estate), estate_name=estate.name)
+    known = known_fqns(base_ir)
+    for decision in payload.decisions:
+        proposal = proposals_by_id[decision.proposal_id]
+        action = str(proposal.get("action") or "")
+        subject = str(proposal.get("fqn") or "")
+        existing = (
+            db.query(LineageOverride)
+            .filter(
+                LineageOverride.estate_id == estate_id,
+                LineageOverride.proposal_id == decision.proposal_id,
+            )
+            .first()
+        )
+        if decision.decision == "rejected":
+            if existing:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"Proposal {decision.proposal_id} was already applied; "
+                        "override it with a corrected target instead of rejecting it"
+                    ),
+                )
+            continue
+
+        target = str(proposal.get("target_fqn") or subject)
+        sources: list[str] = []
+        note = decision.note
+        if decision.decision == "overridden":
+            override = decision.override or RemediationOverride()
+            target = str(override.target_fqn or target)
+            sources = [source.strip() for source in override.sources if source.strip()]
+            note = override.note or note
+        if action in ("map_alias", "correct_reference") and target not in known:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Override target '{target}' is not an existing object in this estate",
+            )
+        missing_sources = [source for source in sources if source not in known]
+        if missing_sources:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Override sources not found in this estate: {', '.join(missing_sources)}",
+            )
+
+        if existing:
+            db.delete(existing)
+            db.flush()
+        db.add(
+            LineageOverride(
+                estate_id=estate_id,
+                proposal_id=decision.proposal_id,
+                action=action,
+                subject_fqn=subject,
+                target_fqn=target if action not in ("capture_runtime_sql",) else None,
+                sources=sources,
+                note=note,
+                status=decision.decision,
+                approver=approver,
+            )
+        )
+    db.flush()
+
+    previous_version = estate.ir_version or "0.0.0"
+    before = {
+        "version": previous_version,
+        "nodes": estate.node_count or 0,
+        "edges": estate.edge_count or 0,
+        "unresolved": estate.unresolved_count or 0,
+    }
+    effective_ir, effects = apply_overrides(base_ir, _override_dicts(db, estate_id))
+    applied_effects = [effect for effect in effects if effect.get("applied")]
+
+    if applied_effects:
+        estate.ir_version = bump_version(previous_version, True)
+        estate.node_count = effective_ir.total_nodes
+        estate.edge_count = effective_ir.total_edges
+        estate.unresolved_count = effective_ir.unresolved_count
+        estate.survey_todo = _build_survey_todo(effective_ir)
+        estate.ir_generated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    append_ledger_event(
+        db,
+        estate_id,
+        "remediation_decided",
+        {
+            "approver": approver,
+            "decisions": [decision.model_dump(mode="json") for decision in payload.decisions],
+            "proposal_count": len(known_ids),
+        },
+        actor=approver,
+        actor_email=payload.actor_email,
+    )
+
+    if applied_effects:
+        append_ledger_event(
+            db,
+            estate_id,
+            "remediation_applied",
+            {
+                "version": estate.ir_version,
+                "previous_version": previous_version,
+                "approver": approver,
+                "applied_count": len(applied_effects),
+                "proposals": applied_effects,
+                "before": before,
+                "after": {
+                    "version": estate.ir_version,
+                    "nodes": effective_ir.total_nodes,
+                    "edges": effective_ir.total_edges,
+                    "unresolved": effective_ir.unresolved_count,
+                },
+                "fingerprint": fingerprint_ir(effective_ir),
+            },
+            actor=approver,
+            actor_email=payload.actor_email,
+        )
+        db.commit()
+        try:
+            from dsxlineage.estate.graph import sync_estate_to_graph
+
+            sync_estate_to_graph(estate.id, estate.name, effective_ir)
+            append_ledger_event(db, estate_id, "graph_synced", {"estate_id": estate_id, "after_override": True})
+            db.commit()
+        except Exception as exc:
+            print(f"Warning: graph sync failed after override for estate {estate.id}: {exc}")
+
+    db.commit()
+    return _unresolved_state(db, estate)
+
+
 @router.get("/{estate_id}/ir")
 def get_estate_ir(estate_id: int, db: Session = Depends(get_db)):
     estate = db.query(Estate).filter(Estate.id == estate_id).first()
@@ -559,7 +1108,7 @@ def get_estate_ir(estate_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Estate not found")
     if not _synthetic_root_for_estate(estate).exists():
         raise HTTPException(status_code=404, detail="Synthetic estate not found")
-    ir = _get_ir(estate)
+    ir = _get_ir(estate, db)
     return ir.model_dump()
 
 
@@ -568,7 +1117,7 @@ def get_estate_graph(estate_id: int, db: Session = Depends(get_db)):
     estate = db.query(Estate).filter(Estate.id == estate_id).first()
     if not estate:
         raise HTTPException(status_code=404, detail="Estate not found")
-    ir = _get_ir(estate)
+    ir = _get_ir(estate, db)
     # Build nodes for ReactFlow: each table/view/procedure/etc is a node
     nodes = []
     edges = []
@@ -687,7 +1236,7 @@ def get_lineage(estate_id: int, fqn: str, direction: str = "both", hops: int = 6
     estate = db.query(Estate).filter(Estate.id == estate_id).first()
     if not estate:
         raise HTTPException(status_code=404, detail="Estate not found")
-    ir = _get_ir(estate)
+    ir = _get_ir(estate, db)
     # BFS in IR (Postgres-native, no Neo4j needed)
     outgoing: dict[str, list[str]] = {}
     incoming: dict[str, list[str]] = {}
@@ -723,7 +1272,7 @@ def get_blast_radius(estate_id: int, fqn: str, db: Session = Depends(get_db)):
     estate = db.query(Estate).filter(Estate.id == estate_id).first()
     if not estate:
         raise HTTPException(status_code=404, detail="Estate not found")
-    ir = _get_ir(estate)
+    ir = _get_ir(estate, db)
     outgoing: dict[str, list[str]] = {}
     for e in ir.edges:
         if e.edge_type.value == "UNRESOLVED":
@@ -751,7 +1300,7 @@ def get_analytics(estate_id: int, db: Session = Depends(get_db)):
     estate = db.query(Estate).filter(Estate.id == estate_id).first()
     if not estate:
         raise HTTPException(status_code=404, detail="Estate not found")
-    ir = _get_ir(estate)
+    ir = _get_ir(estate, db)
     ana = compute_analytics(ir)
     return ana
 
@@ -767,7 +1316,7 @@ def post_chat(estate_id: int, payload: ChatRequest, db: Session = Depends(get_db
         raise HTTPException(status_code=404, detail="Estate not found")
     if not payload.question or not payload.question.strip():
         raise HTTPException(status_code=400, detail="Question is required")
-    ir = _get_ir(estate)
+    ir = _get_ir(estate, db)
 
     # Session handling
     session_id = payload.session_id
@@ -1242,7 +1791,7 @@ def bridge_recommend(estate_id: int, payload: BridgeRecommendRequest | None = No
     if not estate:
         raise HTTPException(status_code=404, detail="Estate not found")
     target = payload.target if payload else "snowflake"
-    ir = _get_ir(estate)
+    ir = _get_ir(estate, db)
     rec = recommend_wedge(ir, target=target)
     append_ledger_event(db, estate_id, "wedge_recommended", rec.model_dump())
     db.commit()
@@ -1254,7 +1803,7 @@ def bridge_create_plan(estate_id: int, payload: PlanCreate, db: Session = Depend
     estate = db.query(Estate).filter(Estate.id == estate_id).first()
     if not estate:
         raise HTTPException(status_code=404, detail="Estate not found")
-    ir = _get_ir(estate)
+    ir = _get_ir(estate, db)
     if payload.scope_fqns is None:
         rec = recommend_wedge(ir, target=payload.target_platform)
         scope = rec.scope_fqns
@@ -1311,7 +1860,7 @@ def bridge_approve_plan(estate_id: int, plan_id: int, payload: PlanApprove, db: 
     plan.approved_at = datetime.now(timezone.utc)
 
     # Generate artifacts upon approval
-    ir = _get_ir(estate)
+    ir = _get_ir(estate, db)
     ddl = generate_snowflake_ddl(ir, plan.scope_fqns or [])
     tf = generate_terraform(ir, plan.scope_fqns or [], target=plan.target_platform)
     # Store as ledger artifacts (for POC, store inline in payload; prod would write to Files)
@@ -1338,7 +1887,7 @@ def bridge_get_ddl(estate_id: int, plan_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Plan not found")
     if plan.status != "approved":
         raise HTTPException(status_code=409, detail="Plan must be approved before generating DDL")
-    ir = _get_ir(estate)
+    ir = _get_ir(estate, db)
     ddl = generate_snowflake_ddl(ir, plan.scope_fqns or [])
     return ddl
 
@@ -1353,7 +1902,7 @@ def bridge_get_terraform(estate_id: int, plan_id: int, db: Session = Depends(get
         raise HTTPException(status_code=404, detail="Plan not found")
     if plan.status != "approved":
         raise HTTPException(status_code=409, detail="Plan must be approved before generating Terraform")
-    ir = _get_ir(estate)
+    ir = _get_ir(estate, db)
     tf = generate_terraform(ir, plan.scope_fqns or [], target=plan.target_platform)
     return tf
 
@@ -1368,7 +1917,7 @@ def bridge_get_scaffold(estate_id: int, plan_id: int, job_fqn: str | None = None
         raise HTTPException(status_code=404, detail="Plan not found")
     if plan.status != "approved":
         raise HTTPException(status_code=409, detail="Plan must be approved before generating migration code")
-    ir = _get_ir(estate)
+    ir = _get_ir(estate, db)
     scope = set(plan.scope_fqns or [])
     eligible = [
         j for j in ir.etl_jobs
@@ -1398,7 +1947,7 @@ def bridge_run_diff(estate_id: int, payload: DiffRequest, db: Session = Depends(
     approved = db.query(MigrationPlan).filter(MigrationPlan.estate_id == estate_id, MigrationPlan.status == "approved").first()
     if not approved:
         raise HTTPException(status_code=409, detail="At least one plan must be approved before running diff (ledger gate)")
-    ir = _get_ir(estate)
+    ir = _get_ir(estate, db)
     scope = payload.scope_fqns or approved.scope_fqns or [t.fqn for t in ir.tables[:8]]
     result = run_diff_harness(ir, scope_fqns=scope, synthetic_data_dir=_synthetic_root_for_estate(estate) / "data", sampling=payload.sampling, n=payload.n)
     # Persist DiffRun
@@ -1436,7 +1985,7 @@ def bridge_check_continuity(estate_id: int, payload: ContinuityRequest, db: Sess
     last_diff = db.query(DiffRun).filter(DiffRun.estate_id == estate_id, DiffRun.status == "passed").order_by(DiffRun.id.desc()).first()
     if not last_diff:
         raise HTTPException(status_code=409, detail="A passed diff run is required before continuity check (ledger gate)")
-    ir = _get_ir(estate)
+    ir = _get_ir(estate, db)
     result = check_continuity(ir, target_ir=None, scope_fqns=payload.scope_fqns)
     # Update diff run with continuity
     last_diff.continuity_passed = result.passed

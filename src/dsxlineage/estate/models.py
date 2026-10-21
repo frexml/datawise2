@@ -17,7 +17,17 @@ import hashlib
 import json
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import JSON
 from sqlalchemy.orm import relationship
@@ -191,6 +201,31 @@ class DiffRun(Base):
     completed_at = Column(DateTime(timezone=True))
 
     estate = relationship("Estate", back_populates="diff_runs")
+
+
+class LineageOverride(Base):
+    """An approved/overridden lineage recommendation, applied to every IR read.
+
+    Overrides are the write-back path for remediation: an approved proposal
+    becomes a persistent patch (alias remap, external object confirmation,
+    runtime sources, etc.) that is re-applied after each extraction/rerun so
+    the correction survives source changes.
+    """
+
+    __tablename__ = "lineage_overrides"
+    __table_args__ = (UniqueConstraint("estate_id", "proposal_id", name="uq_lineage_override_proposal"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    estate_id = Column(Integer, ForeignKey("estates.id"), index=True, nullable=False)
+    proposal_id = Column(String, index=True, nullable=False)
+    action = Column(String, nullable=False)
+    subject_fqn = Column(String, index=True, nullable=False)
+    target_fqn = Column(String, nullable=True)
+    sources = Column(JsonCol, default=list)
+    note = Column(Text, nullable=True)
+    status = Column(String, default="approved")  # approved | overridden
+    approver = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class ChatSession(Base):

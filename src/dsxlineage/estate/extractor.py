@@ -123,6 +123,12 @@ def _parse_procedure_file(path: Path) -> ProcedureDef:
         has_cursor=has_cursor,
         complexity=complexity if complexity in ("low", "medium", "high") else "low",
         source_text=text[:4000],
+        unresolved=has_dynamic or has_cursor,
+        unresolved_reason=(
+            "Procedure uses dynamic SQL/cursors; referenced tables are not statically visible."
+            if has_dynamic or has_cursor
+            else None
+        ),
     )
 
 

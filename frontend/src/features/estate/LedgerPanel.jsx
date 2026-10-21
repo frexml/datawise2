@@ -64,6 +64,13 @@ export default function LedgerPanel({ ledger, estateId }) {
                 <span className="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300">Relationship: {a.relationship}</span>
                 {a.hops && <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700">Hops: {a.hops}</span>}
               </div>
+              {a.details?.length > 0 && (
+                <ul className="mt-1 space-y-0.5">
+                  {a.details.map((detail, i) => (
+                    <li key={i} className="text-[11px] font-mono text-gray-600 dark:text-gray-400 truncate" title={detail}>{detail}</li>
+                  ))}
+                </ul>
+              )}
               <div className="mt-1 text-[11px] font-mono text-gray-500 truncate" title={a.full_path}>{a.full_path || ''}</div>
             </div>
           ))}

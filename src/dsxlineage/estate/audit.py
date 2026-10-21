@@ -55,6 +55,24 @@ def _relationship_for_payload(payload: dict, event_type: str) -> str:
         return f"message {payload.get('message_id')} → {payload.get('decision')} by {payload.get('reviewer')}"
     if event_type == "wedge_recommended":
         return f"wedge → {payload.get('target_platform')} ({len(payload.get('scope_fqns', []))} objects)"
+    if event_type == "estate_rerun":
+        changes = payload.get("changes") or {}
+        return (
+            f"estate → v{payload.get('version')} "
+            f"({len(changes.get('added_objects', []))}+ / {len(changes.get('removed_objects', []))}- objects)"
+        )
+    if event_type == "remediation_proposed":
+        return f"unresolved → {payload.get('item_count', 0)} AI proposals ({payload.get('model')})"
+    if event_type == "remediation_decided":
+        return (
+            f"remediation → {len(payload.get('decisions', []))} decisions "
+            f"by {payload.get('approver')}"
+        )
+    if event_type == "remediation_applied":
+        return (
+            f"lineage → {payload.get('applied_count', 0)} fixes applied "
+            f"(v{payload.get('version')})"
+        )
     # Generic fallback
     if "target_table" in payload and "target_column" in payload:
         return f"{payload['target_table']}.{payload['target_column']} → downstream"
@@ -78,6 +96,44 @@ def _what_for_event(ev: LedgerEvent) -> str:
         return f"Generated IR v{p.get('version')} — {p.get('nodes')} nodes"
     if et == "graph_synced":
         return f"Synced graph for estate {p.get('estate_id')}"
+    if et == "estate_rerun":
+        changes = p.get("changes") or {}
+        if changes.get("baseline"):
+            return f"Re-ran estate v{p.get('version')} — baseline fingerprint recorded"
+        logic = changes.get("logic_changes", [])
+        attributes = changes.get("attribute_changes", [])
+        logic_note = f", {len(logic)} logic change{'s' if len(logic) != 1 else ''}" if logic else ""
+        attribute_note = (
+            f", {len(attributes)} attribute change{'s' if len(attributes) != 1 else ''}"
+            if attributes
+            else ""
+        )
+        return (
+            f"Re-ran estate v{p.get('version')} — "
+            f"{len(changes.get('added_objects', []))} objects added, "
+            f"{len(changes.get('removed_objects', []))} removed, "
+            f"{len(changes.get('added_edges', []))}+/{len(changes.get('removed_edges', []))}- edges"
+            f"{logic_note}{attribute_note}"
+        )
+    if et == "remediation_proposed":
+        return f"Generated {p.get('item_count', 0)} remediation proposals ({p.get('model')}) — awaiting human approval"
+    if et == "remediation_decided":
+        decisions = p.get("decisions", [])
+        approved = sum(1 for d in decisions if d.get("decision") == "approved")
+        overridden = sum(1 for d in decisions if d.get("decision") == "overridden")
+        rejected = sum(1 for d in decisions if d.get("decision") == "rejected")
+        parts = [f"{approved} approved"]
+        if overridden:
+            parts.append(f"{overridden} overridden")
+        parts.append(f"{rejected} rejected")
+        return f"Remediation decision — {', '.join(parts)} by {p.get('approver')}"
+    if et == "remediation_applied":
+        before = p.get("before") or {}
+        after = p.get("after") or {}
+        return (
+            f"Applied {p.get('applied_count', 0)} lineage fixes — v{p.get('version')}; "
+            f"unresolved {before.get('unresolved', '?')} → {after.get('unresolved', '?')}"
+        )
     if et == "plan_created":
         return f"Created migration plan {p.get('name')} → {p.get('target')}"
     if et == "plan_approved":
@@ -105,6 +161,78 @@ def _what_for_event(ev: LedgerEvent) -> str:
     return f"{et}: {str(p)[:80]}"
 
 
+def _change_snippets(
+    before: str | None, after: str | None, context: int = 60, tail: int = 120
+) -> tuple[str, str]:
+    """Return short before/after excerpts centred on the first differing region."""
+    before = before or "(none)"
+    after = after or "(none)"
+    shorter = min(len(before), len(after))
+    start = 0
+    while start < shorter and before[start] == after[start]:
+        start += 1
+    end_before = len(before)
+    end_after = len(after)
+    while (
+        end_before > start
+        and end_after > start
+        and before[end_before - 1] == after[end_after - 1]
+    ):
+        end_before -= 1
+        end_after -= 1
+    lo = max(0, start - context)
+    before_snippet = before[lo : min(len(before), end_before + tail)]
+    after_snippet = after[lo : min(len(after), end_after + tail)]
+    prefix = "…" if lo > 0 else ""
+    suffix_before = "…" if end_before + tail < len(before) else ""
+    suffix_after = "…" if end_after + tail < len(after) else ""
+    return f"{prefix}{before_snippet}{suffix_before}", f"{prefix}{after_snippet}{suffix_after}"
+
+
+def _details_for_event(ev: LedgerEvent) -> list[str]:
+    """Compact before/after detail lines for events that carry change payloads."""
+    payload = ev.payload or {}
+    details: list[str] = []
+    if ev.event_type == "estate_rerun":
+        changes = payload.get("changes") or {}
+        for change in (changes.get("logic_changes") or [])[:8]:
+            before, after = _change_snippets(change.get("before"), change.get("after"))
+            details.append(f"{change.get('key')}: {before} → {after}")
+        if len(changes.get("logic_changes") or []) > 8:
+            details.append(f"… {len(changes['logic_changes']) - 8} more logic changes")
+        for change in (changes.get("attribute_changes") or [])[:8]:
+            before, after = _change_snippets(change.get("before"), change.get("after"))
+            details.append(f"{change.get('key')}: {before} → {after}")
+        if len(changes.get("attribute_changes") or []) > 8:
+            details.append(f"… {len(changes['attribute_changes']) - 8} more attribute changes")
+    elif ev.event_type == "remediation_proposed":
+        for proposal in (payload.get("proposals") or [])[:6]:
+            details.append(
+                f"{proposal.get('fqn')} → {proposal.get('action')} "
+                f"({round(float(proposal.get('confidence') or 0) * 100)}%)"
+            )
+        if len(payload.get("proposals") or []) > 6:
+            details.append(f"… {len(payload['proposals']) - 6} more proposals")
+    elif ev.event_type == "remediation_decided":
+        for decision in payload.get("decisions") or []:
+            details.append(
+                f"{decision.get('proposal_id')} → {decision.get('decision')}"
+                + (f" ({decision['note']})" if decision.get("note") else "")
+            )
+    elif ev.event_type == "remediation_applied":
+        for effect in payload.get("proposals") or []:
+            target = effect.get("target_fqn") or effect.get("subject_fqn")
+            details.append(f"{effect.get('action')}: {effect.get('subject_fqn')} → {target}")
+        before = payload.get("before") or {}
+        after = payload.get("after") or {}
+        details.append(
+            f"unresolved {before.get('unresolved', '?')} → {after.get('unresolved', '?')} · "
+            f"nodes {before.get('nodes', '?')} → {after.get('nodes', '?')} · "
+            f"edges {before.get('edges', '?')} → {after.get('edges', '?')}"
+        )
+    return details
+
+
 def humanize_event(ev: LedgerEvent, ir=None) -> dict[str, Any]:
     """Translate a single LedgerEvent to human-readable."""
     payload = ev.payload or {}
@@ -130,6 +258,7 @@ def humanize_event(ev: LedgerEvent, ir=None) -> dict[str, Any]:
         "when": ev.created_at.isoformat() if ev.created_at else None,
         "when_relative": _relative_when(ev.created_at),
         "relationship": relationship,
+        "details": _details_for_event(ev),
         "hops": payload.get("hops"),
         "full_path": payload.get("full_path"),
         "payload": payload,

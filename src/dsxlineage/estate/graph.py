@@ -138,6 +138,17 @@ def sync_estate_to_graph(estate_id: int, estate_name: str, ir: EstateIR) -> None
     _run_cypher(statements)
 
 
+def delete_estate_from_graph(estate_id: int) -> None:
+    """Best-effort removal of every node + relationship for one estate."""
+    try:
+        _run_cypher([{
+            "cypher": "MATCH (n {estate_id: $estate_id}) DETACH DELETE n",
+            "params": {"estate_id": estate_id},
+        }])
+    except Exception as exc:
+        print(f"Warning: delete_estate_from_graph failed for estate {estate_id}: {exc}")
+
+
 def lineage_query(estate_id: int, fqn: str, direction: str = "both", max_hops: int = 6) -> list[dict]:
     """Run lineage traversal Cypher for a given FQN. Best-effort."""
     if direction == "upstream":

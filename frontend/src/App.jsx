@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { BrowserRouter as Router, Routes, Route, Link, NavLink, Navigate, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -51,6 +51,80 @@ const ThemeToggle = () => {
     );
 };
 
+const UserMenu = () => {
+  const { user, logout } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [error, setError] = useState('');
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [open]);
+
+  const restartDemo = async () => {
+    if (!window.confirm('Restart the demo?\n\nThis permanently clears every estate, ledger event, migration plan, diff run and chat. The app will reload with a clean slate.')) return;
+    setResetting(true);
+    setError('');
+    try {
+      await axios.post('/api/estates/reset-demo', { confirm: true });
+      window.location.assign('/estates');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Reset failed. Please try again.');
+      setResetting(false);
+    }
+  };
+
+  return (
+    <div className="relative hidden sm:block" ref={menuRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="flex items-center gap-2 rounded-full px-1.5 py-1 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+      >
+        <span className="h-8 w-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-medium">
+          {user?.name?.[0]?.toUpperCase() || '?'}
+        </span>
+        <span className="font-medium">{user?.name}</span>
+        <span className={`text-[10px] text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 w-64 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg z-30 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{user?.name}</p>
+            {user?.email && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>}
+          </div>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={restartDemo}
+            disabled={resetting}
+            className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60 transition-colors"
+          >
+            {resetting ? 'Resetting demo…' : 'Restart demo'}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={logout}
+            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 border-t border-gray-100 dark:border-gray-700 transition-colors"
+          >
+            Logout
+          </button>
+          {error && <p className="px-4 py-2 text-xs text-red-600 dark:text-red-400 border-t border-gray-100 dark:border-gray-700">{error}</p>}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const navLinkClass = ({ isActive }) =>
     `hidden sm:inline font-medium transition-colors ${isActive
         ? 'text-orange-600'
@@ -58,7 +132,7 @@ const navLinkClass = ({ isActive }) =>
     }`;
 
 const AppInner = () => {
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated } = useAuth();
   if (!isAuthenticated) return <Login />;
   return (
     <Router>
@@ -75,11 +149,7 @@ const AppInner = () => {
                 </div>
               </Link>
               <div className="flex items-center gap-4 text-sm">
-                <div className="hidden sm:flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                  <span className="h-7 w-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-medium">{user?.name?.[0] || '?'}</span>
-                  <span>{user?.name}</span>
-                  <button onClick={logout} className="ml-2 px-2 py-1 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-xs">Logout</button>
-                </div>
+                <UserMenu />
                 <EstateSwitcher />
                 <NavLink to="/estates" className={navLinkClass}>Estates</NavLink>
                 <ThemeToggle />

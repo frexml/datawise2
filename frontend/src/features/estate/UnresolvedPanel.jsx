@@ -1,0 +1,223 @@
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+
+const STATUS_STYLES = {
+  pending: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+  approved: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+  rejected: 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
+  overridden: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
+};
+
+const ACTION_LABELS = {
+  define_ddl: 'Define DDL',
+  map_alias: 'Map alias',
+  capture_runtime_sql: 'Capture runtime SQL',
+  confirm_external: 'Confirm external',
+  correct_reference: 'Correct reference',
+};
+
+export default function UnresolvedPanel({ estateId }) {
+  const [state, setState] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [approver, setApprover] = useState('');
+  const [overrideInputs, setOverrideInputs] = useState({});
+  const [error, setError] = useState(null);
+
+  const load = async () => {
+    try {
+      const r = await axios.get(`/api/estates/${estateId}/unresolved`);
+      setState(r.data);
+    } catch (e) {
+      setError(e.response?.data?.detail || e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, [estateId]);
+
+  const recommend = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await axios.post(`/api/estates/${estateId}/unresolved/recommend`, { use_ai: true });
+      setState(r.data);
+    } catch (e) {
+      setError(e.response?.data?.detail || e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const decide = async (proposal, decision) => {
+    if (approver.trim().length < 2) {
+      setError('Enter the approver name (min 2 characters) before approving or rejecting.');
+      return;
+    }
+    const raw = (overrideInputs[proposal.id] || '').trim();
+    if (decision === 'overridden' && !raw) {
+      setError('Enter an override target (or comma-separated source FQNs) before overriding.');
+      return;
+    }
+    const override = decision === 'overridden'
+      ? (proposal.action === 'capture_runtime_sql'
+          ? { sources: raw.split(',').map((s) => s.trim()).filter(Boolean) }
+          : { target_fqn: raw })
+      : undefined;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await axios.post(`/api/estates/${estateId}/unresolved/decide`, {
+        approver: approver.trim(),
+        decisions: [{ proposal_id: proposal.id, decision, override }],
+      });
+      setState(r.data);
+    } catch (e) {
+      setError(e.response?.data?.detail || e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading) return <div className="text-sm text-gray-500 p-4">Loading unresolved references…</div>;
+  if (!state) return <div className="text-sm text-red-600 p-4">{error || 'Unable to load unresolved references.'}</div>;
+
+  const { counts, items, proposals, applied = [] } = state;
+  const pending = proposals.filter((p) => p.status === 'pending').length;
+  const stale = state.stale === true;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white dark:bg-gray-800 border rounded-lg p-4">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+          <div>
+            <h4 className="font-medium text-sm">Lineage recommendations — approve, override or reject</h4>
+            <p className="text-xs text-gray-500 mt-1">
+              {counts.total} unresolved objects · {counts.missing_objects} missing · {counts.unresolved_views} views · {counts.unresolved_procedures} procedures · {counts.unresolved_routines} routines
+              {counts.applied_overrides ? ` · ${counts.applied_overrides} applied` : ''}.
+              Approved or overridden recommendations are applied to the IR, graph and ledger immediately; rejected ones are recorded only.
+            </p>
+          </div>
+          <button
+            onClick={recommend}
+            disabled={busy || counts.total === 0}
+            className="shrink-0 px-3 py-1.5 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {busy ? 'Working…' : proposals.length ? 'Regenerate with AI' : 'Recommend remediation with AI'}
+          </button>
+        </div>
+        <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
+          <input
+            value={approver}
+            onChange={(e) => setApprover(e.target.value)}
+            placeholder="Approver name (required for decisions)"
+            className="px-3 py-1.5 border rounded text-xs dark:bg-gray-900 dark:border-gray-700 w-full sm:w-72"
+          />
+          {proposals.length > 0 && (
+            <span className="text-xs text-gray-500">
+              {pending} awaiting approval · generated by {state.model || 'unknown'}{state.proposed_at ? ` · ${new Date(state.proposed_at).toLocaleString()}` : ''}
+            </span>
+          )}
+        </div>
+        {stale && (
+          <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 rounded text-xs">
+            These proposals are from an earlier run ({pending} pending vs {counts.total} unresolved now) — regenerate before approving.
+          </div>
+        )}
+        {error && <div className="mt-3 p-2 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded text-xs">{error}</div>}
+      </div>
+
+      {proposals.length === 0 && (
+        <div className="bg-white dark:bg-gray-800 border rounded-lg p-4">
+          <h5 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Unresolved objects</h5>
+          <div className="space-y-1 max-h-[420px] overflow-y-auto">
+            {items.map((item) => (
+              <div key={`${item.fqn}-${item.kind}`} className="text-xs p-2 border rounded bg-gray-50 dark:bg-gray-900/50">
+                <span className="font-mono text-gray-900 dark:text-white">{item.fqn}</span>
+                <span className="ml-2 text-[11px] text-gray-500">{item.kind}</span>
+                <div className="text-gray-500 mt-0.5">{item.reason}{item.referenced_by ? ` — referenced by ${item.referenced_by}` : ''}</div>
+              </div>
+            ))}
+            {items.length === 0 && <div className="text-xs text-gray-400">No unresolved references — nothing to remediate.</div>}
+          </div>
+        </div>
+      )}
+
+      {proposals.map((proposal) => {
+        const appliedItem = applied.find((item) => item.proposal_id === proposal.id);
+        const isRuntime = proposal.action === 'capture_runtime_sql';
+        const border = proposal.status === 'approved'
+          ? 'border-emerald-200 dark:border-emerald-800'
+          : proposal.status === 'rejected'
+            ? 'border-red-200 dark:border-red-800'
+            : proposal.status === 'overridden'
+              ? 'border-indigo-200 dark:border-indigo-800'
+              : 'border-gray-200 dark:border-gray-700';
+        return (
+          <div key={proposal.id} className={`border rounded-lg p-4 ${border} bg-white dark:bg-gray-800`}>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-sm font-medium text-gray-900 dark:text-white">{proposal.fqn}</span>
+              <span className={`px-1.5 py-0.5 rounded border text-[11px] ${STATUS_STYLES[proposal.status] || STATUS_STYLES.pending}`}>{proposal.status}</span>
+              <span className="px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 text-[11px]">{ACTION_LABELS[proposal.action] || proposal.action}</span>
+              <span className="text-[11px] text-gray-500">{Math.round((proposal.confidence || 0) * 100)}% confidence · {proposal.model_used}</span>
+            </div>
+            <div className="mt-2 text-xs text-gray-700 dark:text-gray-300">{proposal.recommendation}</div>
+            <div className="mt-1 text-xs text-gray-500">{proposal.rationale}</div>
+            <div className="mt-1 text-[11px] text-gray-400">
+              {proposal.kind}{proposal.referenced_by ? ` · referenced by ${proposal.referenced_by}` : ''}{proposal.reason ? ` · ${proposal.reason}` : ''}
+              {proposal.impact?.edges ? ` · lineage impact: ${proposal.impact.edges} edges (${proposal.impact.upstream} upstream, ${proposal.impact.downstream} downstream)` : ''}
+            </div>
+            {proposal.target_fqn && proposal.status === 'pending' && proposal.action !== 'capture_runtime_sql' && (
+              <div className="mt-1 text-[11px] text-emerald-700 dark:text-emerald-300">
+                Recommended target: <span className="font-mono">{proposal.target_fqn}</span>
+              </div>
+            )}
+            {proposal.status === 'pending' ? (
+              <div className="mt-3 space-y-2">
+                <input
+                  value={overrideInputs[proposal.id] || ''}
+                  onChange={(e) => setOverrideInputs((prev) => ({ ...prev, [proposal.id]: e.target.value }))}
+                  placeholder={isRuntime ? 'Override sources (comma-separated FQNs)' : 'Override target FQN (optional)'}
+                  className="w-full px-3 py-1.5 border rounded text-xs font-mono dark:bg-gray-900 dark:border-gray-700"
+                />
+                {proposal.target_candidates?.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1 text-[11px] text-gray-500">
+                    Candidates:
+                    {proposal.target_candidates.map((candidate) => (
+                      <button
+                        key={candidate}
+                        onClick={() => setOverrideInputs((prev) => ({ ...prev, [proposal.id]: candidate }))}
+                        className="px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700 font-mono hover:bg-gray-50 dark:hover:bg-gray-700"
+                      >
+                        {candidate}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => decide(proposal, 'approved')} disabled={busy} className="px-3 py-1 bg-emerald-600 text-white rounded text-xs hover:bg-emerald-700 disabled:opacity-50">Approve &amp; apply</button>
+                  <button onClick={() => decide(proposal, 'overridden')} disabled={busy} className="px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700 disabled:opacity-50">Override &amp; apply</button>
+                  <button onClick={() => decide(proposal, 'rejected')} disabled={busy} className="px-3 py-1 border border-red-300 text-red-700 dark:text-red-300 rounded text-xs hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50">Reject</button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-2 space-y-1 text-[11px] text-gray-500">
+                <div>
+                  {proposal.status} by {proposal.decided_by || 'unknown'}{proposal.decided_at ? ` · ${new Date(proposal.decided_at).toLocaleString()}` : ''}{proposal.note ? ` · ${proposal.note}` : ''}
+                </div>
+                {appliedItem && (
+                  <div className="text-emerald-700 dark:text-emerald-300">
+                    Applied{appliedItem.target_fqn ? <> → <span className="font-mono">{appliedItem.target_fqn}</span></> : ''}
+                    {appliedItem.sources?.length ? <> from <span className="font-mono">{appliedItem.sources.join(', ')}</span></> : ''}
+                    {appliedItem.applied_at ? ` · ${new Date(appliedItem.applied_at).toLocaleString()}` : ''}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}

@@ -208,3 +208,22 @@ def test_bridge_promote_blocked_without_evidence(client):
         blocked = client.post(f"/api/estates/{eid}/bridge/promote")
         assert blocked.status_code == 409
         assert "missing" in blocked.json()["detail"].lower()
+
+
+def test_reset_demo_requires_confirmation(client):
+    resp = client.post("/api/estates/reset-demo", json={"confirm": False})
+    assert resp.status_code == 400
+    assert len(client.get("/api/estates").json()) >= 1
+
+
+def test_reset_demo_clears_all_estate_data(client):
+    resp = client.post("/api/estates/reset-demo", json={"confirm": True})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["reset"] is True
+    assert body["estates_removed"] >= 1
+    assert body["ledger_events_removed"] >= 1
+    assert body["chat_sessions_removed"] >= 1
+    assert body["chat_messages_removed"] >= 1
+    assert client.get("/api/estates").json() == []
+    assert client.get("/api/estates/1/ledger").status_code == 404

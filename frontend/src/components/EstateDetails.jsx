@@ -11,6 +11,7 @@ import ColumnDrawer from '../features/estate/ColumnDrawer';
 import ColumnLineageTable from '../features/estate/ColumnLineageTable';
 import KnowledgeGraphPanel from '../features/estate/KnowledgeGraphPanel';
 import LineagePerspectives from '../features/estate/LineagePerspectives';
+import UnresolvedPanel from '../features/estate/UnresolvedPanel';
 import { useAuth } from '../context/AuthContext';
 
 // BFS shortest path between two graph nodes - used to highlight a column's
@@ -103,6 +104,7 @@ const TAB_LABELS = [
   { key: 'graph', label: 'Lineage Graph' },
   { key: 'knowledge', label: 'Knowledge Graph' },
   { key: 'analytics', label: 'Analytics' },
+  { key: 'unresolved', label: 'Unresolved' },
   { key: 'columns', label: 'Column Lineage' },
   { key: 'chat', label: 'Chat' },
   { key: 'bridge', label: 'Bridge' },
@@ -463,6 +465,7 @@ export default function EstateDetails() {
       )}
       {activeTab === 'knowledge' && <KnowledgeGraphPanel estateId={estateId} selectedFqn={drawerFqn} />}
       {activeTab === 'analytics' && <AnalyticsPanel data={analytics} recommendation={recommendation} />}
+      {activeTab === 'unresolved' && <UnresolvedPanel estateId={estateId} />}
       {activeTab === 'columns' && <ColumnLineageTable columnLineage={ir?.column_lineage || []} />}
       {activeTab === 'chat' && <ChatPanel estateId={estateId} />}
       {activeTab === 'bridge' && <BridgePanel estateId={estateId} />}

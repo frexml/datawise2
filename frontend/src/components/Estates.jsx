@@ -122,6 +122,7 @@ export default function Estates() {
   const [todo, setTodo] = useState([]);
   const [currentStage, setCurrentStage] = useState('');
   const [preview, setPreview] = useState(null);
+  const [notice, setNotice] = useState(null);
 
   const fetch = async () => {
     try {
@@ -143,12 +144,27 @@ export default function Estates() {
     }
   }, [template]);
 
+  const describeChanges = (changes) => {
+    if (!changes || changes.baseline) return 'baseline recorded (no previous run to compare)';
+    const added = changes.added_objects?.length ?? 0;
+    const removed = changes.removed_objects?.length ?? 0;
+    const addedEdges = changes.added_edges?.length ?? 0;
+    const removedEdges = changes.removed_edges?.length ?? 0;
+    const logic = changes.logic_changes?.length ?? 0;
+    const attributes = changes.attribute_changes?.length ?? 0;
+    if (!changes.changed) return 'no changes since last run';
+    return `${added} objects added, ${removed} removed, ${addedEdges} edges added, ${removedEdges} removed`
+      + (logic ? `, ${logic} logic change${logic === 1 ? '' : 's'}` : '')
+      + (attributes ? `, ${attributes} attribute change${attributes === 1 ? '' : 's'}` : '');
+  };
+
   const handleCreateAndSurvey = async () => {
     setCreating(true);
     setError(null);
+    setNotice(null);
     try {
       const tpl = TEMPLATES[template];
-      // 1) Create estate PENDING
+      // 1) Create estate PENDING (an existing name re-runs and diffs instead)
       const createRes = await axios.post('/api/estates', {
         name: tpl.name,
         display_name: tpl.display_name,
@@ -157,6 +173,12 @@ export default function Estates() {
         connection: { host: conn.host, port: conn.port, user: conn.user, db_type: conn.db_type, status: 'pending' },
         defer_discovery: true,
       });
+      if (createRes.data?.rerun) {
+        setNotice(`Re-ran ${tpl.name} → v${createRes.data.ir_version}: ${describeChanges(createRes.data.changes)}. Logged to ledger.`);
+        setShowModal(false);
+        await fetch();
+        return;
+      }
       const estateId = createRes.data.id;
       // 2) Test connection (mock)
       try {
@@ -214,6 +236,7 @@ export default function Estates() {
           <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm">+ Add Estate</button>
         </div>
         {error && <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded text-sm">{error}</div>}
+        {notice && <div className="mt-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 rounded text-sm">{notice}</div>}
         {surveying && todo.length > 0 && (
           <div className="mt-4">
             <div className="text-sm font-medium text-indigo-600 dark:text-indigo-400">

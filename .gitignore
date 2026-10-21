@@ -75,6 +75,7 @@ data/end_to_end_linage/
 /cardinality_prompt.txt
 /test.json
 /test.csv
+/test_sql.py
 /*_output.csv
 /*_output.xlsx
 

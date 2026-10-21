@@ -290,3 +290,264 @@ def test_api_create_and_graph_missing_nodes():
     structure = client.get(f"/api/estates/{payload['id']}/structure/facts").json()
     assert structure["unknown_count"] >= 7
     app.dependency_overrides.pop(get_db, None)
+
+
+def test_drift_fingerprint_detects_logic_change():
+    from dsxlineage.estate.drift import diff_fingerprints
+
+    previous = {
+        "nodes": 1,
+        "edges": 1,
+        "unresolved": 0,
+        "objects": ["FACT.VW_ACTIVE_LOANS"],
+        "edge_keys": ["DIM.DIM_LOAN->FACT.VW_ACTIVE_LOANS:VIEW_DEPENDS"],
+        "unresolved_refs": [],
+        "logic": {"view:FACT.VW_ACTIVE_LOANS": "SELECT SUM(Months) / 12 AS tenure"},
+    }
+    current = {
+        **previous,
+        "logic": {"view:FACT.VW_ACTIVE_LOANS": "SELECT SUM(Months) / 6 AS tenure"},
+    }
+
+    changes = diff_fingerprints(previous, current)
+    assert changes["changed"] is True
+    assert changes["added_objects"] == []
+    assert changes["logic_changes"] == [
+        {
+            "key": "view:FACT.VW_ACTIVE_LOANS",
+            "kind": "view",
+            "before": "SELECT SUM(Months) / 12 AS tenure",
+            "after": "SELECT SUM(Months) / 6 AS tenure",
+        }
+    ]
+
+
+def test_drift_fingerprint_detects_attribute_change():
+    from dsxlineage.estate.drift import diff_fingerprints
+
+    previous = {
+        "nodes": 1,
+        "edges": 0,
+        "unresolved": 0,
+        "objects": ["CTL.DAILY_LOAD"],
+        "edge_keys": [],
+        "unresolved_refs": [],
+        "logic": {},
+        "attributes": {"schedule:CTL.DAILY_LOAD": "scheduler=Control-M; expr=0 2 * * *; frequency=daily"},
+    }
+    current = {
+        **previous,
+        "attributes": {"schedule:CTL.DAILY_LOAD": "scheduler=Control-M; expr=0 4 * * *; frequency=daily"},
+    }
+
+    changes = diff_fingerprints(previous, current)
+    assert changes["changed"] is True
+    assert changes["logic_changes"] == []
+    assert changes["attribute_changes"] == [
+        {
+            "key": "schedule:CTL.DAILY_LOAD",
+            "kind": "schedule",
+            "before": "scheduler=Control-M; expr=0 2 * * *; frequency=daily",
+            "after": "scheduler=Control-M; expr=0 4 * * *; frequency=daily",
+        }
+    ]
+
+
+def test_estate_rerun_and_remediation_approval(monkeypatch):
+    from fastapi.testclient import TestClient
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    from dsxlineage.db.database import Base, get_db
+    import dsxlineage.estate.models  # noqa: F401
+    import dsxlineage.db.models  # noqa: F401
+
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(bind=engine)
+    session_factory = sessionmaker(bind=engine)
+
+    def override():
+        db = session_factory()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    from dsxlineage.main import app
+
+    app.dependency_overrides[get_db] = override
+    client = TestClient(app)
+    payload = {
+        "name": "DATAWISE_RERUN",
+        "display_name": "DataWise Re-run",
+        "source_type": "git",
+        "estate_type": "datawise_platform",
+    }
+    created = client.post("/api/estates", json=payload)
+    assert created.status_code == 200, created.text
+    first = created.json()
+    estate_id = first["id"]
+    assert first["ir_version"] == "1.0.0"
+
+    rerun = client.post(f"/api/estates/{estate_id}/rerun")
+    assert rerun.status_code == 200, rerun.text
+    body = rerun.json()
+    assert body["rerun"] is True
+    assert body["previous_version"] == "1.0.0"
+    assert body["ir_version"] == "1.0.1"
+    assert body["changes"]["baseline"] is False
+    assert body["changes"]["changed"] is False
+    assert body["changes"]["added_objects"] == []
+
+    # Re-posting the same estate name re-runs it instead of returning 409.
+    again = client.post("/api/estates", json=payload)
+    assert again.status_code == 200, again.text
+    assert again.json()["rerun"] is True
+    events = client.get(f"/api/estates/{estate_id}/ledger").json()
+    reruns = [event for event in events if event["event_type"] == "estate_rerun"]
+    assert len(reruns) == 2
+    assert reruns[-1]["payload"]["fingerprint"]["objects"]
+    assert reruns[-1]["payload"]["changes"]["changed"] is False
+
+    # Business-logic drift: a view expression changes between runs (the example:
+    # SUM(Months)/12 -> SUM(Months)/6). The ledger must record before/after.
+    from dsxlineage.estate import api as estate_api
+
+    modified = build_datawise_ir(SNAPSHOT).model_copy(deep=True)
+    view = next(v for v in modified.views if v.fqn == "FACT.VW_ACTIVE_LOANS")
+    assert "/ 12" in view.sql
+    view.sql = view.sql.replace("/ 12", "/ 6")
+    monkeypatch.setattr(
+        estate_api, "extract_estate_ir", lambda root, estate_name: modified
+    )
+
+    changed_run = client.post(f"/api/estates/{estate_id}/rerun")
+    assert changed_run.status_code == 200, changed_run.text
+    changed_body = changed_run.json()
+    assert changed_body["ir_version"] == "1.1.0"
+    logic_changes = changed_body["changes"]["logic_changes"]
+    assert len(logic_changes) == 1
+    assert logic_changes[0]["key"] == "view:FACT.VW_ACTIVE_LOANS"
+    assert "/ 12" in logic_changes[0]["before"]
+    assert "/ 6" in logic_changes[0]["after"]
+
+    events = client.get(f"/api/estates/{estate_id}/ledger").json()
+    reruns = [event for event in events if event["event_type"] == "estate_rerun"]
+    assert len(reruns) == 3
+    assert reruns[-1]["payload"]["changes"]["logic_changes"][0]["before"] != reruns[-1]["payload"]["changes"]["logic_changes"][0]["after"]
+    audit = client.get(f"/api/estates/{estate_id}/audit").json()
+    rerun_audit = [event for event in audit if event["event_type"] == "estate_rerun"]
+    assert any("logic change" in event["what"] for event in rerun_audit)
+    assert any(
+        detail.startswith("view:FACT.VW_ACTIVE_LOANS:") and "/ 6" in detail
+        for event in rerun_audit
+        for detail in event["details"]
+    )
+
+    # AI remediation proposals (deterministic offline) require a named approver.
+    unresolved = client.get(f"/api/estates/{estate_id}/unresolved").json()
+    assert unresolved["counts"]["total"] >= 40
+    assert unresolved["proposals"] == []
+    recommended = client.post(
+        f"/api/estates/{estate_id}/unresolved/recommend", json={"use_ai": False}
+    )
+    assert recommended.status_code == 200, recommended.text
+    state = recommended.json()
+    assert len(state["proposals"]) == state["counts"]["total"]
+    assert all(p["model_used"] == "deterministic" for p in state["proposals"])
+    assert all(p["status"] == "pending" for p in state["proposals"])
+    assert all("impact" in p for p in state["proposals"])
+    proposal = state["proposals"][0]
+    before_total = state["counts"]["total"]
+    before_ir = client.get(f"/api/estates/{estate_id}/ir").json()
+
+    weak = client.post(
+        f"/api/estates/{estate_id}/unresolved/decide",
+        json={"approver": "A", "decisions": [{"proposal_id": proposal["id"], "decision": "approved"}]},
+    )
+    assert weak.status_code == 400
+    decided = client.post(
+        f"/api/estates/{estate_id}/unresolved/decide",
+        json={"approver": "Alice", "decisions": [{"proposal_id": proposal["id"], "decision": "approved"}]},
+    )
+    assert decided.status_code == 200, decided.text
+    updated = next(p for p in decided.json()["proposals"] if p["id"] == proposal["id"])
+    assert updated["status"] == "approved"
+    assert updated["decided_by"] == "Alice"
+
+    # Approval is implemented end to end: unresolved count drops, the fix is
+    # persisted as an override, and the IR/graph/counts reflect it.
+    after_decide = decided.json()
+    assert after_decide["counts"]["total"] == before_total - 1
+    assert any(item["proposal_id"] == proposal["id"] for item in after_decide["applied"])
+    after_ir = client.get(f"/api/estates/{estate_id}/ir").json()
+    assert after_ir["unresolved_count"] <= before_ir["unresolved_count"]
+    ledger = client.get(f"/api/estates/{estate_id}/ledger").json()
+    assert any(event["event_type"] == "remediation_proposed" for event in ledger)
+    assert any(event["event_type"] == "remediation_decided" for event in ledger)
+    applied_events = [event for event in ledger if event["event_type"] == "remediation_applied"]
+    assert applied_events
+    assert applied_events[-1]["payload"]["applied_count"] >= 1
+
+    # An already-applied fix cannot be silently "rejected" (which would remove
+    # its override without recomputing lineage); it must be overridden instead.
+    cannot_reject = client.post(
+        f"/api/estates/{estate_id}/unresolved/decide",
+        json={"approver": "Alice", "decisions": [{"proposal_id": proposal["id"], "decision": "rejected"}]},
+    )
+    assert cannot_reject.status_code == 409
+
+    # Override path: a named human can supply a different existing target,
+    # which is applied instead of the recommendation.
+    pending = [p for p in after_decide["proposals"] if p["status"] == "pending"]
+    overridable = next(
+        (p for p in pending if p["action"] in ("define_ddl", "confirm_external", "correct_reference", "map_alias")),
+        None,
+    )
+    if overridable is not None:
+        target = next(
+            t["fqn"] for t in after_ir["tables"] if t["fqn"] != overridable["fqn"]
+        )
+        before_override_total = after_decide["counts"]["total"]
+        overridden = client.post(
+            f"/api/estates/{estate_id}/unresolved/decide",
+            json={
+                "approver": "Bob",
+                "decisions": [{
+                    "proposal_id": overridable["id"],
+                    "decision": "overridden",
+                    "override": {"target_fqn": target, "note": "mapped by reviewer"},
+                }],
+            },
+        )
+        assert overridden.status_code == 200, overridden.text
+        overridden_state = overridden.json()
+        changed = next(p for p in overridden_state["proposals"] if p["id"] == overridable["id"])
+        assert changed["status"] == "overridden"
+        assert overridden_state["counts"]["total"] == before_override_total - 1
+        assert any(
+            item["proposal_id"] == overridable["id"] and item["target_fqn"] == target
+            for item in overridden_state["applied"]
+        )
+
+    # Rejection is recorded but does not modify lineage.
+    pending = [p for p in overridden_state["proposals"] if p["status"] == "pending"] if overridable is not None else pending
+    if pending:
+        before_reject_total = overridden_state["counts"]["total"] if overridable is not None else after_decide["counts"]["total"]
+        rejected = client.post(
+            f"/api/estates/{estate_id}/unresolved/decide",
+            json={"approver": "Carol", "decisions": [{"proposal_id": pending[0]["id"], "decision": "rejected"}]},
+        )
+        assert rejected.status_code == 200, rejected.text
+        assert rejected.json()["counts"]["total"] == before_reject_total
+
+    # A re-run after applying lineage fixes diffs against the applied state, so
+    # the already-recorded fixes do not show up again as fresh drift.
+    steady = client.post(f"/api/estates/{estate_id}/rerun")
+    assert steady.status_code == 200, steady.text
+    assert steady.json()["changes"]["changed"] is False
+
+    verify = client.get(f"/api/estates/{estate_id}/ledger/verify").json()
+    assert verify["verified"] is True
+    app.dependency_overrides.pop(get_db, None)
